@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional, List
+from typing import Any, Dict, Optional
 
 import discord
 from discord import app_commands
@@ -119,26 +119,27 @@ def knight_embed(knight: Knight, user: discord.abc.User) -> discord.Embed:
 
     return e
 
+
 class StatSelect(discord.ui.Select):
-    def __init__(self, stat_name: str, builder: "KnightStatBuilderView"):
-        self.stat_name = stat_name
+    def __init__(self, builder: "KnightStatBuilderView"):
         self.builder = builder
 
         options = [
             discord.SelectOption(
-                label=str(i),
-                value=str(i),
-                description=f"Set {stat_name.title()} to {i}",
+                label=stat.title(),
+                value=stat,
+                description=f"Current value: {builder.stats[stat]}",
+                default=(stat == builder.selected_stat),
             )
-            for i in range(STAT_MIN, STAT_MAX + 1)
+            for stat in STATS
         ]
 
         super().__init__(
-            placeholder=f"{stat_name.title()}: {builder.stats[stat_name]}",
+            placeholder="Choose a stat to edit",
             min_values=1,
             max_values=1,
             options=options,
-            row=builder.stat_row(stat_name),
+            row=0,
         )
 
     async def callback(self, interaction: discord.Interaction):
@@ -148,100 +149,68 @@ class StatSelect(discord.ui.Select):
                 ephemeral=True,
             )
 
-        new_value = int(self.values[0])
-        old_value = self.builder.stats[self.stat_name]
-
-        new_total = self.builder.total_points() - old_value + new_value
-
-        if new_total > STAT_POOL:
-            remaining = STAT_POOL - (self.builder.total_points() - old_value)
-            return await interaction.response.send_message(
-                f"❌ You only have **{remaining}** point(s) available for **{self.stat_name.title()}**.",
-                ephemeral=True,
-            )
-
-        self.builder.stats[self.stat_name] = new_value
-
+        self.builder.selected_stat = str(self.values[0])
         await self.builder.refresh(interaction)
 
 
-class KnightStatBuilderView(discord.ui.View):
-    def __init__(self, user_id: int, name: str):
-        super().__init__(timeout=300)
+class ValueSelect(discord.ui.Select):
+    def __init__(self, builder: "KnightStatBuilderView"):
+        self.builder = builder
+        stat = builder.selected_stat
+        current_value = builder.stats[stat]
 
-        self.user_id = user_id
-        self.name = name
+        # Dynamic cap: the player can only pick values that keep the total at or below 20.
+        max_allowed = min(STAT_MAX, current_value + builder.remaining_points())
 
-        # Start each stat at 1, so the player has 14 spare points to distribute.
-        self.stats: Dict[str, int] = {stat: STAT_MIN for stat in STATS}
+        options = [
+            discord.SelectOption(
+                label=str(value),
+                value=str(value),
+                description=f"Set {stat.title()} to {value}",
+                default=(value == current_value),
+            )
+            for value in range(STAT_MIN, max_allowed + 1)
+        ]
 
-        for stat in STATS:
-            self.add_item(StatSelect(stat, self))
-
-    def stat_row(self, stat_name: str) -> int:
-        # Discord allows 5 rows max.
-        # We put 2 selects per row where possible.
-        index = list(STATS).index(stat_name)
-        return index // 2
-
-    def total_points(self) -> int:
-        return sum(self.stats.values())
-
-    def remaining_points(self) -> int:
-        return STAT_POOL - self.total_points()
-
-    def make_embed(self) -> discord.Embed:
-        total = self.total_points()
-        remaining = self.remaining_points()
-
-        e = discord.Embed(
-            title=f"Create Knight — {self.name}",
-            description=(
-                f"Choose your knight stats.\n\n"
-                f"**Points Used:** {total}/{STAT_POOL}\n"
-                f"**Points Remaining:** {remaining}"
-            ),
+        super().__init__(
+            placeholder=f"Set {stat.title()} value",
+            min_values=1,
+            max_values=1,
+            options=options,
+            row=1,
         )
 
-        stat_lines = []
-        for stat in STATS:
-            stat_lines.append(f"**{stat.title()}**: {self.stats[stat]}")
+    async def callback(self, interaction: discord.Interaction):
+        if interaction.user.id != self.builder.user_id:
+            return await interaction.response.send_message(
+                "❌ This stat builder is not yours.",
+                ephemeral=True,
+            )
 
-        e.add_field(name="Stats", value="\n".join(stat_lines), inline=False)
+        stat = self.builder.selected_stat
+        old_value = self.builder.stats[stat]
+        new_value = int(self.values[0])
+        new_total = self.builder.total_points() - old_value + new_value
 
-        if total == STAT_POOL:
-            e.set_footer(text="Ready. Press Create Knight.")
-        else:
-            e.set_footer(text="Spend exactly 20 points to create your knight.")
+        if new_total > STAT_POOL:
+            return await interaction.response.send_message(
+                f"❌ That would exceed the {STAT_POOL}-point limit.",
+                ephemeral=True,
+            )
 
-        return e
-
-    async def refresh(self, interaction: discord.Interaction):
-        self.clear_items()
-
-        for stat in STATS:
-            self.add_item(StatSelect(stat, self))
-
-        self.add_item(CreateKnightButton(self))
-
-        await interaction.response.edit_message(
-            embed=self.make_embed(),
-            view=self,
-        )
-
-    async def on_timeout(self):
-        for item in self.children:
-            item.disabled = True
+        self.builder.stats[stat] = new_value
+        await self.builder.refresh(interaction)
 
 
 class CreateKnightButton(discord.ui.Button):
-    def __init__(self, builder: KnightStatBuilderView):
+    def __init__(self, builder: "KnightStatBuilderView"):
         self.builder = builder
 
         super().__init__(
             label="Create Knight",
             style=discord.ButtonStyle.success,
-            row=4,
+            disabled=(builder.total_points() != STAT_POOL),
+            row=2,
         )
 
     async def callback(self, interaction: discord.Interaction):
@@ -253,8 +222,7 @@ class CreateKnightButton(discord.ui.Button):
 
         if self.builder.total_points() != STAT_POOL:
             return await interaction.response.send_message(
-                f"❌ You must spend exactly **{STAT_POOL}** points. "
-                f"You have used **{self.builder.total_points()}**.",
+                f"❌ You must spend exactly **{STAT_POOL}** points.",
                 ephemeral=True,
             )
 
@@ -275,14 +243,98 @@ class CreateKnightButton(discord.ui.Button):
         set_knight(db, knight)
         save_knights(db)
 
-        for item in self.builder.children:
-            item.disabled = True
-
         await interaction.response.edit_message(
             content="✅ Knight created.",
             embed=knight_embed(knight, interaction.user),
             view=None,
         )
+
+
+class ResetStatsButton(discord.ui.Button):
+    def __init__(self, builder: "KnightStatBuilderView"):
+        self.builder = builder
+
+        super().__init__(
+            label="Reset Stats",
+            style=discord.ButtonStyle.secondary,
+            row=2,
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        if interaction.user.id != self.builder.user_id:
+            return await interaction.response.send_message(
+                "❌ This stat builder is not yours.",
+                ephemeral=True,
+            )
+
+        self.builder.stats = {stat: STAT_MIN for stat in STATS}
+        self.builder.selected_stat = STATS[0]
+        await self.builder.refresh(interaction)
+
+
+class KnightStatBuilderView(discord.ui.View):
+    def __init__(self, user_id: int, name: str):
+        super().__init__(timeout=300)
+
+        self.user_id = user_id
+        self.name = name
+        self.stats: Dict[str, int] = {stat: STAT_MIN for stat in STATS}
+        self.selected_stat = STATS[0]
+
+        self.rebuild_items()
+
+    def rebuild_items(self) -> None:
+        self.clear_items()
+        self.add_item(StatSelect(self))
+        self.add_item(ValueSelect(self))
+        self.add_item(CreateKnightButton(self))
+        self.add_item(ResetStatsButton(self))
+
+    def total_points(self) -> int:
+        return sum(self.stats.values())
+
+    def remaining_points(self) -> int:
+        return STAT_POOL - self.total_points()
+
+    def make_embed(self) -> discord.Embed:
+        total = self.total_points()
+        remaining = self.remaining_points()
+
+        e = discord.Embed(
+            title=f"Create Knight — {self.name}",
+            description=(
+                "Use the first dropdown to choose a stat, then the second dropdown to set its value.\n\n"
+                f"**Points Used:** {total}/{STAT_POOL}\n"
+                f"**Points Remaining:** {remaining}\n"
+                f"**Editing:** {self.selected_stat.title()}"
+            ),
+        )
+
+        stat_lines = []
+        for stat in STATS:
+            marker = "⬅️" if stat == self.selected_stat else ""
+            stat_lines.append(f"**{stat.title()}**: {self.stats[stat]} {marker}")
+
+        e.add_field(name="Stats", value="\n".join(stat_lines), inline=False)
+
+        if total == STAT_POOL:
+            e.set_footer(text="Ready. Press Create Knight.")
+        else:
+            e.set_footer(text="Spend exactly 20 points to enable Create Knight.")
+
+        return e
+
+    async def refresh(self, interaction: discord.Interaction) -> None:
+        self.rebuild_items()
+        await interaction.response.edit_message(
+            embed=self.make_embed(),
+            view=self,
+        )
+
+    async def on_timeout(self) -> None:
+        for item in self.children:
+            item.disabled = True
+
 
 class KnightCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
@@ -316,22 +368,7 @@ class KnightCog(commands.Cog):
             name=name,
         )
 
-        view.add_item(CreateKnightButton(view))
-
         await interaction.response.send_message(
-            embed=view.make_embed(),
-            view=view,
-            ephemeral=True,
-        )
-
-        view = KnightStatBuilderView(
-            user_id=interaction.user.id,
-            name=name,
-        )
-
-        view.add_item(CreateKnightButton(view))
-
-        await interaction.followup.send(
             embed=view.make_embed(),
             view=view,
             ephemeral=True,
