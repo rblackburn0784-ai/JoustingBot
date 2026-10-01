@@ -1,22 +1,22 @@
 # JoustingBot
 
-A medieval jousting Discord bot built with `discord.py`.
+A lightweight medieval jousting Discord game bot built with `discord.py`.
 
-This is a lightweight game-style bot where Discord users can create knights, create and bind horses, equip both rider and horse, choose an arena, and run single joust matches.
+Players create a knight, build and bind a horse, equip both rider and horse, choose an arena, and run single-match jousts against other Discord users.
 
-The current version is intentionally simple: **no tournaments, no ladders, no injuries, no replay system**. It is a clean base for expanding later.
+This version is a clean MVP base: **main menu, knight builder, horse builder, equipment, arenas, and single duels**. It does not currently include tournaments, ladders, injuries, economy, or replay logs.
 
 ---
 
 ## Features
 
-- Create a knight with balanced stat allocation
-- Interactive knight stat builder using Discord dropdowns
-- Create horses with their own stats
+- Interactive `/menu` with button-based help pages
+- Create a knight with a private dropdown stat builder
+- Create a horse with a private dropdown stat builder
 - Bind a horse to your knight
 - Equip knight lances and armour
 - Equip horse barding
-- View available arenas
+- View available arenas and arena modifiers
 - Run single joust matches against another Discord user
 - Equipment has positive and negative traits for balance
 - Arenas affect charge, alignment, slip risk, panic risk, and impact
@@ -26,9 +26,9 @@ The current version is intentionally simple: **no tournaments, no ladders, no in
 
 ## Current gameplay loop
 
-1. Create your knight.
-2. Assign knight stats using the private stat builder.
-3. Create a horse.
+1. Open the main menu.
+2. Create your knight.
+3. Create your horse.
 4. Bind the horse to your knight.
 5. Equip your knight and horse.
 6. Pick an arena.
@@ -37,8 +37,9 @@ The current version is intentionally simple: **no tournaments, no ladders, no in
 Example:
 
 ```text
+/menu
 /knight create name: Sir Raymond
-/horse create name: Biscuit breed: Destrier speed: 5 stamina: 5 power: 5 obedience: 4 courage: 5
+/horse create name: Biscuit breed: Destrier
 /horse list
 /horse bind horse_id: h-123456-biscuit-1234567890
 /equip list
@@ -103,9 +104,10 @@ JoustingBot/
 ├── cogs/
 │   ├── arena.py        # /arena commands
 │   ├── equipment.py    # /equip commands
-│   ├── horse.py        # /horse commands
+│   ├── horse.py        # /horse commands and horse stat builder UI
 │   ├── joust.py        # /joust duel command
-│   └── knight.py       # /knight commands and stat builder UI
+│   ├── knight.py       # /knight commands and knight stat builder UI
+│   └── menu.py         # /menu and /help_joust interactive main menu
 │
 ├── services/
 │   ├── arenas.py       # Arena definitions and modifiers
@@ -123,13 +125,32 @@ JoustingBot/
 
 ## Commands
 
+### Main menu
+
+#### `/menu`
+
+Opens the main Jousting Bot menu with buttons for:
+
+- Getting Started
+- Knight
+- Horse
+- Equipment
+- Arenas
+- Duel
+
+#### `/help_joust`
+
+Alias-style help command that opens the same interactive menu.
+
+---
+
 ### Knight commands
 
 #### `/knight create name:<name>`
 
 Creates a new knight using an interactive private stat builder.
 
-The stat builder starts each stat at 1 and gives the player 20 total points to spend.
+The builder starts each stat at 1 and gives the player **20 total points** to spend.
 
 Knight stats:
 
@@ -144,7 +165,7 @@ Rules:
 
 - Total points must equal 20.
 - Each stat must stay between 1 and 8.
-- The `Create Knight` button only completes creation once the total is valid.
+- The `Create Knight` button only enables once the total is valid.
 
 #### `/knight view`
 
@@ -158,9 +179,11 @@ Deletes your knight.
 
 ### Horse commands
 
-#### `/horse create`
+#### `/horse create name:<name> breed:<breed>`
 
-Creates a horse.
+Creates a new horse using an interactive private stat builder.
+
+The builder starts each stat at 1 and gives the player **24 total points** to spend.
 
 Horse stats:
 
@@ -173,13 +196,8 @@ Horse stats:
 Rules:
 
 - Total horse stat points must equal 24.
-- Each horse stat must be between 1 and 10.
-
-Example:
-
-```text
-/horse create name: Biscuit breed: Destrier speed: 5 stamina: 5 power: 5 obedience: 4 courage: 5
-```
+- Each horse stat must stay between 1 and 10.
+- The `Create Horse` button only enables once the total is valid.
 
 #### `/horse list`
 
@@ -197,7 +215,7 @@ A knight needs a bound horse before jousting.
 
 #### `/horse delete horse_id:<id>`
 
-Deletes one of your horses.
+Deletes one of your horses. If that horse was bound to your knight, the knight is unbound.
 
 ---
 
@@ -241,7 +259,7 @@ Lists all available arenas.
 
 #### `/arena view arena_key:<key>`
 
-Shows arena modifiers.
+Shows one arena and its modifiers.
 
 Current arenas:
 
@@ -258,7 +276,13 @@ Current arenas:
 
 #### `/joust duel opponent:<member> arena_key:<arena>`
 
-Runs a single joust match against another player.
+Runs a single joust match.
+
+Requirements:
+
+- Both players must have a knight.
+- Both players must have a bound horse.
+- The arena key must be valid.
 
 Example:
 
@@ -266,48 +290,38 @@ Example:
 /joust duel opponent: @Opponent arena_key: frozen_ground
 ```
 
-Both players need:
-
-- A knight
-- A horse
-- A bound horse
-
-The match runs up to 5 passes and ends early if a rider reaches 3 points.
-
 ---
 
-## Knight stats
+## Stats overview
 
-| Stat | Purpose |
+### Knight stats
+
+| Stat | Main role |
 |---|---|
-| Strength | Adds force to charge and impact |
-| Control | Helps alignment and accuracy |
-| Endurance | Useful for heavier armour and future systems |
-| Agility | Represents balance and responsiveness |
-| Resolve | Represents nerve under pressure |
-| Tactics | Reserved for future expansion |
+| Strength | Adds power to charge impact |
+| Control | Helps alignment and lance control |
+| Endurance | Used by armour/equipment balance and future expansion |
+| Agility | Used by armour/equipment balance and future expansion |
+| Resolve | Future expansion / flavour support |
+| Tactics | Future expansion / flavour support |
 
----
+### Horse stats
 
-## Horse stats
-
-| Stat | Purpose |
+| Stat | Main role |
 |---|---|
-| Speed | Adds to charge power |
-| Stamina | Helps reduce slip risk |
-| Power | Adds to charge power |
-| Obedience | Helps alignment and behaviour checks |
-| Courage | Helps resist panic, bolting, and refusal |
+| Speed | Adds to charge force |
+| Stamina | Helps avoid slipping |
+| Power | Adds to charge force |
+| Obedience | Helps alignment and prevents refusal/slip |
+| Courage | Helps prevent refusal/bolting |
 
 ---
 
 ## Equipment balance
 
-Equipment is not meant to be pure upgrades. Most items trade one advantage for one weakness.
-
 ### Lances
 
-| Key | Item | Strength | Weakness |
+| Key | Item | Positive | Negative |
 |---|---|---|---|
 | `lance_ash` | Ash Lance | Balanced | None |
 | `lance_heavy` | Heavy War Lance | Higher impact | Worse aim/control |
@@ -316,72 +330,69 @@ Equipment is not meant to be pure upgrades. Most items trade one advantage for o
 
 ### Armour
 
-| Key | Item | Strength | Weakness |
+| Key | Item | Positive | Negative |
 |---|---|---|---|
 | `armour_mail` | Tournament Mail | Balanced | None |
 | `armour_light` | Light Plate | Better agility/aim | Easier to unhorse |
 | `armour_full` | Full Plate | Harder to unhorse | Worse agility/control |
-| `armour_reinforced_helm` | Reinforced Helm | Better resolve/resistance | Worse vision/aim |
+| `armour_reinforced_helm` | Reinforced Helm | Better resolve/resistance | Worse control/vision |
 
 ### Barding
 
-| Key | Item | Strength | Weakness |
+| Key | Item | Positive | Negative |
 |---|---|---|---|
-| `barding_none` | No Barding | No penalties | No protection |
-| `barding_leather` | Leather Barding | Calmer horse | Minimal downside |
+| `barding_none` | No Barding | No restrictions | No protection |
+| `barding_leather` | Leather Barding | Calmer/braver horse | Minimal downside |
 | `barding_steel` | Steel Barding | Braver horse | Slower, more slip risk |
 | `barding_spiked` | Spiked Barding | More aggressive charge | Less obedience, more slip risk |
 
 ---
 
-## Arenas
+## Arena effects
 
-Arenas modify the joust without requiring a tournament system.
+Arenas can modify:
 
-| Key | Arena | Gameplay effect |
-|---|---|---|
-| `royal_lists` | Royal Lists | Balanced default field |
-| `muddy_field` | Muddy Field | Worse charge and alignment, higher slip risk |
-| `frozen_ground` | Frozen Ground | Harder impacts, high slip risk |
-| `wind_swept` | Wind-Swept Field | Worse alignment, slight panic pressure |
-| `festival_arena` | Festival Arena | Crowd pressure and distraction |
-| `war_torn` | War-Torn Battlefield | Chaotic, unstable, harder-hitting field |
+- Alignment
+- Charge
+- Slip risk
+- Panic/refusal risk
+- Impact multiplier
+
+Use:
+
+```text
+/arena view arena_key:<key>
+```
+
+to inspect exact modifiers in Discord.
 
 ---
 
 ## Match scoring
 
-Each joust pass compares alignment, charge, equipment, horse behaviour, and arena modifiers.
+Each match runs up to 5 passes.
 
-Possible outcomes:
+General scoring:
 
-| Outcome | Points |
-|---|---:|
-| Glancing clash | 0 |
-| Lance break | 1 |
-| Solid hit | 2 |
-| Unhorsed | 3 |
-| Horse refused while opponent charges | Opponent gains 1 |
-
-The match ends when:
-
-- One player reaches 3 points, or
-- 5 passes have been completed
+- Lance break: 1 point
+- Solid hit: 2 points
+- Unhorsed: 3 points
+- Horse refusal can award 1 point to the opponent
+- First to 3 points can end the match early
+- Otherwise, highest score after 5 passes wins
 
 ---
 
-## Local storage
+## Storage
 
-The bot stores data in local JSON files under `storage/`.
-
-Typical runtime files:
+The bot uses local JSON files created at runtime:
 
 ```text
 storage/knights.json
 storage/horses.json
 ```
 
-These files are ignored by Git so local test data does not get committed.
+These files are ignored by Git and should remain local.
 
 ---
 
@@ -389,80 +400,63 @@ These files are ignored by Git so local test data does not get committed.
 
 ### `RuntimeError: Missing DISCORD_BOT_TOKEN in .env`
 
-Create a `.env` file beside `main.py`:
+Make sure `.env` exists beside `main.py` and contains:
 
 ```env
 DISCORD_BOT_TOKEN=your_bot_token_here
 ```
 
-Make sure it is named `.env`, not `.env.txt`.
-
-### Slash commands are not showing
+### Slash commands do not appear
 
 Try:
 
 1. Stop the bot.
-2. Start it again.
+2. Restart the bot.
 3. Restart Discord.
-4. Wait a short while for global slash command sync.
+4. Wait a short while for command sync.
 
-### `/knight create` says the bot is thinking forever
+### `/horse create` or `/knight create` does not finish
 
-This usually means an exception happened during the interaction.
+Make sure you spend exactly the required points:
 
-Check the PyCharm or terminal console for the real error.
+- Knight: 20 points
+- Horse: 24 points
 
-The current version uses a safer two-dropdown stat builder to avoid Discord component layout problems.
+The create button stays disabled until the total is correct.
 
-### Import errors involving `services.arenas`
+### Unknown arena or item key
 
-Make sure `services/arenas.py` contains the `ARENAS` dictionary and does not import itself.
+Use:
 
-Correct import style:
-
-```python
-from services.arenas import ARENAS, get_arena
+```text
+/arena list
+/equip list
 ```
 
-Wrong import style:
-
-```python
-from services.arenas import arenas
-```
-
-### Do not run cog files directly
-
-Do not run:
-
-```bash
-python cogs/joust.py
-```
-
-Run the bot from:
-
-```bash
-python main.py
-```
+to see valid keys.
 
 ---
 
-## Development notes
+## Current scope
 
-This bot is currently a simplified base. Good future additions would be:
+Included:
 
-- Duel confirmation buttons
-- Public challenge/accept flow
-- Tournament mode
+- Main menu
+- Knight builder
+- Horse builder
+- Horse binding
+- Equipment
+- Arenas
+- Single duels
+
+Not currently included:
+
+- Tournaments
 - Ranked ladder
-- Match logs and replay
-- Injuries and healing
-- Knight XP and levelling
-- Horse bond XP
-- Better embeds and flavour commentary
-- Arena images or GIF highlights
+- Injuries
+- Economy/gold
+- XP/levelling
+- Match replay logs
+- Persistent leaderboards
 
----
-
-## License
-
-No license has been set yet.
+These can be added later once the core loop is stable.
