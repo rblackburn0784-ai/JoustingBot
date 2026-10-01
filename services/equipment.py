@@ -21,6 +21,8 @@ class EquipmentItem:
     charge_mod: int = 0
     impact_mult: float = 1.0
 
+    # In combat.py, higher panic_mod helps the horse resist refusal/bolting.
+    # Arena panic is applied separately as a penalty.
     slip_mod: int = 0
     panic_mod: int = 0
     unhorse_resist: int = 0
@@ -157,7 +159,7 @@ add_item(
         slot="barding",
         description="Light protection. Keeps the horse calmer with little speed cost.",
         horse_stat_mods={"courage": 1},
-        panic_mod=-1,
+        panic_mod=1,
     )
 )
 
@@ -168,7 +170,7 @@ add_item(
         slot="barding",
         description="Heavy protection and confidence, but slows the horse.",
         horse_stat_mods={"courage": 2, "speed": -1},
-        panic_mod=-2,
+        panic_mod=2,
         slip_mod=1,
         charge_mod=-1,
     )
@@ -181,7 +183,7 @@ add_item(
         slot="barding",
         description="Intimidating and bold, but more awkward under pressure.",
         horse_stat_mods={"courage": 1, "obedience": -1},
-        panic_mod=-1,
+        panic_mod=1,
         slip_mod=1,
         charge_mod=1,
     )
