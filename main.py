@@ -20,6 +20,7 @@ class JoustBot(commands.Bot):
         super().__init__(command_prefix="!", intents=INTENTS)
 
     async def setup_hook(self):
+        await self.load_extension("cogs.menu")
         await self.load_extension("cogs.knight")
         await self.load_extension("cogs.horse")
         await self.load_extension("cogs.equipment")
