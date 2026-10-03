@@ -2,9 +2,11 @@
 
 A lightweight medieval jousting Discord game bot built with `discord.py`.
 
-Players create a knight, build and bind a horse, equip both rider and horse, choose an arena, and run single-match jousts against other Discord users.
+**Current version:** `v0.3 — Match Presentation Update`
 
-This version is a clean MVP base: **main menu, knight builder, horse builder, equipment, arenas, and single duels**. It does not currently include tournaments, ladders, injuries, economy, or replay logs.
+Players create a knight, build and bind a horse, equip both rider and horse, choose an arena, and run cinematic single-match jousts against other Discord users.
+
+This version is a clean MVP base with presentation polish: **main menu, knight builder, horse builder, equipment, arenas, cinematic duel intro embeds, dramatic pass-by-pass results, and single duels**. It does not currently include tournaments, ladders, injuries, economy, or replay logs.
 
 ---
 
@@ -17,7 +19,11 @@ This version is a clean MVP base: **main menu, knight builder, horse builder, eq
 - Equip knight lances and armour
 - Equip horse barding
 - View available arenas and arena modifiers
-- Run single joust matches against another Discord user
+- Run cinematic single joust matches against another Discord user
+- Duel intro embed with rider, horse, gear, and arena flavour
+- Dramatic pass-by-pass match chronicle
+- Final result summary embed
+- GIF/image placeholder support in `cogs/joust.py`
 - Equipment has positive and negative traits for balance
 - Arenas affect charge, alignment, slip risk, panic risk, and impact
 - JSON-based local storage
@@ -33,6 +39,7 @@ This version is a clean MVP base: **main menu, knight builder, horse builder, eq
 5. Equip your knight and horse.
 6. Pick an arena.
 7. Challenge another player to a joust.
+8. Watch the intro and final match presentation.
 
 Example:
 
@@ -105,7 +112,7 @@ JoustingBot/
 │   ├── arena.py        # /arena commands
 │   ├── equipment.py    # /equip commands
 │   ├── horse.py        # /horse commands and horse stat builder UI
-│   ├── joust.py        # /joust duel command
+│   ├── joust.py        # /joust duel command and v0.3 presentation embeds
 │   ├── knight.py       # /knight commands and knight stat builder UI
 │   └── menu.py         # /menu and /help_joust interactive main menu
 │
@@ -116,6 +123,7 @@ JoustingBot/
 │   └── storage.py      # JSON load/save helpers
 │
 ├── storage/            # Local JSON save files, created at runtime
+├── CHANGELOG.md
 ├── .gitignore
 ├── main.py
 └── README.md
@@ -276,7 +284,12 @@ Current arenas:
 
 #### `/joust duel opponent:<member> arena_key:<arena>`
 
-Runs a single joust match.
+Runs a cinematic single joust match.
+
+The command now sends:
+
+1. A duel intro embed with both riders, horses, gear, and arena flavour.
+2. A final result embed with score, pass-by-pass commentary, and match summary.
 
 Requirements:
 
@@ -289,6 +302,28 @@ Example:
 ```text
 /joust duel opponent: @Opponent arena_key: frozen_ground
 ```
+
+---
+
+## v0.3 GIF placeholders
+
+`cogs/joust.py` contains a `GIF_PLACEHOLDERS` dictionary:
+
+```python
+GIF_PLACEHOLDERS = {
+    "intro": "",
+    "lance_break": "",
+    "solid_hit": "",
+    "unhorsed": "",
+    "miss": "",
+    "draw": "",
+    "victory": "",
+}
+```
+
+Add hosted GIF/image URLs there later and the duel embeds will automatically use them.
+
+Leaving them blank is safe. The bot simply omits images.
 
 ---
 
@@ -447,6 +482,8 @@ Included:
 - Horse binding
 - Equipment
 - Arenas
+- Cinematic duel intro
+- Dramatic pass-by-pass match presentation
 - Single duels
 
 Not currently included:
