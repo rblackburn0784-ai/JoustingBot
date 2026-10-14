@@ -17,12 +17,12 @@ def main_menu_embed() -> discord.Embed:
             "4. `/equip list`\n"
             "5. `/arena list`\n"
             "6. `/joust challenge`\n"
-            "7. `/profile`"
+            "7. `/profile`\n"\n            "8. `/leaderboard wins`\n"\n            "9. `/titles`"
         ),
     )
     e.add_field(
         name="Core Systems",
-        value="⚔️ Knights\n🐴 Horses\n🛡️ Equipment\n🏟️ Arenas\n🎯 Challenges\n📜 Profiles & History",
+        value="⚔️ Knights\n🐴 Horses\n🛡️ Equipment\n🏟️ Arenas\n🎯 Challenges\n📜 Profiles & History\n🏆 Leaderboards\n🏅 Titles",
         inline=False,
     )
     e.set_footer(text="Use the buttons below for command help.")
@@ -178,6 +178,39 @@ def profile_help_embed() -> discord.Embed:
     return e
 
 
+
+def leaderboard_help_embed() -> discord.Embed:
+    e = discord.Embed(
+        title="🏆 Server Leaderboards",
+        description="Compete against other knights in this server. Rankings start from v0.7 because earlier matches have no server ID.",
+    )
+    e.add_field(name="Knight rankings", value=(
+        "/leaderboard wins\n/leaderboard winrate\n/leaderboard unhorsings\n"
+        "/leaderboard lancebreaks\n/leaderboard jousts\n/leaderboard arena"
+    ), inline=False)
+    e.add_field(name="Horse rankings", value=(
+        "/leaderboard reliable_horse\n/leaderboard chaotic_horse"
+    ), inline=False)
+    return e
+
+
+def titles_help_embed() -> discord.Embed:
+    e = discord.Embed(
+        title="🏅 Earned Titles",
+        description="Win jousts, break lances and perform in different arenas to unlock titles.",
+    )
+    e.add_field(name="Commands", value=(
+        "/titles — view unlocked titles and progress\n"
+        "/title equip — equip an earned title\n"
+        "/title unequip — remove your title"
+    ), inline=False)
+    e.add_field(name="Available titles", value=(
+        "The Unhorsed · Shield Splitter · Mud King\n"
+        "Frozen Terror · Crowd Favourite · The Reluctant Rider"
+    ), inline=False)
+    return e
+
+
 class MainMenuView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=300)
@@ -209,6 +242,14 @@ class MainMenuView(discord.ui.View):
     @discord.ui.button(label="Profile", emoji="📜", style=discord.ButtonStyle.secondary, row=2)
     async def profile(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.edit_message(embed=profile_help_embed(), view=self)
+
+    @discord.ui.button(label="Leaderboards", emoji="🏆", style=discord.ButtonStyle.secondary, row=2)
+    async def leaderboards(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.edit_message(embed=leaderboard_help_embed(), view=self)
+
+    @discord.ui.button(label="Titles", emoji="🏅", style=discord.ButtonStyle.secondary, row=2)
+    async def titles(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.edit_message(embed=titles_help_embed(), view=self)
 
     @discord.ui.button(label="Home", emoji="🏰", style=discord.ButtonStyle.success, row=3)
     async def home(self, interaction: discord.Interaction, button: discord.ui.Button):
