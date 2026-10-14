@@ -2,11 +2,59 @@
 
 A lightweight medieval jousting Discord game bot built with `discord.py`.
 
-**Current version:** `v0.7 — Leaderboards & Titles`
+**Current version:** `v0.7.1 — Titles & Interactive UI`
 
 Players create a knight, build and bind a horse, equip both rider and horse, choose an arena, and challenge other Discord users to cinematic jousts with accept/decline buttons.
 
 This version focuses on making matches feel more like a sport: richer pass categories, arena-specific lines, gear-specific lines, seed display, debug roll breakdowns, and tunable balance constants.
+
+---
+
+## v0.7.1 — Titles & Interactive Game Hub
+
+**12 new earnable titles** bring the total to **18**. All are unlocked automatically from accepted-challenge match history in the current Discord server. They give **no combat advantages**.
+
+| New title | Requirement |
+| --- | --- |
+| First Lance | Win your first accepted joust |
+| Iron Will | Win 10 jousts |
+| Grand Champion | Win 25 jousts |
+| Veteran of the Lists | Complete 25 jousts |
+| Saddlebreaker | Unhorse opponents 10 times |
+| Timberstorm | Break 15 lances |
+| Royal Standard | Win 3 jousts at Royal Lists |
+| Gale Rider | Win 3 jousts at Wind-Swept Field |
+| Festival Hero | Win 3 jousts at Festival Arena |
+| Battle Hardened | Win 3 jousts at War-Torn Battlefield |
+| Honour Bound | Finish 3 jousts in draws |
+| Steady in the Saddle | Complete 10 clean jousts without horse slip/refusal |
+
+### Main menu and navigation
+
+The `/menu` and `/help_joust` commands now open a **functional game dashboard**, not just command instructions. Every hub page has a **Main Menu** button.
+
+- **Getting Started:** guided game flow.
+- **Knight:** Create (modal + point allocation), view, career stats, delete confirmation.
+- **Horse:** Create (modal + point allocation), browse/select horses, view, stats, bind, delete confirmation; stable pages for larger collections.
+- **Equipment:** browse lances, armour and barding, then equip using Discord dropdowns and buttons.
+- **Arenas:** browse modifiers, pick a random arena, or start a challenge for that arena.
+- **Challenge:** select another Discord member and an arena, then post a public challenge with Accept/Decline buttons; instant test duels are separate.
+- **Profile:** browse another member's profile, your stats and recent history.
+- **Leaderboards:** switch between eight server rankings with a dropdown.
+- **Titles:** browse three pages of six titles with progress, choose and equip an earned title, or unequip it.
+- **Admin:** restricted menu with System Health, Server Summary, Backup Data and Instant Test Duel.
+
+The `/titles` slash command also opens the new title browser. Duel challenge/result messages have a **Main Menu** button that opens a private dashboard for the person who clicks.
+
+### Admin permissions
+
+The **Admin** entry is displayed only to members with **Manage Server** permission. `/admin` is hidden from ordinary users where supported by Discord permissions, and the bot **checks permission again for every admin button**. Instant `/joust duel` testing is now also restricted to admins; normal gameplay uses `/joust challenge`.
+
+The backup button writes timestamped JSON snapshots to `backups/` on the host machine, which Git ignores. These are *local* files, not off-host backups.
+
+### Compatibility
+
+No reset or migration is required for existing knight, horse, match or title JSON. The original six titles and their keys are preserved. The 12 new titles use the same server-specific accepted-joust rules, and existing eligible records can count toward them.
 
 ---
 
