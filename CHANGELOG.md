@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.6 — Profiles, Records & History
+
+- Added append-only completed match journal in `storage/matches.json` with unique match IDs, participants, horse identities, arena, seed, scores and outcomes.
+- Added `/profile [player]`, `/knight stats`, `/horse stats horse_id:<id>`.
+- Track knight wins, losses, draws, jousts, unhorsings caused/taken and lance breaks.
+- Track horse jousts, refusals, slips and wins with rider.
+- Display last five completed matches.
+- Declines and timeouts do not create results; instant duels do.
+- Career totals are derived from saved match history. Matches before v0.6 are not automatically backfilled.
+
+---
+
 ## v0.5 — Match Engine Polish
 
 Combat readability and tuning update. This version makes jousts feel more like a sport while keeping the existing command flow.
