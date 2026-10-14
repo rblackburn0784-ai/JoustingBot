@@ -208,6 +208,12 @@ class KnightPage(OwnedView):
 
     async def view(self, interaction):
         knight = get_knight(load_knights(), interaction.user.id)
+        if knight:
+            from services.progression import loadout
+            knight.equipped_lance_key = loadout(interaction.guild_id, interaction.user.id,
+                                                  "lance", knight.equipped_lance_key)
+            knight.equipped_armour_key = loadout(interaction.guild_id, interaction.user.id,
+                                                   "armour", knight.equipped_armour_key)
         await interaction.response.edit_message(
             embed=knight_embed(knight, interaction.user) if knight else self.make_embed(), view=self)
 
@@ -290,13 +296,21 @@ class StableView(OwnedView):
 
     def make_embed(self):
         h = self.horse()
-        detail = (f"**{h.name}** ({h.breed})\nBarding: {h.equipped_barding_key}\nID: `{h.horse_id}`"
-                  if h else "No horse on this page.")
+        if h:
+            from services.progression import loadout
+            current_barding = loadout(None, self.owner_id, "barding", h.equipped_barding_key)
+            detail = f"**{h.name}** ({h.breed})\nBarding: {current_barding}\nID: `{h.horse_id}`"
+        else:
+            detail = "No horse on this page."
         return embed("🐎 Stable Management", f"{detail}\n\nPage {self.page + 1} of "
                      f"{max(1, (len(self.raws) + self.PAGE_SIZE - 1) // self.PAGE_SIZE)}")
 
     async def show(self, interaction):
         h = self.horse()
+        if h:
+            from services.progression import loadout
+            h.equipped_barding_key = loadout(interaction.guild_id, interaction.user.id,
+                                                "barding", h.equipped_barding_key, h.horse_id)
         await interaction.response.edit_message(embed=horse_embed(h, interaction.user) if h else self.make_embed(), view=self)
 
     async def stats(self, interaction):
@@ -374,7 +388,7 @@ class EquipmentPage(OwnedView):
             raw = load_horses().get("horses", {}).get(knight.bound_horse_id)
             if raw and raw.get("owner_id") == self.owner_id:
                 description += (
-                    f"\n**Barding:** {loadout(self.guild_id, self.owner_id, 'barding', raw.get('equipped_barding_key'))}"
+                    f"\n**Barding:** {loadout(self.guild_id, self.owner_id, 'barding', raw.get('equipped_barding_key'), knight.bound_horse_id)}"
                 )
         else:
             description = "Create a knight before equipping."
@@ -444,7 +458,8 @@ class EquipmentPicker(OwnedView):
             if horse is None or horse.get("owner_id") != interaction.user.id:
                 return await interaction.response.send_message("❌ Bind a horse you own first.", ephemeral=True)
         try:
-            set_loadout(interaction.guild_id, interaction.user.id, self.slot, self.selected)
+            set_loadout(interaction.guild_id, interaction.user.id, self.slot, self.selected,
+                        horse_id=knight.get("bound_horse_id") if self.slot == "barding" else None)
         except ValueError as exc:
             return await interaction.response.send_message(f"🔒 {exc}", ephemeral=True)
         await navigate(interaction, EquipmentPicker(interaction.user.id, self.slot,
