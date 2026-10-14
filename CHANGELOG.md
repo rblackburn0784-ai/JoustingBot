@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.7.1 — Titles & Interactive UI
+
+- Added 12 new earned titles (18 total), preserving the original six and existing title selections.
+- Replaced help-only main menu with functional player navigation and Home buttons.
+- Knight/horse creation modals plus stat builders with Home navigation, stable browser and binding, gear selection, arena selection and button-driven challenge creation.
+- Added profile browsing, leaderboard selection and paginated title unlock/equip/unequip UI.
+- Added restricted /admin dashboard with server health, snapshot backups, server totals and instant test duel.
+- Restricted instant /joust duel to Manage Server permission, while regular accepted challenges remain open to players.
+- Added private Main Menu entrypoints on public challenge/result messages.
+- Extended UI navigation/admin permission smoke tests and ignored local backups directory.
+
+---
+
+
 ## v0.7 — Leaderboards & Titles
 
 - Added eight server-scoped boards: wins, win rate, unhorsings, lance breaks, jousts, reliable horses, chaotic horses and arena specialists.
