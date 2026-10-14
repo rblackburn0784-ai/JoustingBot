@@ -97,6 +97,7 @@ class PreparedDuel:
     fighter_b: Fighter
     seed: Optional[int] = None
     debug_requested: bool = False
+    guild_id: Optional[int] = None
 
 
 def equipment_name(key: Optional[str]) -> str:
@@ -460,6 +461,7 @@ class JoustCog(commands.Cog):
         arena_key: str,
         seed: Optional[int] = None,
         debug_requested: bool = False,
+        guild_id: Optional[int] = None,
     ) -> tuple[Optional[str], Optional[PreparedDuel]]:
         if opponent.id == challenger.id:
             return "❌ You cannot joust yourself.", None
@@ -530,6 +532,7 @@ class JoustCog(commands.Cog):
             fighter_b=fighter_b,
             seed=seed,
             debug_requested=debug_requested,
+            guild_id=guild_id,
         )
 
     async def send_match(self, sender, prepared: PreparedDuel) -> MatchResult:
@@ -539,7 +542,7 @@ class JoustCog(commands.Cog):
         result = run_single_match(prepared.fighter_a, prepared.fighter_b, prepared.arena_key, seed=prepared.seed)
         result_embed = make_result_embed(result, prepared.arena_key)
         match_id = record_match(prepared, result)
-        result_embed.add_field(name="📜 Match ID", value=`${match_id}`, inline=False)
+        result_embed.add_field(name="📜 Match ID", value=f"`{match_id}`", inline=False)
         await sender.send(embed=result_embed)
         return result
 
@@ -561,6 +564,7 @@ class JoustCog(commands.Cog):
             arena_key=arena_key,
             seed=seed,
             debug_requested=debug_allowed,
+            guild_id=interaction.guild_id,
         )
 
         if error or not prepared:
@@ -595,6 +599,7 @@ class JoustCog(commands.Cog):
             arena_key=arena_key,
             seed=seed,
             debug_requested=debug_allowed,
+            guild_id=interaction.guild_id,
         )
 
         if error or not prepared:
