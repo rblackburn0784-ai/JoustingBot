@@ -2,11 +2,73 @@
 
 A lightweight medieval jousting Discord game bot built with `discord.py`.
 
-**Current version:** `v0.7.1 — Titles & Interactive UI`
+**Current version:** `v0.8 — Equipment Progression & Unlocks`
 
 Players create a knight, build and bind a horse, equip both rider and horse, choose an arena, and challenge other Discord users to cinematic jousts with accept/decline buttons.
 
 This version focuses on making matches feel more like a sport: richer pass categories, arena-specific lines, gear-specific lines, seed display, debug roll breakdowns, and tunable balance constants.
+
+---
+
+## v0.8 — Equipment Progression & Unlocks
+
+The v0.8 release introduces a **guild-specific equipment economy** and unlockable sidegrades. The original twelve pieces of equipment are still free and usable without migration. New equipment is deliberately designed as a *sidegrade*, with an advantage and a meaningful drawback.
+
+### Gold and prestige
+
+Only **completed, accepted** `/joust challenge` matches in the current server earn gold, prestige and unlock progress. Instant admin test duels do **not** earn rewards.
+
+| Outcome | Gold earned |
+| --- | ---: |
+| Participate in an accepted joust | +12 |
+| Win (additional bonus) | +8 |
+| Draw (additional bonus) | +4 |
+
+A win therefore awards **20 gold**, a draw **16 gold** and a loss **12 gold**. The gold wallet is derived from the completed-match journal, less previous purchases in `storage/progression.json`, so simply restarting the bot does not duplicate rewards.
+
+Prestige is **1 per completed challenge plus 2 per win**, and determines a display tier (Squire, Lancer, Knight Errant, Grand Champion, Legend of the Lists). Prestige is not spent, and does not affect combat strength.
+
+### Unlockable sidegrade equipment
+
+| Item | Required achievement | Cost | Advantages and drawbacks |
+| --- | --- | ---: | --- |
+| Oakbreaker Lance | 5 wins | 110 | Better charge and impact; weaker control/alignment |
+| Windrunner Lance | 3 wins on Wind-Swept Field | 100 | Excellent alignment; reduced charge |
+| Riveted Mail | 8 completed jousts | 105 | Some unhorsing resistance; worse alignment |
+| Duelist's Harness | Unhorse 3 rivals | 110 | Better alignment; much lower saddle protection |
+| Runner's Barding | Win with no barding equipped | 95 | Higher speed; less courage and more slipping |
+| Marsh Warden Barding | Finish 3 Frozen Ground jousts without being unhorsed | 95 | Better footing; lower speed and charge |
+
+Once an achievement is satisfied, players may **purchase** the item with earned gold. Buying the same item twice is rejected. Equipment purchases are permanent per server; no microtransactions or paid currency are involved.
+
+**Equipment loadouts are per server.** Lance and armour are chosen for the player's knight, while barding is equipped to a specific owned horse. Stored old-style gear is used as a fallback where possible; in a different server, gear that has not been unlocked there cannot be brought into combat.
+
+### Cosmetic standards
+
+Standards are displayed at duel introductions and on player career profiles, but have **no gameplay effects**.
+
+- **Royal Standard** — win 5 accepted jousts.
+- **Frost Pennant** — complete 3 Frozen Ground jousts without being unhorsed.
+- **Mud Banner** — win 3 Muddy Field jousts.
+- **No Standard** — unequipped/default.
+
+Cosmetic standards are earned automatically; they cost no gold.
+
+### Navigation and commands
+
+The `/menu` main hub now has a **Progression** button. The **Equipment** section includes gear selection, **Unlock Selected**, **Equip Selected**, Gold and Standards screens, all with Main Menu navigation.
+
+- `/progress` — interactive wallet, rank and achievement progress.
+- `/armory` — interactive equipment catalog, unlock and equip controls.
+- `/standards` — browse/equip earned cosmetic standards.
+- `/equip list [slot]` — view equipment and unlock requirements.
+- `/equip unlock item_key:<key>` — unlock one earned sidegrade for gold.
+- `/equip wallet` — view available gold.
+- `/equip lance|armour|barding item_key:<key>` — equip owned gear.
+
+Player/horse profiles and duel introductions reflect the actual equipped loadout. New match records store the equipment used in a duel, making no-barding challenge unlocks auditable. Historical matches without equipment snapshots cannot count towards the specific *no-barding* achievement.
+
+`storage/progression.json` contains your purchases, server-specific loadouts and standards; it is intentionally excluded from Git and included in the Admin backup/health checks. Back up this file together with `storage/matches.json`, `storage/titles.json`, `storage/knights.json` and `storage/horses.json`. On Railway, use a persistent volume for storage.
 
 ---
 
@@ -225,6 +287,7 @@ JoustingBot/
 ├── services/
 │   ├── arenas.py       # Arena definitions
 │   ├── balance.py      # v0.5 tunable combat constants
+│   ├── progression.py  # Gold, unlocked sidegrades and standards
 │   ├── competition.py  # Leaderboards/title rules
 │   ├── records.py      # Persistent matches and career statistics
 │   ├── combat.py       # Match simulation logic
