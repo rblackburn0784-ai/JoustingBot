@@ -2,11 +2,11 @@
 
 A lightweight medieval jousting Discord game bot built with `discord.py`.
 
-**Current version:** `v0.3 — Match Presentation Update`
+**Current version:** `v0.4 — Challenge Flow`
 
-Players create a knight, build and bind a horse, equip both rider and horse, choose an arena, and run cinematic single-match jousts against other Discord users.
+Players create a knight, build and bind a horse, equip both rider and horse, choose an arena, and challenge other Discord users to cinematic jousts with accept/decline buttons.
 
-This version is a clean MVP base with presentation polish: **main menu, knight builder, horse builder, equipment, arenas, cinematic duel intro embeds, dramatic pass-by-pass results, and single duels**. It does not currently include tournaments, ladders, injuries, economy, or replay logs.
+This version is a clean MVP base with controlled duel flow: **main menu, knight builder, horse builder, equipment, arenas, challenge/accept jousts, cinematic duel intro embeds, dramatic pass-by-pass results, and instant duel testing**. It does not currently include tournaments, ladders, injuries, economy, or replay logs.
 
 ---
 
@@ -19,7 +19,10 @@ This version is a clean MVP base with presentation polish: **main menu, knight b
 - Equip knight lances and armour
 - Equip horse barding
 - View available arenas and arena modifiers
-- Run cinematic single joust matches against another Discord user
+- Challenge another player with accept/decline buttons
+- 120-second challenge timeout
+- Basic active-challenge locking to prevent challenge spam
+- Run instant cinematic jousts for testing/admin use
 - Duel intro embed with rider, horse, gear, and arena flavour
 - Dramatic pass-by-pass match chronicle
 - Final result summary embed
@@ -39,7 +42,8 @@ This version is a clean MVP base with presentation polish: **main menu, knight b
 5. Equip your knight and horse.
 6. Pick an arena.
 7. Challenge another player to a joust.
-8. Watch the intro and final match presentation.
+8. The opponent accepts or declines.
+9. Watch the intro and final match presentation.
 
 Example:
 
@@ -54,6 +58,12 @@ Example:
 /equip armour item_key: armour_full
 /equip barding item_key: barding_steel
 /arena list
+/joust challenge opponent: @Opponent arena_key: royal_lists
+```
+
+For immediate testing, you can still use:
+
+```text
 /joust duel opponent: @Opponent arena_key: royal_lists
 ```
 
@@ -112,7 +122,7 @@ JoustingBot/
 │   ├── arena.py        # /arena commands
 │   ├── equipment.py    # /equip commands
 │   ├── horse.py        # /horse commands and horse stat builder UI
-│   ├── joust.py        # /joust duel command and v0.3 presentation embeds
+│   ├── joust.py        # /joust challenge, /joust duel and match presentation embeds
 │   ├── knight.py       # /knight commands and knight stat builder UI
 │   └── menu.py         # /menu and /help_joust interactive main menu
 │
@@ -282,30 +292,43 @@ Current arenas:
 
 ### Joust commands
 
-#### `/joust duel opponent:<member> arena_key:<arena>`
+#### `/joust challenge opponent:<member> arena_key:<arena>`
 
-Runs a cinematic single joust match.
+Preferred normal player flow.
 
-The command now sends:
+Creates a public joust challenge with buttons:
+
+- **Accept Challenge** — only the challenged player can accept.
+- **Decline** — the challenged player or challenger can decline.
+
+The challenge expires after 120 seconds. While a challenge is active, both players are locked from creating or receiving another challenge.
+
+Once accepted, the bot sends:
 
 1. A duel intro embed with both riders, horses, gear, and arena flavour.
 2. A final result embed with score, pass-by-pass commentary, and match summary.
 
-Requirements:
+Example:
+
+```text
+/joust challenge opponent: @Opponent arena_key: frozen_ground
+```
+
+#### `/joust duel opponent:<member> arena_key:<arena>`
+
+Runs a cinematic single joust match immediately.
+
+This is still useful for testing or admin-style quick matches, but `/joust challenge` is the intended normal player-vs-player flow.
+
+Requirements for both joust commands:
 
 - Both players must have a knight.
 - Both players must have a bound horse.
 - The arena key must be valid.
 
-Example:
-
-```text
-/joust duel opponent: @Opponent arena_key: frozen_ground
-```
-
 ---
 
-## v0.3 GIF placeholders
+## GIF placeholders
 
 `cogs/joust.py` contains a `GIF_PLACEHOLDERS` dictionary:
 
@@ -459,6 +482,15 @@ Make sure you spend exactly the required points:
 
 The create button stays disabled until the total is correct.
 
+### A challenge will not send
+
+Check that:
+
+- Both players have knights.
+- Both players have bound horses.
+- Neither player already has an active challenge.
+- The arena key is valid.
+
 ### Unknown arena or item key
 
 Use:
@@ -482,9 +514,10 @@ Included:
 - Horse binding
 - Equipment
 - Arenas
+- Challenge/accept duel flow
 - Cinematic duel intro
 - Dramatic pass-by-pass match presentation
-- Single duels
+- Instant duel command for testing
 
 Not currently included:
 
