@@ -5,7 +5,8 @@
 - Added eight server-scoped boards: wins, win rate, unhorsings, lance breaks, jousts, reliable horses, chaotic horses and arena specialists.
 - Added six automatically earned cosmetic titles, /titles progress, /title equip and /title unequip.
 - Added minimum match requirements for win-rate, horse and arena rankings.
-- Match recording now captures guild_id. Historical v0.6 results without guild_id remain in global career profiles only.
+- Only accepted /joust challenge results affect competitive rankings and title progress; instant duels remain visible in personal match history.
+- Match recording now captures guild_id and match type. Historical v0.6 results without guild_id remain in global career profiles only.
 - Title selections persist in storage/titles.json and appear on profiles and leaderboards.
 - Fixed the invalid Python expression in the v0.6 match-ID embed and added GitHub Actions tests.
 - Added Leaderboards and Titles pages to /menu.
