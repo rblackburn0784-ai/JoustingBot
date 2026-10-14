@@ -94,6 +94,17 @@ class HomeOnlyView(OwnedView):
         return embed("🏰 Main Menu", "Press Main Menu to return to the hub.")
 
 
+class PublicHomeView(discord.ui.View):
+    """A public button that privately opens the caller's own menu."""
+    def __init__(self):
+        super().__init__(timeout=300)
+
+    @discord.ui.button(label="Main Menu", emoji="🏰", style=discord.ButtonStyle.success)
+    async def home(self, interaction: discord.Interaction, button: discord.ui.Button):
+        view = MainMenuView(interaction.user.id, is_admin(interaction))
+        await interaction.response.send_message(embed=view.make_embed(), view=view, ephemeral=True)
+
+
 class MainMenuView(OwnedView):
     def __init__(self, user_id: int, allow_admin: bool = False):
         super().__init__(user_id)
@@ -590,12 +601,12 @@ class RankingSelect(discord.ui.Select):
 
 
 class LeaderboardPage(OwnedView):
-    def __init__(self, user_id: int, guild_id: int | None):
+    def __init__(self, user_id: int, guild_id: int | None, category: str = "wins"):
         super().__init__(user_id)
         self.guild_id = guild_id
-        self.category = "wins"
+        self.category = category
         self.add_item(RankingSelect(self))
-        self.button("Refresh Board", lambda it: navigate(it, LeaderboardPage(it.user.id, it.guild_id)),
+        self.button("Refresh Board", lambda it: navigate(it, LeaderboardPage(it.user.id, it.guild_id, self.category)),
                     row=1, style=STYLE.primary)
         self.home()
 
@@ -638,11 +649,11 @@ class TitleSelect(discord.ui.Select):
 class TitlePage(OwnedView):
     PER_PAGE = 6
 
-    def __init__(self, user_id: int, guild_id: int | None, page: int = 0):
+    def __init__(self, user_id: int, guild_id: int | None, page: int = 0, selected: str | None = None):
         super().__init__(user_id)
         self.guild_id = guild_id
         self.page = page
-        self.selected = next(iter(TITLE_RULES))
+        self.selected = selected or next(iter(TITLE_RULES))
         self.add_item(TitleSelect(self))
         self.button("Equip Selected", self.equip, row=1, style=STYLE.primary)
         self.button("Unequip", self.unequip, row=1)
@@ -667,10 +678,10 @@ class TitlePage(OwnedView):
         return e
 
     async def previous(self, interaction):
-        await navigate(interaction, TitlePage(interaction.user.id, interaction.guild_id, self.page - 1))
+        await navigate(interaction, TitlePage(interaction.user.id, interaction.guild_id, self.page - 1, self.selected))
 
     async def next(self, interaction):
-        await navigate(interaction, TitlePage(interaction.user.id, interaction.guild_id, self.page + 1))
+        await navigate(interaction, TitlePage(interaction.user.id, interaction.guild_id, self.page + 1, self.selected))
 
     async def equip(self, interaction):
         if self.guild_id is None:
