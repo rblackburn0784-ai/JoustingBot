@@ -16,12 +16,12 @@ def main_menu_embed() -> discord.Embed:
             "3. `/horse bind`\n"
             "4. `/equip list`\n"
             "5. `/arena list`\n"
-            "6. `/joust duel`"
+            "6. `/joust challenge`\n"\n            "7. `/profile`"
         ),
     )
     e.add_field(
         name="Core Systems",
-        value="⚔️ Knights\n🐴 Horses\n🛡️ Equipment\n🏟️ Arenas\n🎯 Single Duels",
+        value="⚔️ Knights\n🐴 Horses\n🛡️ Equipment\n🏟️ Arenas\n🎯 Challenges\n📜 Profiles & History",
         inline=False,
     )
     e.set_footer(text="Use the buttons below for command help.")
@@ -69,7 +69,7 @@ def knight_help_embed() -> discord.Embed:
         value=(
             "`/knight create name:<name>` — open the knight stat builder\n"
             "`/knight view` — view your knight\n"
-            "`/knight delete` — delete your knight"
+            "`/knight delete` — delete your knight\n"\n            "`/knight stats` — view career record"
         ),
         inline=False,
     )
@@ -93,7 +93,7 @@ def horse_help_embed() -> discord.Embed:
             "`/horse list` — list your horses and IDs\n"
             "`/horse view horse_id:<id>` — view a horse\n"
             "`/horse bind horse_id:<id>` — bind a horse to your knight\n"
-            "`/horse delete horse_id:<id>` — delete a horse"
+            "`/horse delete horse_id:<id>` — delete a horse\n"\n            "`/horse stats horse_id:<id>` — view career record"
         ),
         inline=False,
     )
@@ -154,7 +154,7 @@ def duel_help_embed() -> discord.Embed:
     )
     e.add_field(
         name="Command",
-        value="`/joust duel opponent:@Opponent arena_key:royal_lists`",
+        value="`/joust challenge opponent:@Opponent arena_key:royal_lists`\n`/joust duel opponent:@Opponent arena_key:royal_lists` (instant testing)",
         inline=False,
     )
     e.add_field(
@@ -167,6 +167,13 @@ def duel_help_embed() -> discord.Embed:
         ),
         inline=False,
     )
+    return e
+
+
+def profile_help_embed() -> discord.Embed:
+    e = discord.Embed(title="📜 Profiles & History", description="Every completed joust builds your persistent career record.")
+    e.add_field(name="Commands", value="/profile — your career and last five matches\n/profile player:@Member — view another rider\n/knight stats — your rider record\n/horse stats horse_id:<id> — your mount's career", inline=False)
+    e.set_footer(text="Declined and expired challenges do not count.")
     return e
 
 
@@ -198,7 +205,11 @@ class MainMenuView(discord.ui.View):
     async def duel(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.edit_message(embed=duel_help_embed(), view=self)
 
-    @discord.ui.button(label="Home", emoji="🏰", style=discord.ButtonStyle.success, row=2)
+    @discord.ui.button(label="Profile", emoji="📜", style=discord.ButtonStyle.secondary, row=2)
+    async def profile(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.edit_message(embed=profile_help_embed(), view=self)
+
+    @discord.ui.button(label="Home", emoji="🏰", style=discord.ButtonStyle.success, row=3)
     async def home(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.edit_message(embed=main_menu_embed(), view=self)
 
