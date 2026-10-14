@@ -1,12 +1,21 @@
+"""Equipment commands backed by v0.8 guild-scoped player inventories."""
 from __future__ import annotations
 
 import discord
 from discord import app_commands
 from discord.ext import commands
 
-from cogs.horse import Horse, load_horses, save_horses
-from cogs.knight import load_knights, save_knights
+from cogs.horse import load_horses
+from cogs.knight import load_knights
 from services.equipment import ITEMS, get_item, items_by_slot
+from services.progression import buy, loadout, set_loadout, unlock_info, wallet
+
+
+async def send_with_home(interaction: discord.Interaction, message: str) -> None:
+    from cogs.menu import HomeOnlyView
+    await interaction.response.send_message(
+        message, ephemeral=True, view=HomeOnlyView(interaction.user.id)
+    )
 
 
 class EquipmentCog(commands.Cog):
@@ -14,143 +23,82 @@ class EquipmentCog(commands.Cog):
         self.bot = bot
 
     equip_group = app_commands.Group(
-        name="equip",
-        description="Equip lances, armour, and horse barding",
+        name="equip", description="Manage your server's lances, armour and barding"
     )
 
-    @equip_group.command(name="list", description="List equipment.")
+    @equip_group.command(name="list", description="Browse gear and its unlock requirements.")
     async def list_items(self, interaction: discord.Interaction, slot: str = ""):
         slot = slot.strip().lower()
-
-        if slot in ("lance", "armour", "barding"):
-            items = items_by_slot(slot)  # type: ignore[arg-type]
-        else:
-            items = ITEMS
-
-        lines = []
-        for key, item in items.items():
-            lines.append(
-                f"• `{key}` — **{item.name}** ({item.slot})\n"
-                f"  _{item.description}_"
-            )
-
-        e = discord.Embed(
-            title="Equipment",
-            description="\n".join(lines)[:4096],
+        if slot and slot not in {"lance", "armour", "barding"}:
+            return await send_with_home(interaction, "❌ Slot must be lance, armour or barding.")
+        from cogs.menu import HomeOnlyView
+        e = discord.Embed(title="🛡️ Equipment Catalog",
+                          description="Original equipment is free. Extra gear needs achievements and gold.")
+        for current_slot in ([slot] if slot else ["lance", "armour", "barding"]):
+            lines = []
+            for key, item in items_by_slot(current_slot).items():
+                state = unlock_info(interaction.guild_id, interaction.user.id, key)
+                if state["owned"]:
+                    status = "✅ Owned"
+                else:
+                    status = (f"🔒 {state['cost']} gold · "
+                              f"{state['requirement']} {state['progress']}/{state['required']}")
+                lines.append(f"**{item.name}** (`{key}`)\n{item.description}\n{status}")
+            e.add_field(name=current_slot.title(), value="\n\n".join(lines)[:1024], inline=False)
+        await interaction.response.send_message(
+            embed=e, ephemeral=True, view=HomeOnlyView(interaction.user.id)
         )
 
-        await interaction.response.send_message(embed=e, ephemeral=True)
-
-    @equip_group.command(name="lance", description="Equip a lance.")
-    async def equip_lance(self, interaction: discord.Interaction, item_key: str):
-        await interaction.response.defer(ephemeral=True)
-
+    async def _equip(self, interaction: discord.Interaction, item_key: str, slot: str):
         item = get_item(item_key)
-        if not item or item.slot != "lance":
-            return await interaction.followup.send(
-                "❌ Unknown lance. Use `/equip list lance`.",
-                ephemeral=True,
-            )
-
-        db = load_knights()
-        knight = db.get("knights", {}).get(str(interaction.user.id))
-
+        if not item or item.slot != slot:
+            return await send_with_home(interaction, "❌ Unknown equipment key for this slot.")
+        if interaction.guild_id is None:
+            return await send_with_home(interaction, "❌ Equip gear within a Discord server.")
+        knight = load_knights().get("knights", {}).get(str(interaction.user.id))
         if not knight:
-            return await interaction.followup.send(
-                "❌ You need a knight first.",
-                ephemeral=True,
-            )
+            return await send_with_home(interaction, "❌ Create a knight first.")
+        if slot == "barding":
+            horse = load_horses().get("horses", {}).get(knight.get("bound_horse_id"))
+            if not horse or int(horse.get("owner_id", -1)) != interaction.user.id:
+                return await send_with_home(interaction, "❌ Bind a horse you own first.")
+        try:
+            set_loadout(interaction.guild_id, interaction.user.id, slot, item_key)
+        except ValueError as exc:
+            return await send_with_home(interaction, f"🔒 {exc}")
+        return await send_with_home(interaction, f"✅ Equipped **{item.name}** in this server.")
 
-        knight["equipped_lance_key"] = item.key
-        db["knights"][str(interaction.user.id)] = knight
-        save_knights(db)
+    @equip_group.command(name="lance", description="Equip an owned lance.")
+    async def lance(self, interaction: discord.Interaction, item_key: str):
+        await self._equip(interaction, item_key, "lance")
 
-        await interaction.followup.send(
-            f"✅ Equipped lance: **{item.name}**",
-            ephemeral=True,
+    @equip_group.command(name="armour", description="Equip owned armour.")
+    async def armour(self, interaction: discord.Interaction, item_key: str):
+        await self._equip(interaction, item_key, "armour")
+
+    @equip_group.command(name="barding", description="Equip owned barding on your bound mount.")
+    async def barding(self, interaction: discord.Interaction, item_key: str):
+        await self._equip(interaction, item_key, "barding")
+
+    @equip_group.command(name="unlock", description="Spend earned gold to unlock a sidegrade.")
+    async def unlock(self, interaction: discord.Interaction, item_key: str):
+        try:
+            balance = buy(interaction.guild_id, interaction.user.id, item_key)
+        except ValueError as exc:
+            return await send_with_home(interaction, f"❌ {exc}")
+        item = ITEMS[item_key]
+        await send_with_home(
+            interaction,
+            f"🔓 **{item.name} unlocked!** Gold remaining: **{balance}**. "
+            f"Equip it from /menu → Equipment or /equip {item.slot}."
         )
 
-    @equip_group.command(name="armour", description="Equip armour.")
-    async def equip_armour(self, interaction: discord.Interaction, item_key: str):
-        await interaction.response.defer(ephemeral=True)
-
-        item = get_item(item_key)
-        if not item or item.slot != "armour":
-            return await interaction.followup.send(
-                "❌ Unknown armour. Use `/equip list armour`.",
-                ephemeral=True,
-            )
-
-        db = load_knights()
-        knight = db.get("knights", {}).get(str(interaction.user.id))
-
-        if not knight:
-            return await interaction.followup.send(
-                "❌ You need a knight first.",
-                ephemeral=True,
-            )
-
-        knight["equipped_armour_key"] = item.key
-        db["knights"][str(interaction.user.id)] = knight
-        save_knights(db)
-
-        await interaction.followup.send(
-            f"✅ Equipped armour: **{item.name}**",
-            ephemeral=True,
-        )
-
-    @equip_group.command(name="barding", description="Equip barding on your bound horse.")
-    async def equip_barding(self, interaction: discord.Interaction, item_key: str):
-        await interaction.response.defer(ephemeral=True)
-
-        item = get_item(item_key)
-        if not item or item.slot != "barding":
-            return await interaction.followup.send(
-                "❌ Unknown barding. Use `/equip list barding`.",
-                ephemeral=True,
-            )
-
-        knights_db = load_knights()
-        knight = knights_db.get("knights", {}).get(str(interaction.user.id))
-
-        if not knight:
-            return await interaction.followup.send(
-                "❌ You need a knight first.",
-                ephemeral=True,
-            )
-
-        horse_id = knight.get("bound_horse_id")
-        if not horse_id:
-            return await interaction.followup.send(
-                "❌ You need a bound horse first. Use `/horse bind`.",
-                ephemeral=True,
-            )
-
-        horses_db = load_horses()
-        raw = horses_db.get("horses", {}).get(horse_id)
-
-        if not raw:
-            return await interaction.followup.send(
-                "❌ Could not find your bound horse.",
-                ephemeral=True,
-            )
-
-        horse = Horse.from_dict(raw)
-
-        if horse.owner_id != interaction.user.id:
-            return await interaction.followup.send(
-                "❌ That horse is not yours.",
-                ephemeral=True,
-            )
-
-        raw["equipped_barding_key"] = item.key
-        horses_db["horses"][horse_id] = raw
-        save_horses(horses_db)
-
-        await interaction.followup.send(
-            f"✅ Equipped **{item.name}** on **{horse.name}**.",
-            ephemeral=True,
-        )
+    @equip_group.command(name="wallet", description="View your guild equipment gold balance.")
+    async def wallet_command(self, interaction: discord.Interaction):
+        if interaction.guild_id is None:
+            return await send_with_home(interaction, "❌ Open your wallet in a server.")
+        balance = wallet(interaction.guild_id, interaction.user.id)
+        await send_with_home(interaction, f"🪙 Your equipment gold: **{balance}**.")
 
 
 async def setup(bot: commands.Bot):
