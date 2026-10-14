@@ -1,5 +1,22 @@
 # Changelog
 
+## v0.8.1a — Contextual Injury Risk & Tiered Treatment
+
+- Replaced flat injury odds with capped (2–42%) contextual probabilities: arena (Royal/Festival safer; Muddy/Frozen/War-Torn riskier), armour, barding, attacking lance, horse breed, courage, obedience, and riding while injured.
+- Added the horse slip category to potential rider injuries; different arenas and horse slips weight injury types differently.
+- Added Twisted Knee (Agility) and Strained Back (Endurance) while preserving the original three injuries and all existing saves.
+- Added Light / Moderate / Serious severity, changing only recovery duration (roughly 0.8x, 1x, 1.35x). Existing fairness caps of one injury per rider per bout and at most two effective stat penalties remain.
+- Added Faith Healer (12g/8h/16% failure), Shady Doctor (27g/18h/9% failure), and Private Doctor (55g/30h/3% failure).
+- Healing successes can never reduce recovery below **3 real hours**; failures still cost gold.
+- Successful treatment has a small 12–24% chance of granting one-time next-bout relief, easing a single injury penalty without exceeding normal base stats. Relief expires after 24 hours, and is consumed only by a recorded accepted duel.
+- Added a second Injury Ward dropdown for treatment choice; /heal accepts a provider argument with Discord choices.
+- Challenge screen now shows illustrative unhorsing injury probabilities, while match results include risk modifier details, severity and injury effects.
+- Persisted the mount's breed/handling snapshots and consumed treatment-support token with each competitive match.
+- Expanded regression suite with risk, treatment, noninstant recovery, gold spend, odds caps, arena weighting, next-bout aid and compatibility coverage.
+
+---
+
+
 ## v0.8.1 — Injuries & Recovery
 
 - Added three non-permanent knight injuries: Bruised Ribs (Endurance −1, 24h), Wrenched Shoulder (Strength −1, 36h), and Jarred Wrist (Control −1, 48h).
