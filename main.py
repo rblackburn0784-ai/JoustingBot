@@ -26,6 +26,7 @@ class JoustBot(commands.Bot):
         await self.load_extension("cogs.equipment")
         await self.load_extension("cogs.arena")
         await self.load_extension("cogs.joust")
+        await self.load_extension("cogs.profile")
 
         await self.tree.sync()
         print("Slash commands synced.")
