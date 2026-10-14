@@ -347,30 +347,46 @@ class ConfirmHorseDelete(OwnedView):
 
 
 class EquipmentPage(OwnedView):
-    def __init__(self, user_id: int):
+    def __init__(self, user_id: int, guild_id: int | None = None):
         super().__init__(user_id)
-        for i, (key, label) in enumerate((("lance", "Lances"), ("armour", "Armour"), ("barding", "Horse Barding"))):
-            self.button(label, lambda it, slot=key: navigate(it, EquipmentPicker(it.user.id, slot)), row=0)
+        self.guild_id = guild_id
+        for slot, name in (("lance", "Lances"), ("armour", "Armour"), ("barding", "Horse Barding")):
+            self.button(name, lambda it, s=slot: navigate(
+                it, EquipmentPicker(it.user.id, s, it.guild_id)), row=0)
+        self.button("Progression & Gold", lambda it: navigate(it, ProgressionPage(it.user.id, it.guild_id)),
+                    row=1, emoji="🪙")
+        self.button("Standards", lambda it: navigate(it, StandardPage(it.user.id, it.guild_id)),
+                    row=1, emoji="🚩")
         self.home()
 
     def make_embed(self):
+        from services.progression import loadout, wallet
         knight = get_knight(load_knights(), self.owner_id)
         if knight:
-            detail = (f"**Lance:** {knight.equipped_lance_key}\n"
-                      f"**Armour:** {knight.equipped_armour_key}\n"
-                      f"**Bound Horse:** {knight.bound_horse_id or 'None'}")
+            description = (
+                f"**Lance:** {loadout(self.guild_id, self.owner_id, 'lance', knight.equipped_lance_key)}\n"
+                f"**Armour:** {loadout(self.guild_id, self.owner_id, 'armour', knight.equipped_armour_key)}\n"
+                f"**Bound Horse:** {knight.bound_horse_id or 'None'}"
+            )
+            raw = load_horses().get("horses", {}).get(knight.bound_horse_id)
+            if raw and raw.get("owner_id") == self.owner_id:
+                description += (
+                    f"\n**Barding:** {loadout(self.guild_id, self.owner_id, 'barding', raw.get('equipped_barding_key'))}"
+                )
         else:
-            detail = "Create a knight before equipping."
-        return embed("🛡️ Equipment", detail + "\n\nEvery item has trade-offs; choose a category below.")
+            description = "Create a knight before equipping."
+        money = wallet(self.guild_id, self.owner_id) if self.guild_id else 0
+        return embed("🛡️ Armory — Equipment", description + f"\n\n🪙 **{money} gold**"
+                     "\nAll twelve starter items are free. Unlock sidegrades by playing accepted jousts.")
 
 
 class GearSelect(discord.ui.Select):
-    def __init__(self, parent: "EquipmentPicker"):
-        self.screen = parent
-        choices = items_by_slot(parent.slot)
-        super().__init__(placeholder="Choose your item", row=0, options=[
+    def __init__(self, screen: "EquipmentPicker"):
+        self.screen = screen
+        choices = items_by_slot(screen.slot)
+        super().__init__(placeholder="Choose equipment", row=0, options=[
             discord.SelectOption(label=item.name[:100], value=key,
-                description=item.description[:100], default=key == parent.selected)
+                description=item.description[:100], default=key == screen.selected)
             for key, item in choices.items()
         ])
 
@@ -380,45 +396,152 @@ class GearSelect(discord.ui.Select):
 
 
 class EquipmentPicker(OwnedView):
-    def __init__(self, user_id: int, slot: str):
+    def __init__(self, user_id: int, slot: str, guild_id: int | None = None, selected: str | None = None):
         super().__init__(user_id)
         self.slot = slot
-        self.selected = next(iter(items_by_slot(slot)))
+        self.guild_id = guild_id
+        self.selected = selected or next(iter(items_by_slot(slot)))
         self.add_item(GearSelect(self))
         self.button("Equip Selected", self.equip, row=1, style=STYLE.primary)
-        self.button("Back", lambda it: navigate(it, EquipmentPage(it.user.id)), row=1)
+        self.button("Unlock Selected", self.unlock, row=1, emoji="🔓")
+        self.button("Back", lambda it: navigate(it, EquipmentPage(it.user.id, it.guild_id)), row=2)
         self.home()
 
     def make_embed(self):
+        from services.progression import unlock_info, wallet, loadout
         gear = get_item(self.selected)
-        mods = []
+        state = unlock_info(self.guild_id, self.owner_id, self.selected)
+        mods = [f"{attr}: {getattr(gear, attr):+}" for attr in
+                ("alignment_mod", "charge_mod", "slip_mod", "panic_mod", "unhorse_resist")
+                if getattr(gear, attr) != 0]
+        if gear.impact_mult != 1:
+            mods.append(f"Impact x{gear.impact_mult:.2f}")
         for field in ("knight_stat_mods", "horse_stat_mods"):
-            vals = getattr(gear, field)
-            mods += [f"{key}: {value:+}" for key, value in vals.items()]
-        return embed(f"🛡️ {self.slot.title()} Selection", f"**{gear.name}**\n{gear.description}\n"
-                     + (" · ".join(mods) if mods else "Balanced / no stat modifiers"))
+            mods.extend(f"{key}: {value:+}" for key, value in getattr(gear, field).items())
+        if state["owned"]:
+            access = "✅ Owned · Ready to equip"
+        else:
+            access = (f"🔒 Requirement: {state['requirement']} "
+                      f"{state['progress']}/{state['required']}\n🪙 Cost: **{state['cost']} gold**")
+        money = wallet(self.guild_id, self.owner_id) if self.guild_id else 0
+        return embed(f"🛡️ {gear.name}", f"{gear.description}\n\n"
+                     f"**Trade-offs:** {' · '.join(mods) or 'Balanced'}\n"
+                     f"**Status:** {access}\n**Wallet:** {money} gold")
 
     async def equip(self, interaction):
+        from services.progression import set_loadout
         gear = get_item(self.selected)
-        if not gear or gear.slot != self.slot:
-            return await interaction.response.send_message("❌ Invalid item.", ephemeral=True)
-        db = load_knights()
-        knight = db.get("knights", {}).get(str(interaction.user.id))
-        if not knight:
-            return await interaction.response.send_message("❌ Create your knight first.", ephemeral=True)
+        if gear is None or gear.slot != self.slot:
+            return await interaction.response.send_message("❌ Invalid gear.", ephemeral=True)
+        knight = load_knights().get("knights", {}).get(str(interaction.user.id))
+        if knight is None:
+            return await interaction.response.send_message("❌ Create a knight first.", ephemeral=True)
         if self.slot == "barding":
-            hid = knight.get("bound_horse_id")
-            horse_db = load_horses()
-            raw = horse_db.get("horses", {}).get(hid)
-            if not raw or raw.get("owner_id") != interaction.user.id:
-                return await interaction.response.send_message("❌ Bind one of your horses first.", ephemeral=True)
-            raw["equipped_barding_key"] = self.selected
-            save_horses(horse_db)
-        else:
-            knight["equipped_" + self.slot + "_key"] = self.selected
-            save_knights(db)
-        await navigate(interaction, EquipmentPicker(interaction.user.id, self.slot),
-                       f"✅ Equipped {gear.name}.")
+            horse = load_horses().get("horses", {}).get(knight.get("bound_horse_id"))
+            if horse is None or horse.get("owner_id") != interaction.user.id:
+                return await interaction.response.send_message("❌ Bind a horse you own first.", ephemeral=True)
+        try:
+            set_loadout(interaction.guild_id, interaction.user.id, self.slot, self.selected)
+        except ValueError as exc:
+            return await interaction.response.send_message(f"🔒 {exc}", ephemeral=True)
+        await navigate(interaction, EquipmentPicker(interaction.user.id, self.slot,
+                       interaction.guild_id, self.selected), f"✅ Equipped {gear.name}.")
+
+    async def unlock(self, interaction):
+        from services.progression import buy
+        try:
+            balance = buy(interaction.guild_id, interaction.user.id, self.selected)
+        except ValueError as exc:
+            return await interaction.response.send_message(f"❌ {exc}", ephemeral=True)
+        item = get_item(self.selected)
+        await navigate(interaction, EquipmentPicker(interaction.user.id, self.slot,
+                       interaction.guild_id, self.selected),
+                       f"🔓 Unlocked **{item.name}**! {balance} gold remaining.")
+
+
+class ProgressionPage(OwnedView):
+    def __init__(self, user_id: int, guild_id: int | None = None):
+        super().__init__(user_id)
+        self.guild_id = guild_id
+        self.button("Open Armory", lambda it: navigate(it, EquipmentPage(it.user.id, it.guild_id)),
+                    row=0, style=STYLE.primary, emoji="🛡️")
+        self.button("View Standards", lambda it: navigate(it, StandardPage(it.user.id, it.guild_id)),
+                    row=0, emoji="🚩")
+        self.home()
+
+    def make_embed(self):
+        from services.progression import UNLOCKS, earned_gold, prestige, wallet, purchased, progress
+        if self.guild_id is None:
+            return embed("🪙 Career Progression", "Progression is tracked per Discord server. Open /menu in a server.")
+        scores = progress(self.guild_id, self.owner_id)
+        points, tier = prestige(self.guild_id, self.owner_id)
+        owned = purchased(self.guild_id, self.owner_id)
+        remaining = wallet(self.guild_id, self.owner_id)
+        total = earned_gold(self.guild_id, self.owner_id)
+        e = embed("🪙 Progression & Unlocks",
+                  f"**Rank:** {tier} · **Prestige:** {points}\n"
+                  f"**Gold:** {remaining} available · {total} lifetime earned\n"
+                  f"**Career:** {scores['jousts']} accepted jousts · {scores['wins']} victories\n\n"
+                  "Play accepted challenges to earn gold and prestige. "
+                  "Starter gear remains free; unlockables offer trade-offs, not raw power.")
+        lines = []
+        for key, (name, condition, required, cost) in UNLOCKS.items():
+            progress_now = scores[condition]
+            icon = "✅" if key in owned else ("🟡" if progress_now >= required else "🔒")
+            lines.append(f"{icon} **{name}** — {cost} gold · {condition.replace('_', ' ')} "
+                         f"{progress_now}/{required}")
+        e.add_field(name="Sidegrade Unlocks", value="\n".join(lines), inline=False)
+        return e
+
+
+class StandardSelect(discord.ui.Select):
+    def __init__(self, screen: "StandardPage"):
+        from services.progression import STANDARDS
+        self.screen = screen
+        super().__init__(placeholder="Choose cosmetic standard", row=0, options=[
+            discord.SelectOption(label=value[0], value=key, default=key == screen.selected)
+            for key, value in STANDARDS.items()
+        ])
+
+    async def callback(self, interaction):
+        self.screen.selected = self.values[0]
+        await interaction.response.edit_message(embed=self.screen.make_embed(), view=self.screen)
+
+
+class StandardPage(OwnedView):
+    def __init__(self, user_id: int, guild_id: int | None = None, selected: str = "none"):
+        super().__init__(user_id)
+        self.guild_id = guild_id
+        self.selected = selected
+        self.add_item(StandardSelect(self))
+        self.button("Equip Standard", self.equip, row=1, style=STYLE.primary)
+        self.button("Progression", lambda it: navigate(it, ProgressionPage(it.user.id, it.guild_id)), row=1)
+        self.home()
+
+    def make_embed(self):
+        from services.progression import STANDARDS, equipped_standard, standard_info
+        if self.guild_id is None:
+            return embed("🚩 Cosmetic Standards", "Open this section inside a Discord server.")
+        lines = []
+        for key in STANDARDS:
+            status = standard_info(self.guild_id, self.owner_id, key)
+            icon = "✅" if status["earned"] else "🔒"
+            lines.append(f"{icon} **{status['name']}** — {status['progress']}/{status['required']} "
+                         f"{STANDARDS[key][1].replace('_', ' ')}")
+        return embed("🚩 Cosmetic Standards",
+                     f"**Equipped:** {equipped_standard(self.guild_id, self.owner_id) or 'None'}\n"
+                     f"**Selected:** {STANDARDS[self.selected][0]}\n\n"
+                     + "\n".join(lines)
+                     + "\n\nStandards are purely visual and give no combat advantage.")
+
+    async def equip(self, interaction):
+        from services.progression import STANDARDS, set_standard
+        try:
+            set_standard(interaction.guild_id, interaction.user.id, self.selected)
+        except ValueError as exc:
+            return await interaction.response.send_message(f"🔒 {exc}", ephemeral=True)
+        await navigate(interaction, StandardPage(interaction.user.id, interaction.guild_id,
+                       self.selected), f"✅ Equipped {STANDARDS[self.selected][0]}.")
 
 
 class ArenaSelect(discord.ui.Select):
