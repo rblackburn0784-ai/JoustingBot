@@ -2,50 +2,42 @@
 
 A lightweight medieval jousting Discord game bot built with `discord.py`.
 
-**Current version:** `v0.4 — Challenge Flow`
+**Current version:** `v0.5 — Match Engine Polish`
 
 Players create a knight, build and bind a horse, equip both rider and horse, choose an arena, and challenge other Discord users to cinematic jousts with accept/decline buttons.
 
-This version is a clean MVP base with controlled duel flow: **main menu, knight builder, horse builder, equipment, arenas, challenge/accept jousts, cinematic duel intro embeds, dramatic pass-by-pass results, and instant duel testing**. It does not currently include tournaments, ladders, injuries, economy, or replay logs.
+This version focuses on making matches feel more like a sport: richer pass categories, arena-specific lines, gear-specific lines, seed display, debug roll breakdowns, and tunable balance constants.
 
 ---
 
 ## Features
 
 - Interactive `/menu` with button-based help pages
-- Create a knight with a private dropdown stat builder
-- Create a horse with a private dropdown stat builder
-- Bind a horse to your knight
-- Equip knight lances and armour
-- Equip horse barding
-- View available arenas and arena modifiers
-- Challenge another player with accept/decline buttons
+- Private dropdown knight builder
+- Private dropdown horse builder
+- Horse binding
+- Knight lances and armour
+- Horse barding
+- Arenas with modifiers
+- `/joust challenge` with accept/decline buttons
 - 120-second challenge timeout
-- Basic active-challenge locking to prevent challenge spam
-- Run instant cinematic jousts for testing/admin use
-- Duel intro embed with rider, horse, gear, and arena flavour
+- Active challenge locking
+- Random arena support
+- Random Arena button on challenges
+- Expanded pre-match comparison before accept
+- `/joust duel` for instant testing/admin use
+- Cinematic intro embed
 - Dramatic pass-by-pass match chronicle
 - Final result summary embed
-- GIF/image placeholder support in `cogs/joust.py`
-- Equipment has positive and negative traits for balance
-- Arenas affect charge, alignment, slip risk, panic risk, and impact
+- Match seed display
+- Optional reproducible seed input
+- Hidden admin/debug roll breakdowns
+- Balance constants in `services/balance.py`
 - JSON-based local storage
 
 ---
 
 ## Current gameplay loop
-
-1. Open the main menu.
-2. Create your knight.
-3. Create your horse.
-4. Bind the horse to your knight.
-5. Equip your knight and horse.
-6. Pick an arena.
-7. Challenge another player to a joust.
-8. The opponent accepts or declines.
-9. Watch the intro and final match presentation.
-
-Example:
 
 ```text
 /menu
@@ -61,11 +53,25 @@ Example:
 /joust challenge opponent: @Opponent arena_key: royal_lists
 ```
 
-For immediate testing, you can still use:
+You can also use a random arena:
+
+```text
+/joust challenge opponent: @Opponent arena_key: random
+```
+
+For immediate testing:
 
 ```text
 /joust duel opponent: @Opponent arena_key: royal_lists
 ```
+
+For reproducible/admin testing:
+
+```text
+/joust duel opponent: @Opponent arena_key: frozen_ground seed: 12345 debug: True
+```
+
+`debug: True` only shows hidden roll breakdowns to users with **Manage Server** permission.
 
 ---
 
@@ -86,30 +92,22 @@ pip install discord.py python-dotenv
 
 ## Setup
 
-### 1. Clone the repository
-
 ```bash
 git clone https://github.com/rblackburn0784-ai/JoustingBot.git
 cd JoustingBot
 ```
 
-### 2. Create a `.env` file
-
-Create a file named `.env` in the project root, next to `main.py`.
+Create `.env` beside `main.py`:
 
 ```env
 DISCORD_BOT_TOKEN=your_bot_token_here
 ```
 
-Do not commit `.env` to GitHub. It is ignored by `.gitignore`.
-
-### 3. Run the bot
+Run:
 
 ```bash
 python main.py
 ```
-
-If slash commands do not appear immediately in Discord, restart the Discord client or wait a short while for command sync.
 
 ---
 
@@ -121,18 +119,19 @@ JoustingBot/
 ├── cogs/
 │   ├── arena.py        # /arena commands
 │   ├── equipment.py    # /equip commands
-│   ├── horse.py        # /horse commands and horse stat builder UI
-│   ├── joust.py        # /joust challenge, /joust duel and match presentation embeds
-│   ├── knight.py       # /knight commands and knight stat builder UI
-│   └── menu.py         # /menu and /help_joust interactive main menu
+│   ├── horse.py        # /horse commands and horse builder UI
+│   ├── joust.py        # /joust challenge, /joust duel, presentation and debug embeds
+│   ├── knight.py       # /knight commands and knight builder UI
+│   └── menu.py         # /menu and /help_joust
 │
 ├── services/
-│   ├── arenas.py       # Arena definitions and modifiers
+│   ├── arenas.py       # Arena definitions
+│   ├── balance.py      # v0.5 tunable combat constants
 │   ├── combat.py       # Match simulation logic
 │   ├── equipment.py    # Equipment definitions and modifiers
-│   └── storage.py      # JSON load/save helpers
+│   └── storage.py      # JSON helpers
 │
-├── storage/            # Local JSON save files, created at runtime
+├── storage/            # Runtime JSON save files
 ├── CHANGELOG.md
 ├── .gitignore
 ├── main.py
@@ -141,143 +140,163 @@ JoustingBot/
 
 ---
 
-## Commands
+## Joust commands
+
+### `/joust challenge opponent:<member> arena_key:<arena> seed:<optional> debug:<optional>`
+
+Preferred normal player flow.
+
+Creates a public challenge with:
+
+- Accept Challenge button
+- Decline button
+- Random Arena button
+- Pre-match rider comparison
+- Arena modifiers
+- 120-second timeout
+
+Only the challenged player can accept. The challenger or challenged player can decline.
+
+### `/joust duel opponent:<member> arena_key:<arena> seed:<optional> debug:<optional>`
+
+Runs the match immediately. Best for testing/admin use.
+
+---
+
+## v0.5 pass categories
+
+The match engine now returns structured pass categories:
+
+- `clean_miss`
+- `shield_scrape`
+- `lance_break`
+- `heavy_shield_hit`
+- `saddle_stagger`
+- `unhorsing`
+- `horse_refusal`
+- `horse_slip`
+- `double_clash`
+
+Each pass can include:
+
+- public result label
+- score change
+- margin
+- arena-specific flavour line
+- gear-specific flavour line
+- notes
+- hidden debug rolls
+
+---
+
+## Match scoring
+
+General scoring:
+
+- Clean miss: 0 points
+- Shield scrape: 0 points
+- Lance break: 1 point
+- Heavy shield hit: 2 points
+- Saddle stagger: 2 points
+- Unhorsing: 3 points
+- Horse refusal: 1 point to opponent
+- Horse slip: 1 point to opponent
+- Double clash: 0 points
+
+Matches run up to 5 passes. First to 3 points can end the match early.
+
+---
+
+## Debug and seeds
+
+Every match result shows a seed.
+
+Use a seed to reproduce a match shape:
+
+```text
+/joust duel opponent: @Opponent arena_key: royal_lists seed: 12345
+```
+
+Use debug mode for hidden roll breakdowns:
+
+```text
+/joust duel opponent: @Opponent arena_key: royal_lists seed: 12345 debug: True
+```
+
+Debug requires **Manage Server** permission and is sent as an ephemeral message.
+
+---
+
+## GIF placeholders
+
+`cogs/joust.py` contains:
+
+```python
+GIF_PLACEHOLDERS = {
+    "intro": "",
+    "lance_break": "",
+    "heavy_shield_hit": "",
+    "saddle_stagger": "",
+    "unhorsing": "",
+    "miss": "",
+    "draw": "",
+    "victory": "",
+}
+```
+
+Add hosted GIF/image URLs later. Blank values are safe.
+
+---
+
+## Other commands
 
 ### Main menu
 
-#### `/menu`
+```text
+/menu
+/help_joust
+```
 
-Opens the main Jousting Bot menu with buttons for:
+### Knight
 
-- Getting Started
-- Knight
-- Horse
-- Equipment
-- Arenas
-- Duel
+```text
+/knight create name:<name>
+/knight view
+/knight delete
+```
 
-#### `/help_joust`
+Knight stats: `strength`, `control`, `endurance`, `agility`, `resolve`, `tactics`.
 
-Alias-style help command that opens the same interactive menu.
+### Horse
 
----
+```text
+/horse create name:<name> breed:<breed>
+/horse list
+/horse view horse_id:<id>
+/horse bind horse_id:<id>
+/horse delete horse_id:<id>
+```
 
-### Knight commands
+Horse stats: `speed`, `stamina`, `power`, `obedience`, `courage`.
 
-#### `/knight create name:<name>`
+### Equipment
 
-Creates a new knight using an interactive private stat builder.
+```text
+/equip list
+/equip list slot:lance
+/equip list slot:armour
+/equip list slot:barding
+/equip lance item_key:<key>
+/equip armour item_key:<key>
+/equip barding item_key:<key>
+```
 
-The builder starts each stat at 1 and gives the player **20 total points** to spend.
+### Arena
 
-Knight stats:
-
-- `strength`
-- `control`
-- `endurance`
-- `agility`
-- `resolve`
-- `tactics`
-
-Rules:
-
-- Total points must equal 20.
-- Each stat must stay between 1 and 8.
-- The `Create Knight` button only enables once the total is valid.
-
-#### `/knight view`
-
-Shows your current knight, stats, equipped lance, equipped armour, and bound horse.
-
-#### `/knight delete`
-
-Deletes your knight.
-
----
-
-### Horse commands
-
-#### `/horse create name:<name> breed:<breed>`
-
-Creates a new horse using an interactive private stat builder.
-
-The builder starts each stat at 1 and gives the player **24 total points** to spend.
-
-Horse stats:
-
-- `speed`
-- `stamina`
-- `power`
-- `obedience`
-- `courage`
-
-Rules:
-
-- Total horse stat points must equal 24.
-- Each horse stat must stay between 1 and 10.
-- The `Create Horse` button only enables once the total is valid.
-
-#### `/horse list`
-
-Lists your horses and their horse IDs.
-
-#### `/horse view horse_id:<id>`
-
-Shows one of your horses.
-
-#### `/horse bind horse_id:<id>`
-
-Binds one of your horses to your knight.
-
-A knight needs a bound horse before jousting.
-
-#### `/horse delete horse_id:<id>`
-
-Deletes one of your horses. If that horse was bound to your knight, the knight is unbound.
-
----
-
-### Equipment commands
-
-#### `/equip list`
-
-Lists all equipment.
-
-#### `/equip list slot:lance`
-
-Lists only lances.
-
-#### `/equip list slot:armour`
-
-Lists only armour.
-
-#### `/equip list slot:barding`
-
-Lists only horse barding.
-
-#### `/equip lance item_key:<key>`
-
-Equips a lance on your knight.
-
-#### `/equip armour item_key:<key>`
-
-Equips armour on your knight.
-
-#### `/equip barding item_key:<key>`
-
-Equips barding on your currently bound horse.
-
----
-
-### Arena commands
-
-#### `/arena list`
-
-Lists all available arenas.
-
-#### `/arena view arena_key:<key>`
-
-Shows one arena and its modifiers.
+```text
+/arena list
+/arena view arena_key:<key>
+```
 
 Current arenas:
 
@@ -287,220 +306,6 @@ Current arenas:
 - `wind_swept`
 - `festival_arena`
 - `war_torn`
-
----
-
-### Joust commands
-
-#### `/joust challenge opponent:<member> arena_key:<arena>`
-
-Preferred normal player flow.
-
-Creates a public joust challenge with buttons:
-
-- **Accept Challenge** — only the challenged player can accept.
-- **Decline** — the challenged player or challenger can decline.
-
-The challenge expires after 120 seconds. While a challenge is active, both players are locked from creating or receiving another challenge.
-
-Once accepted, the bot sends:
-
-1. A duel intro embed with both riders, horses, gear, and arena flavour.
-2. A final result embed with score, pass-by-pass commentary, and match summary.
-
-Example:
-
-```text
-/joust challenge opponent: @Opponent arena_key: frozen_ground
-```
-
-#### `/joust duel opponent:<member> arena_key:<arena>`
-
-Runs a cinematic single joust match immediately.
-
-This is still useful for testing or admin-style quick matches, but `/joust challenge` is the intended normal player-vs-player flow.
-
-Requirements for both joust commands:
-
-- Both players must have a knight.
-- Both players must have a bound horse.
-- The arena key must be valid.
-
----
-
-## GIF placeholders
-
-`cogs/joust.py` contains a `GIF_PLACEHOLDERS` dictionary:
-
-```python
-GIF_PLACEHOLDERS = {
-    "intro": "",
-    "lance_break": "",
-    "solid_hit": "",
-    "unhorsed": "",
-    "miss": "",
-    "draw": "",
-    "victory": "",
-}
-```
-
-Add hosted GIF/image URLs there later and the duel embeds will automatically use them.
-
-Leaving them blank is safe. The bot simply omits images.
-
----
-
-## Stats overview
-
-### Knight stats
-
-| Stat | Main role |
-|---|---|
-| Strength | Adds power to charge impact |
-| Control | Helps alignment and lance control |
-| Endurance | Used by armour/equipment balance and future expansion |
-| Agility | Used by armour/equipment balance and future expansion |
-| Resolve | Future expansion / flavour support |
-| Tactics | Future expansion / flavour support |
-
-### Horse stats
-
-| Stat | Main role |
-|---|---|
-| Speed | Adds to charge force |
-| Stamina | Helps avoid slipping |
-| Power | Adds to charge force |
-| Obedience | Helps alignment and prevents refusal/slip |
-| Courage | Helps prevent refusal/bolting |
-
----
-
-## Equipment balance
-
-### Lances
-
-| Key | Item | Positive | Negative |
-|---|---|---|---|
-| `lance_ash` | Ash Lance | Balanced | None |
-| `lance_heavy` | Heavy War Lance | Higher impact | Worse aim/control |
-| `lance_tournament` | Tournament Lance | Better accuracy | Lower impact |
-| `lance_long` | Long Reach Lance | Better control | Lower strength/charge |
-
-### Armour
-
-| Key | Item | Positive | Negative |
-|---|---|---|---|
-| `armour_mail` | Tournament Mail | Balanced | None |
-| `armour_light` | Light Plate | Better agility/aim | Easier to unhorse |
-| `armour_full` | Full Plate | Harder to unhorse | Worse agility/control |
-| `armour_reinforced_helm` | Reinforced Helm | Better resolve/resistance | Worse control/vision |
-
-### Barding
-
-| Key | Item | Positive | Negative |
-|---|---|---|---|
-| `barding_none` | No Barding | No restrictions | No protection |
-| `barding_leather` | Leather Barding | Calmer/braver horse | Minimal downside |
-| `barding_steel` | Steel Barding | Braver horse | Slower, more slip risk |
-| `barding_spiked` | Spiked Barding | More aggressive charge | Less obedience, more slip risk |
-
----
-
-## Arena effects
-
-Arenas can modify:
-
-- Alignment
-- Charge
-- Slip risk
-- Panic/refusal risk
-- Impact multiplier
-
-Use:
-
-```text
-/arena view arena_key:<key>
-```
-
-to inspect exact modifiers in Discord.
-
----
-
-## Match scoring
-
-Each match runs up to 5 passes.
-
-General scoring:
-
-- Lance break: 1 point
-- Solid hit: 2 points
-- Unhorsed: 3 points
-- Horse refusal can award 1 point to the opponent
-- First to 3 points can end the match early
-- Otherwise, highest score after 5 passes wins
-
----
-
-## Storage
-
-The bot uses local JSON files created at runtime:
-
-```text
-storage/knights.json
-storage/horses.json
-```
-
-These files are ignored by Git and should remain local.
-
----
-
-## Troubleshooting
-
-### `RuntimeError: Missing DISCORD_BOT_TOKEN in .env`
-
-Make sure `.env` exists beside `main.py` and contains:
-
-```env
-DISCORD_BOT_TOKEN=your_bot_token_here
-```
-
-### Slash commands do not appear
-
-Try:
-
-1. Stop the bot.
-2. Restart the bot.
-3. Restart Discord.
-4. Wait a short while for command sync.
-
-### `/horse create` or `/knight create` does not finish
-
-Make sure you spend exactly the required points:
-
-- Knight: 20 points
-- Horse: 24 points
-
-The create button stays disabled until the total is correct.
-
-### A challenge will not send
-
-Check that:
-
-- Both players have knights.
-- Both players have bound horses.
-- Neither player already has an active challenge.
-- The arena key is valid.
-
-### Unknown arena or item key
-
-Use:
-
-```text
-/arena list
-/equip list
-```
-
-to see valid keys.
 
 ---
 
@@ -515,8 +320,11 @@ Included:
 - Equipment
 - Arenas
 - Challenge/accept duel flow
+- Random arena controls
 - Cinematic duel intro
-- Dramatic pass-by-pass match presentation
+- v0.5 match engine categories
+- Dramatic pass-by-pass presentation
+- Seed/debug support
 - Instant duel command for testing
 
 Not currently included:
@@ -528,5 +336,3 @@ Not currently included:
 - XP/levelling
 - Match replay logs
 - Persistent leaderboards
-
-These can be added later once the core loop is stable.
