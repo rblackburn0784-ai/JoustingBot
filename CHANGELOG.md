@@ -1,5 +1,20 @@
 # Changelog
 
+## v0.8.1 — Injuries & Recovery
+
+- Added three non-permanent knight injuries: Bruised Ribs (Endurance −1, 24h), Wrenched Shoulder (Strength −1, 36h), and Jarred Wrist (Control −1, 48h).
+- Injuries roll once after an accepted server challenge, based on the highest serious hit received (28% unhorsing, 12% saddle stagger, 6% heavy shield hit); admin test duels do not injure riders.
+- Injury events are deterministically stored inside completed match JSON; no injury rolls are repeated on profile views and old matches are not retroactively injured.
+- At most one new injury per rider per match, a maximum of 2 effective stat debuffs total, and no permanent stat losses.
+- Free slow natural recovery continues while offline; paid treatment advances the selected injury by 24 hours for 30 gold.
+- Healing payments share the existing progression wallet ledger, preventing gold being spent twice on healing and gear.
+- Added /injuries and /heal, plus private Injury Ward selection/treatment and Main Menu navigation.
+- Added injury announcements in match results, injury indicators on introductions, and recovery status on rider profiles.
+- Added regression tests for fair penalties, deterministic outcomes, healing payments, natural expiry, legacy history and match-journal persistence.
+
+---
+
+
 ## v0.8 — Equipment Progression & Unlocks
 
 - Added server-specific gold earned from accepted challenge results only: +12 per match, +8 per win, +4 per draw.
