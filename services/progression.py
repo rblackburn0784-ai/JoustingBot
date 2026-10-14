@@ -112,6 +112,15 @@ def prestige(guild_id: int, user_id: int, history: dict | None = None) -> tuple[
     return points, next(name for threshold, name in TIERS if points >= threshold)
 
 
+def reputation(guild_id: int, user_id: int, history: dict | None = None) -> int:
+    """Non-spendable recognition of notable competitive feats."""
+    fighters, _ = aggregate(guild_id, history if history is not None else load_history())
+    stats = fighters.get(user_id, {})
+    return (int(stats.get("wins", 0))
+            + 2 * int(stats.get("unhorsings", 0))
+            + int(stats.get("lance_breaks", 0)))
+
+
 def purchased(guild_id: int, user_id: int, data: dict | None = None) -> dict:
     return dict(_player(data if data is not None else _db(), guild_id, user_id).get("purchases", {}))
 
