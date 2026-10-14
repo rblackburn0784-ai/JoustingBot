@@ -190,6 +190,63 @@ add_item(
 )
 
 
+
+# -------------------------
+# v0.8 Unlockable sidegrades (no strictly superior upgrade path)
+# -------------------------
+
+add_item(EquipmentItem(
+    key="lance_oakbreaker",
+    name="Oakbreaker Lance",
+    slot="lance",
+    description="A brutal oak shaft. Improved charging force, but poor lance-line control.",
+    knight_stat_mods={"control": -1},
+    alignment_mod=-2, charge_mod=2, impact_mult=1.04,
+))
+
+add_item(EquipmentItem(
+    key="lance_windrunner",
+    name="Windrunner Lance",
+    slot="lance",
+    description="Very accurate in a crosswind, but sacrifices charge and impact.",
+    alignment_mod=4, charge_mod=-2, impact_mult=0.95,
+))
+
+add_item(EquipmentItem(
+    key="armour_riveted",
+    name="Riveted Mail",
+    slot="armour",
+    description="Modest protection against unhorsing at the cost of alignment.",
+    alignment_mod=-1, unhorse_resist=1,
+))
+
+add_item(EquipmentItem(
+    key="armour_duelist",
+    name="Duelist's Harness",
+    slot="armour",
+    description="A precision-focused harness with dangerously light saddle protection.",
+    knight_stat_mods={"strength": -1},
+    alignment_mod=2, unhorse_resist=-2,
+))
+
+add_item(EquipmentItem(
+    key="barding_runner",
+    name="Runner's Barding",
+    slot="barding",
+    description="Fast and light, but spooks easily and slips on unstable terrain.",
+    horse_stat_mods={"speed": 2, "courage": -2},
+    panic_mod=-2, slip_mod=2,
+))
+
+add_item(EquipmentItem(
+    key="barding_marsh",
+    name="Marsh Warden Barding",
+    slot="barding",
+    description="Superb footing on treacherous ground, but slow to build a charge.",
+    horse_stat_mods={"stamina": 2, "speed": -1},
+    slip_mod=-2, charge_mod=-2,
+))
+
 def get_item(key: Optional[str]) -> Optional[EquipmentItem]:
     if not key:
         return None
