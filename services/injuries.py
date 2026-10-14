@@ -19,7 +19,7 @@ KINDS = {
     "twisted_knee": ("Twisted Knee", "agility", 32),
     "strained_back": ("Strained Back", "endurance", 40),
 }
-RISKS = {"unhorsing": 28, "saddle_stagger": 12, "heavy_shield_hit": 6}
+RISKS = {"unhorsing": 28, "saddle_stagger": 12, "heavy_shield_hit": 6, "horse_slip": 10}
 PENALTY_CAP = 2
 HEAL_HOURS = 24   # Legacy names retained for callers; tiered treatment supersedes these.
 HEAL_COST = 30
@@ -94,25 +94,37 @@ def risk_profile(match: dict, side: str, other: str, category: str) -> dict:
     own_gear = defender.get("gear") or {}
     foe_gear = attacker.get("gear") or {}
     area = str(match.get("arena_key", "royal_lists"))
+    horse_stats = defender.get("horse_stats") or {}
+    courage = int(horse_stats.get("courage", 5))
+    obedience = int(horse_stats.get("obedience", 5))
+    horse_handling = (-1 if courage >= 8 else (1 if courage <= 3 else 0))
+    horse_handling += (-1 if obedience >= 8 else (1 if obedience <= 3 else 0))
     mods = {
         "arena": ARENA_RISK.get(area, 0),
         "armour": ARMOUR_RISK.get(own_gear.get("armour"), 0),
         "barding": BARDING_RISK.get(own_gear.get("barding"), 0),
         "attacker_lance": LANCE_RISK.get(foe_gear.get("lance"), 0),
         "horse_breed": _breed_modifier(defender.get("horse_breed", "")),
+        "horse_handling": horse_handling,
     }
     # Riding while hurt adds a little danger without multiplying injury penalties.
     if defender.get("already_injured"):
         mods["riding_hurt"] = 3
+    if category == "horse_slip":
+        # Slippery ground primarily causes lower-body rather than shield injuries.
+        mods["terrain_slip"] = max(0, ARENA_RISK.get(area, 0)) // 2
     base = RISKS[category]
     chance = max(MIN_RISK, min(MAX_RISK, base + sum(mods.values())))
     return {"category": category, "base": base, "modifiers": mods, "chance": chance}
 
 
-def _choose_kind(match_id: str, side: str, arena: str) -> str:
+def _choose_kind(match_id: str, side: str, arena: str, category: str = "") -> str:
     weights = {key: 2 for key in KINDS}
     for key, bonus in ARENA_KIND_WEIGHTS.get(arena, {}).items():
         weights[key] += bonus
+    if category == "horse_slip":
+        weights["twisted_knee"] += 7
+        weights["strained_back"] += 3
     total = sum(weights.values())
     target = roll(match_id, side, "kind") * total // 100
     for kind, weight in weights.items():
@@ -153,7 +165,7 @@ def make_events(match: dict) -> list[dict]:
                 strongest = profile
         if not strongest or roll(mid, side, "risk") >= strongest["chance"]:
             continue
-        kind = _choose_kind(mid, side, match.get("arena_key", "royal_lists"))
+        kind = _choose_kind(mid, side, match.get("arena_key", "royal_lists"), strongest["category"])
         name, stat, hours = KINDS[kind]
         severity_roll = roll(mid, side, "severity")
         severity = "light" if severity_roll < 50 else ("moderate" if severity_roll < 90 else "serious")
@@ -198,7 +210,7 @@ def injuries(guild_id: int | None, user_id: int, history=None, data=None, now=No
                 if event["user_id"] != user_id or event["id"] in seen:
                     continue
                 seen.add(event["id"])
-                hours = max(0, int(paid.get(event["id"], {}).get("hours", 0)))
+                hours = max(0.0, float(paid.get(event["id"], {}).get("hours", 0)))
                 expiry = utc(event["expires_at"]) - timedelta(hours=hours)
                 remaining = max(0, (expiry - now).total_seconds())
             except (KeyError, ValueError, TypeError, OverflowError):
