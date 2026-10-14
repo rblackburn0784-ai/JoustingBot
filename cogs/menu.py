@@ -26,7 +26,7 @@ from services.competition import (
 from services.equipment import items_by_slot, get_item
 from services.records import load_history
 
-VERSION = "v0.7.1"
+VERSION = "v0.8"
 STYLE = discord.ButtonStyle
 
 
@@ -112,12 +112,13 @@ class MainMenuView(OwnedView):
             ("Getting Started", "📜", lambda it: navigate(it, StartView(it.user.id))),
             ("Knight", "⚔️", lambda it: navigate(it, KnightPage(it.user.id))),
             ("Horse", "🐎", lambda it: navigate(it, HorsePage(it.user.id))),
-            ("Equipment", "🛡️", lambda it: navigate(it, EquipmentPage(it.user.id))),
+            ("Equipment", "🛡️", lambda it: navigate(it, EquipmentPage(it.user.id, it.guild_id))),
             ("Arenas", "🏟️", lambda it: navigate(it, ArenaPage(it.user.id))),
             ("Challenge", "🎯", lambda it: navigate(it, DuelPage(it.user.id))),
             ("Profile", "📜", lambda it: navigate(it, ProfilePage(it.user.id))),
             ("Leaderboards", "🏆", lambda it: navigate(it, LeaderboardPage(it.user.id, it.guild_id))),
             ("Titles", "🏅", lambda it: navigate(it, TitlePage(it.user.id, it.guild_id))),
+            ("Progression", "🪙", lambda it: navigate(it, ProgressionPage(it.user.id, it.guild_id))),
         ]
         for i, (label, icon, action) in enumerate(pages):
             self.button(label, action, row=i // 5, emoji=icon)
@@ -132,7 +133,8 @@ class MainMenuView(OwnedView):
                      "challenge another player, and earn your way up the lists.\n\n"
                      "**Every section below opens usable controls.**\n"
                      "⚔️ Knight · 🐎 Horse · 🛡️ Equipment · 🏟️ Arenas\n"
-                     "🎯 Challenge · 📜 Profile · 🏆 Leaderboards · 🏅 Titles\n\n"
+                     "🎯 Challenge · 📜 Profile · 🏆 Leaderboards · 🏅 Titles\n"
+                     "🪙 Progression & Gold\n\n"
                      "Only authorised members see the ⚙️ Admin controls.")
 
 
@@ -141,8 +143,9 @@ class StartView(OwnedView):
         super().__init__(user_id)
         self.button("Create Knight", lambda it: navigate(it, KnightPage(it.user.id)), emoji="⚔️")
         self.button("Build Horse", lambda it: navigate(it, HorsePage(it.user.id)), emoji="🐎")
-        self.button("Choose Equipment", lambda it: navigate(it, EquipmentPage(it.user.id)), row=1, emoji="🛡️")
+        self.button("Choose Equipment", lambda it: navigate(it, EquipmentPage(it.user.id, it.guild_id)), row=1, emoji="🛡️")
         self.button("Challenge", lambda it: navigate(it, DuelPage(it.user.id)), row=1, emoji="🎯")
+        self.button("Earn Gold", lambda it: navigate(it, ProgressionPage(it.user.id, it.guild_id)), row=2, emoji="🪙")
         self.home()
 
     def make_embed(self):
@@ -899,6 +902,21 @@ class MenuCog(commands.Cog):
     @app_commands.command(name="help_joust", description="Open JoustingBot controls and help.")
     async def help_joust(self, interaction: discord.Interaction):
         view = MainMenuView(interaction.user.id, is_admin(interaction))
+        await interaction.response.send_message(embed=view.make_embed(), view=view, ephemeral=True)
+
+    @app_commands.command(name="progress", description="Check your gold, prestige and equipment unlocks.")
+    async def progress(self, interaction: discord.Interaction):
+        view = ProgressionPage(interaction.user.id, interaction.guild_id)
+        await interaction.response.send_message(embed=view.make_embed(), view=view, ephemeral=True)
+
+    @app_commands.command(name="armory", description="Browse, unlock and equip gear with buttons.")
+    async def armory(self, interaction: discord.Interaction):
+        view = EquipmentPage(interaction.user.id, interaction.guild_id)
+        await interaction.response.send_message(embed=view.make_embed(), view=view, ephemeral=True)
+
+    @app_commands.command(name="standards", description="Browse and equip cosmetic standards.")
+    async def standards(self, interaction: discord.Interaction):
+        view = StandardPage(interaction.user.id, interaction.guild_id)
         await interaction.response.send_message(embed=view.make_embed(), view=view, ephemeral=True)
 
     @app_commands.command(name="admin", description="Open the restricted JoustingBot admin dashboard.")
