@@ -79,6 +79,7 @@ class UIReleaseTests(unittest.TestCase):
             menu.EquipmentPicker(123, "lance"), menu.ArenaPage(123),
             menu.DuelPage(123), menu.ProfilePage(123),
             menu.LeaderboardPage(123, None), menu.TitlePage(123, None),
+            menu.InjuryPage(123, None),
             menu.AdminPage(123), menu.ConfirmKnightDelete(123),
             menu.ConfirmHorseDelete(123, "none"), menu.HomeOnlyView(123),
             KnightStatBuilderView(123, "Sir Test"),
