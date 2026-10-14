@@ -118,13 +118,30 @@ def risk_profile(match: dict, side: str, other: str, category: str) -> dict:
     return {"category": category, "base": base, "modifiers": mods, "chance": chance}
 
 
-def _choose_kind(match_id: str, side: str, arena: str, category: str = "") -> str:
+def _choose_kind(match_id: str, side: str, arena: str, category: str = "",
+                 defender: dict | None = None, attacker: dict | None = None) -> str:
     weights = {key: 2 for key in KINDS}
     for key, bonus in ARENA_KIND_WEIGHTS.get(arena, {}).items():
         weights[key] += bonus
     if category == "horse_slip":
         weights["twisted_knee"] += 7
         weights["strained_back"] += 3
+    defender = defender or {}
+    attacker = attacker or {}
+    armour = (defender.get("gear") or {}).get("armour")
+    barding = (defender.get("gear") or {}).get("barding")
+    lance = (attacker.get("gear") or {}).get("lance")
+    breed = str(defender.get("horse_breed", "")).lower()
+    if armour in {"armour_light", "armour_duelist"}:
+        weights["bruised_ribs"] += 3
+    if armour == "armour_full":
+        weights["strained_back"] += 2
+    if barding == "barding_steel":
+        weights["strained_back"] += 2
+    if lance in {"lance_heavy", "lance_oakbreaker"}:
+        weights["bruised_ribs"] += 2
+    if "courser" in breed or "charger" in breed:
+        weights["twisted_knee"] += 2
     total = sum(weights.values())
     target = roll(match_id, side, "kind") * total // 100
     for kind, weight in weights.items():
@@ -165,7 +182,8 @@ def make_events(match: dict) -> list[dict]:
                 strongest = profile
         if not strongest or roll(mid, side, "risk") >= strongest["chance"]:
             continue
-        kind = _choose_kind(mid, side, match.get("arena_key", "royal_lists"), strongest["category"])
+        kind = _choose_kind(mid, side, match.get("arena_key", "royal_lists"), strongest["category"],
+                            defender=match.get(side), attacker=match.get(other))
         name, stat, hours = KINDS[kind]
         severity_roll = roll(mid, side, "severity")
         severity = "light" if severity_roll < 50 else ("moderate" if severity_roll < 90 else "serious")
