@@ -243,10 +243,11 @@ class CreateKnightButton(discord.ui.Button):
         set_knight(db, knight)
         save_knights(db)
 
+        from cogs.menu import HomeOnlyView
         await interaction.response.edit_message(
             content="✅ Knight created.",
             embed=knight_embed(knight, interaction.user),
-            view=None,
+            view=HomeOnlyView(interaction.user.id),
         )
 
 
@@ -289,6 +290,12 @@ class KnightStatBuilderView(discord.ui.View):
         self.add_item(ValueSelect(self))
         self.add_item(CreateKnightButton(self))
         self.add_item(ResetStatsButton(self))
+        from cogs.menu import Action, MainMenuView, navigate, is_admin
+        self.add_item(Action(
+            "Main Menu",
+            lambda it: navigate(it, MainMenuView(it.user.id, is_admin(it))),
+            row=4, style=discord.ButtonStyle.success, emoji="🏰",
+        ))
 
     def total_points(self) -> int:
         return sum(self.stats.values())
