@@ -2,11 +2,25 @@
 
 A lightweight medieval jousting Discord game bot built with `discord.py`.
 
-**Current version:** `v0.5 — Match Engine Polish`
+**Current version:** `v0.6 — Profiles, Records & History`
 
 Players create a knight, build and bind a horse, equip both rider and horse, choose an arena, and challenge other Discord users to cinematic jousts with accept/decline buttons.
 
 This version focuses on making matches feel more like a sport: richer pass categories, arena-specific lines, gear-specific lines, seed display, debug roll breakdowns, and tunable balance constants.
+
+---
+
+## v0.6 Career & History
+
+Every **completed** joust (including instant test duels) is saved to `storage/matches.json`. Declined and expired challenges do not count. Existing knight and horse JSON records remain compatible; older matches played before this update cannot be reconstructed automatically.
+
+- `/profile [player]` — rider record, bound mount, and five most recent completed matches (private response).
+- `/knight stats` — your knight's wins, losses, draws, total jousts, unhorsings caused, times unhorsed, and lance breaks.
+- `/horse stats horse_id:<id>` — your horse's appearances, refusals, slips, and wins with its rider.
+- Saved history includes the matchup, horse identities, arena, scores, seed and pass outcomes.
+- Historical totals are calculated from the match journal, avoiding accidental double counting from displaying a result twice.
+
+**Note:** Records are local to the bot installation, not shared across deployments. Instant `/joust duel` results also count. Back up `storage/matches.json` alongside your existing local data.
 
 ---
 
@@ -120,6 +134,7 @@ JoustingBot/
 │   ├── arena.py        # /arena commands
 │   ├── equipment.py    # /equip commands
 │   ├── horse.py        # /horse commands and horse builder UI
+│   ├── profile.py      # /profile and records screens
 │   ├── joust.py        # /joust challenge, /joust duel, presentation and debug embeds
 │   ├── knight.py       # /knight commands and knight builder UI
 │   └── menu.py         # /menu and /help_joust
@@ -127,6 +142,7 @@ JoustingBot/
 ├── services/
 │   ├── arenas.py       # Arena definitions
 │   ├── balance.py      # v0.5 tunable combat constants
+│   ├── records.py      # Persistent matches and career statistics
 │   ├── combat.py       # Match simulation logic
 │   ├── equipment.py    # Equipment definitions and modifiers
 │   └── storage.py      # JSON helpers
