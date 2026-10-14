@@ -67,8 +67,9 @@ class CompetitionCog(commands.Cog):
         elif key == "arena":
             e.set_footer(text="Each rider's strongest arena; minimum 3 appearances in that arena.")
         else:
-            e.set_footer(text="JoustingBot v0.7 — Leaderboards & Titles")
-        await interaction.response.send_message(embed=e)
+            e.set_footer(text="JoustingBot v0.7.1 — UI & Titles")
+        from cogs.menu import PublicHomeView
+        await interaction.response.send_message(embed=e, view=PublicHomeView())
 
     @leaderboard_group.command(name="wins", description="Rank knights by number of wins.")
     async def wins(self, interaction: discord.Interaction):
@@ -102,28 +103,14 @@ class CompetitionCog(commands.Cog):
     async def arena(self, interaction: discord.Interaction):
         await self.show_board(interaction, "arena")
 
-    @app_commands.command(name="titles", description="See your earned and locked titles.")
+    @app_commands.command(name="titles", description="Browse all earned and locked titles using buttons.")
     async def titles(self, interaction: discord.Interaction):
         guild_id = await require_guild(interaction)
         if guild_id is None:
             return
-        progress = title_progress(guild_id, interaction.user.id)
-        wearing = equipped_title(guild_id, interaction.user.id)
-        e = discord.Embed(
-            title="🏅 Your Titles",
-            description=f"{interaction.user.mention} · Equipped: **{wearing or 'None'}**",
-            colour=discord.Colour.gold(),
-        )
-        lines = []
-        for key, info in progress.items():
-            icon = "✅" if info["earned"] else "🔒"
-            lines.append(
-                f"{icon} **{info['name']}** — {info['progress']}/{info['required']}\n"
-                f"      {info['description']}"
-            )
-        e.add_field(name="Progress", value="\n".join(lines)[:1024], inline=False)
-        e.set_footer(text="Earn titles with completed server jousts, then use /title equip.")
-        await interaction.response.send_message(embed=e, ephemeral=True)
+        from cogs.menu import TitlePage
+        view = TitlePage(interaction.user.id, guild_id)
+        await interaction.response.send_message(embed=view.make_embed(), view=view, ephemeral=True)
 
     @title_group.command(name="equip", description="Display one of your earned titles.")
     @app_commands.choices(title=[
@@ -140,9 +127,10 @@ class CompetitionCog(commands.Cog):
             set_title(guild_id, interaction.user.id, title)
         except ValueError as exc:
             return await interaction.response.send_message(f"🔒 {exc}", ephemeral=True)
+        from cogs.menu import HomeOnlyView
         await interaction.response.send_message(
             f"🏅 Equipped **{TITLE_RULES[title][0]}**! This now appears alongside your name on this server's leaderboards and profile.",
-            ephemeral=True,
+            ephemeral=True, view=HomeOnlyView(interaction.user.id),
         )
 
     @title_group.command(name="unequip", description="Remove your displayed title.")
@@ -151,7 +139,8 @@ class CompetitionCog(commands.Cog):
         if guild_id is None:
             return
         set_title(guild_id, interaction.user.id, None)
-        await interaction.response.send_message("✅ Title unequipped.", ephemeral=True)
+        from cogs.menu import HomeOnlyView
+        await interaction.response.send_message("✅ Title unequipped.", ephemeral=True, view=HomeOnlyView(interaction.user.id))
 
 
 async def setup(bot: commands.Bot):
