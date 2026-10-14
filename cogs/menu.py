@@ -796,6 +796,7 @@ class ProfilePage(OwnedView):
         self.button("My Profile", self.mine, row=1)
         self.button("Career Stats", self.stats, row=1)
         self.button("Match History", self.history, row=1)
+        self.button("Injury Ward", lambda it: navigate(it, InjuryPage(it.user.id, it.guild_id)), row=2, emoji="🩹")
         self.home()
 
     def make_embed(self):
