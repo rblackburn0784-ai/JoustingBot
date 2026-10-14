@@ -35,9 +35,13 @@ def record_match(prepared: Any, result: Any) -> str:
         "seed": result.seed,
         "a": {"user_id": prepared.fighter_a.user_id, "knight": prepared.knight_a.name,
               "horse_id": prepared.horse_a.horse_id, "horse": prepared.horse_a.name,
+              "gear": {"lance": prepared.fighter_a.lance_key, "armour": prepared.fighter_a.armour_key,
+                       "barding": prepared.fighter_a.barding_key},
               "score": result.score_a},
         "b": {"user_id": prepared.fighter_b.user_id, "knight": prepared.knight_b.name,
               "horse_id": prepared.horse_b.horse_id, "horse": prepared.horse_b.name,
+              "gear": {"lance": prepared.fighter_b.lance_key, "armour": prepared.fighter_b.armour_key,
+                       "barding": prepared.fighter_b.barding_key},
               "score": result.score_b},
         "passes": passes,
     }
