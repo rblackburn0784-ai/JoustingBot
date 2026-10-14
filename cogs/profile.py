@@ -8,7 +8,7 @@ from cogs.knight import get_knight, load_knights
 from cogs.horse import Horse, load_horses
 from services.records import knight_record, horse_record, latest_matches
 from services.competition import equipped_title
-from services.progression import equipped_standard, prestige
+from services.progression import equipped_standard, prestige, reputation
 
 def knight_stats_embed(member: discord.abc.User) -> discord.Embed:
     knight = get_knight(load_knights(), member.id)
@@ -19,10 +19,11 @@ def knight_stats_embed(member: discord.abc.User) -> discord.Embed:
     e.description = f"Rider: {member.mention}" + (f"\n🏅 **{current_title}**" if current_title else "")
     if guild:
         points, tier = prestige(guild.id, member.id)
+        rep = reputation(guild.id, member.id)
         standard = equipped_standard(guild.id, member.id)
         e.add_field(
             name="🪙 Guild Progression",
-            value=f"**{tier}** · {points} prestige" + (f"\n🚩 {standard}" if standard else ""),
+            value=f"**{tier}** · {points} prestige · {rep} reputation" + (f"\n🚩 {standard}" if standard else ""),
             inline=False,
         )
     e.add_field(name="Record", value=f"🏆 {stats['wins']} W  ·  {stats['losses']} L  ·  {stats['draws']} D\nJousts: **{stats['jousts_completed']}**", inline=False)
