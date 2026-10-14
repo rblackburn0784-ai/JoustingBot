@@ -15,9 +15,10 @@ from services.combat import Fighter, MatchResult, PassLog, run_single_match
 from services.equipment import get_item
 from services.records import record_match
 from services.progression import loadout, equipped_standard
+from services.injuries import apply_penalty, active as active_injuries, duration as injury_duration
 
 
-VERSION_LABEL = "JoustingBot v0.8 — Equipment Progression"
+VERSION_LABEL = "JoustingBot v0.8.1 — Injuries & Recovery"
 CHALLENGE_TIMEOUT_SECONDS = 120
 
 
@@ -196,6 +197,20 @@ def make_intro_embed(prepared: PreparedDuel) -> discord.Embed:
                       f"{prepared.knight_b.name}: **{standard_b or 'None'}**",
                 inline=False,
             )
+
+    if prepared.guild_id is not None:
+        for user_id, name in ((prepared.challenger.id, prepared.knight_a.name),
+                              (prepared.opponent.id, prepared.knight_b.name)):
+            injury_list = active_injuries(prepared.guild_id, user_id)
+            if injury_list:
+                e.add_field(
+                    name=f"🩹 {name} — recovering",
+                    value="\n".join(
+                        f"{inj['name']} ({injury_duration(inj['remaining_seconds'])})"
+                        for inj in injury_list[:3]
+                    )[:1024],
+                    inline=False,
+                )
 
     seed_text = f"Seed `{prepared.seed}`" if prepared.seed is not None else "Seed will be generated at match start."
     e.add_field(
@@ -543,11 +558,14 @@ class JoustCog(commands.Cog):
             knight.equipped_armour_key = loadout(guild_id, user_id, "armour", knight.equipped_armour_key)
             horse.equipped_barding_key = loadout(guild_id, user_id, "barding", horse.equipped_barding_key, horse.horse_id)
 
+        effective_a = apply_penalty(knight_a.stats, guild_id, challenger.id)
+        effective_b = apply_penalty(knight_b.stats, guild_id, opponent.id)
+
         fighter_a = Fighter(
             user_id=challenger.id,
             knight_name=knight_a.name,
             horse_name=horse_a.name,
-            knight_stats=knight_a.stats,
+            knight_stats=effective_a,
             horse_stats=horse_a.stats,
             lance_key=knight_a.equipped_lance_key,
             armour_key=knight_a.equipped_armour_key,
@@ -558,7 +576,7 @@ class JoustCog(commands.Cog):
             user_id=opponent.id,
             knight_name=knight_b.name,
             horse_name=horse_b.name,
-            knight_stats=knight_b.stats,
+            knight_stats=effective_b,
             horse_stats=horse_b.stats,
             lance_key=knight_b.equipped_lance_key,
             armour_key=knight_b.equipped_armour_key,
@@ -587,6 +605,18 @@ class JoustCog(commands.Cog):
         result = run_single_match(prepared.fighter_a, prepared.fighter_b, prepared.arena_key, seed=prepared.seed)
         result_embed = make_result_embed(result, prepared.arena_key)
         match_id = record_match(prepared, result)
+        if prepared.guild_id is not None and prepared.mode == "challenge":
+            from services.records import load_history
+            entry = next(
+                (m for m in reversed(load_history()["matches"]) if m.get("id") == match_id), {}
+            )
+            events = entry.get("injuries", [])
+            if events:
+                descriptions = []
+                for event in events:
+                    rider = prepared.knight_a.name if event["user_id"] == prepared.challenger.id else prepared.knight_b.name
+                    descriptions.append(f"**{rider}**: {event['name']} (−1 {event['stat']}, natural healing)")
+                result_embed.add_field(name="🩹 Injuries Sustained", value="\n".join(descriptions)[:1024], inline=False)
         result_embed.add_field(name="📜 Match ID", value=f"`{match_id}`", inline=False)
         await sender.send(embed=result_embed, view=ChallengeHomeView())
         return result
