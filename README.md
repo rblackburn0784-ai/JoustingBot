@@ -2,7 +2,7 @@
 
 A lightweight medieval jousting Discord game bot built with `discord.py`.
 
-**Current version:** `v0.6 — Profiles, Records & History`
+**Current version:** `v0.7 — Leaderboards & Titles`
 
 Players create a knight, build and bind a horse, equip both rider and horse, choose an arena, and challenge other Discord users to cinematic jousts with accept/decline buttons.
 
@@ -21,6 +21,40 @@ Every **completed** joust (including instant test duels) is saved to `storage/ma
 - Historical totals are calculated from the match journal, avoiding accidental double counting from displaying a result twice.
 
 **Note:** Records are local to the bot installation, not shared across deployments. Instant `/joust duel` results also count. Back up `storage/matches.json` alongside your existing local data.
+
+---
+
+## v0.7 — Leaderboards & Titles
+
+Eight server-scoped leaderboards are available:
+
+| Command | Ranking | Minimum |
+| --- | --- | --- |
+| /leaderboard wins | Most wins | 1 match |
+| /leaderboard winrate | Win percentage | 5 matches |
+| /leaderboard unhorsings | Most unhorsings caused | 1 match |
+| /leaderboard lancebreaks | Most lance breaks | 1 match |
+| /leaderboard jousts | Most completed matches | 1 match |
+| /leaderboard reliable_horse | Clean jousts / total jousts | 5 horse jousts |
+| /leaderboard chaotic_horse | (Refusals + slips) / joust | 3 horse jousts |
+| /leaderboard arena | Each rider's best arena by wins | 3 jousts at that arena |
+
+**Six cosmetic titles** can be earned:
+
+| Title | Unlock |
+| --- | --- |
+| The Unhorsed | Get unhorsed five times |
+| Shield Splitter | Break five lances |
+| Mud King | Win three jousts on Muddy Field |
+| Frozen Terror | Win three jousts on Frozen Ground |
+| Crowd Favourite | Complete ten jousts |
+| The Reluctant Rider | Experience three horse refusals |
+
+Use /titles to check progress, /title equip to select a title and /title unequip to remove it. Equipped titles appear on your profile and alongside your name in server leaderboards. They provide no combat bonuses.
+
+**Server scoping and historical data:** From v0.7 onwards, new match records include the Discord guild ID. Historical v0.6 match records did not capture guild IDs, so they remain available in global career history but are excluded from new *server* rankings and title unlocks. Instant /joust duel results also count; use /joust challenge for fair player competition.
+
+Back up both storage/matches.json and storage/titles.json; these files are intentionally ignored by Git. Automated Python syntax, tests and Discord command-registration checks run under GitHub Actions.
 
 ---
 
@@ -134,6 +168,7 @@ JoustingBot/
 │   ├── arena.py        # /arena commands
 │   ├── equipment.py    # /equip commands
 │   ├── horse.py        # /horse commands and horse builder UI
+│   ├── competition.py  # Rankings and title commands
 │   ├── profile.py      # /profile and records screens
 │   ├── joust.py        # /joust challenge, /joust duel, presentation and debug embeds
 │   ├── knight.py       # /knight commands and knight builder UI
@@ -142,6 +177,7 @@ JoustingBot/
 ├── services/
 │   ├── arenas.py       # Arena definitions
 │   ├── balance.py      # v0.5 tunable combat constants
+│   ├── competition.py  # Leaderboards/title rules
 │   ├── records.py      # Persistent matches and career statistics
 │   ├── combat.py       # Match simulation logic
 │   ├── equipment.py    # Equipment definitions and modifiers
