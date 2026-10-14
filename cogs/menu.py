@@ -1,262 +1,770 @@
+"""JoustingBot v0.7.1 — fully actionable, owner-locked Discord UI hub."""
 from __future__ import annotations
+
+import random
+import shutil
+from datetime import datetime, timezone
+from pathlib import Path
 
 import discord
 from discord import app_commands
 from discord.ext import commands
 
+from cogs.knight import (
+    KnightStatBuilderView, get_knight, load_knights, save_knights,
+    knight_embed, validate_name,
+)
+from cogs.horse import (
+    Horse, HorseStatBuilderView, load_horses, save_horses, horse_embed,
+    NAME_RE, BREED_RE, validate_text,
+)
+from cogs.profile import knight_stats_embed, horse_stats_embed, history_lines
+from services.arenas import ARENAS
+from services.competition import (
+    CATEGORIES, TITLE_RULES, equipped_title, ranked, set_title, title_progress,
+)
+from services.equipment import items_by_slot, get_item
+from services.records import load_history
 
-def main_menu_embed() -> discord.Embed:
-    e = discord.Embed(
-        title="🏰 Jousting Bot Main Menu",
-        description=(
-            "Create a knight, raise a horse, equip both, choose an arena, and run single joust matches.\n\n"
-            "**Recommended flow**\n"
-            "1. `/knight create`\n"
-            "2. `/horse create`\n"
-            "3. `/horse bind`\n"
-            "4. `/equip list`\n"
-            "5. `/arena list`\n"
-            "6. `/joust challenge`\n"
-            "7. `/profile`\n"
-            "8. `/leaderboard wins`\n"
-            "9. `/titles`"
-        ),
-    )
-    e.add_field(
-        name="Core Systems",
-        value="⚔️ Knights\n🐴 Horses\n🛡️ Equipment\n🏟️ Arenas\n🎯 Challenges\n📜 Profiles & History\n🏆 Leaderboards\n🏅 Titles",
-        inline=False,
-    )
-    e.set_footer(text="Use the buttons below for command help.")
+VERSION = "v0.7.1"
+STYLE = discord.ButtonStyle
+
+
+def is_admin(interaction: discord.Interaction) -> bool:
+    perms = getattr(interaction.user, "guild_permissions", None)
+    return bool(interaction.guild_id and perms and perms.manage_guild)
+
+
+def embed(title: str, description: str = "") -> discord.Embed:
+    e = discord.Embed(title=title, description=description, colour=discord.Colour.dark_gold())
+    e.set_footer(text=f"JoustingBot {VERSION} · Use Main Menu to return")
     return e
 
 
-def getting_started_embed() -> discord.Embed:
-    e = discord.Embed(
-        title="📜 Getting Started",
-        description=(
-            "Start by creating your knight and horse. Both use private dropdown builders, so you do not need to type stat numbers manually."
-        ),
-    )
-    e.add_field(
-        name="First-time setup",
-        value=(
-            "`/knight create name: Sir Example`\n"
-            "`/horse create name: Thunder breed: Destrier`\n"
-            "`/horse list`\n"
-            "`/horse bind horse_id: <id from list>`"
-        ),
-        inline=False,
-    )
-    e.add_field(
-        name="Then equip and fight",
-        value=(
-            "`/equip list`\n"
-            "`/equip lance item_key: lance_heavy`\n"
-            "`/equip armour item_key: armour_full`\n"
-            "`/equip barding item_key: barding_steel`\n"
-            "`/joust duel opponent: @Opponent arena_key: royal_lists`"
-        ),
-        inline=False,
-    )
-    return e
+class Action(discord.ui.Button):
+    def __init__(self, label: str, callback, *, row: int = 0,
+                 style: discord.ButtonStyle = STYLE.secondary, emoji: str | None = None,
+                 disabled: bool = False):
+        self.action = callback
+        super().__init__(label=label, row=row, style=style, emoji=emoji, disabled=disabled)
+
+    async def callback(self, interaction: discord.Interaction):
+        await self.action(interaction)
 
 
-def knight_help_embed() -> discord.Embed:
-    e = discord.Embed(title="⚔️ Knight Commands", description="Knights are your riders.")
-    e.add_field(name="Commands", value=(
-        "/knight create name:<name> — create your knight\n"
-        "/knight view — view your knight\n"
-        "/knight stats — inspect your career\n"
-        "/knight delete — delete your knight"
-    ), inline=False)
-    e.add_field(name="Stats", value="Strength, Control, Endurance, Agility, Resolve, Tactics. Spend exactly 20 points.", inline=False)
-    return e
-
-
-def horse_help_embed() -> discord.Embed:
-    e = discord.Embed(title="🐴 Horse Commands", description="Create and bind your mount to compete.")
-    e.add_field(name="Commands", value=(
-        "/horse create name:<name> breed:<breed> — create a horse\n"
-        "/horse list — list your horses\n"
-        "/horse view horse_id:<id> — view your horse\n"
-        "/horse stats horse_id:<id> — view its career\n"
-        "/horse bind horse_id:<id> — set current mount\n"
-        "/horse delete horse_id:<id> — delete a horse"
-    ), inline=False)
-    e.add_field(name="Stats", value="Speed, Stamina, Power, Obedience, Courage. Spend exactly 24 points.", inline=False)
-    return e
-
-
-def equipment_help_embed() -> discord.Embed:
-    e = discord.Embed(
-        title="🛡️ Equipment Commands",
-        description="Equipment has positive and negative traits. There is no gold/shop system yet; you can freely equip listed items.",
-    )
-    e.add_field(
-        name="Commands",
-        value=(
-            "`/equip list` — list everything\n"
-            "`/equip list slot:lance` — list lances\n"
-            "`/equip list slot:armour` — list armour\n"
-            "`/equip list slot:barding` — list horse barding\n"
-            "`/equip lance item_key:<key>` — equip a lance\n"
-            "`/equip armour item_key:<key>` — equip armour\n"
-            "`/equip barding item_key:<key>` — equip barding on your bound horse"
-        ),
-        inline=False,
-    )
-    return e
-
-
-def arena_help_embed() -> discord.Embed:
-    e = discord.Embed(
-        title="🏟️ Arena Commands",
-        description="Arenas modify alignment, charge, slip risk, panic risk, and impact.",
-    )
-    e.add_field(
-        name="Commands",
-        value=(
-            "`/arena list` — list arenas\n"
-            "`/arena view arena_key:<key>` — view arena modifiers"
-        ),
-        inline=False,
-    )
-    e.add_field(
-        name="Current arenas",
-        value="`royal_lists`, `muddy_field`, `frozen_ground`, `wind_swept`, `festival_arena`, `war_torn`",
-        inline=False,
-    )
-    return e
-
-
-def duel_help_embed() -> discord.Embed:
-    e = discord.Embed(
-        title="🎯 Joust Duel",
-        description="Single-match jousting. Both players need a knight and a bound horse.",
-    )
-    e.add_field(
-        name="Command",
-        value="`/joust challenge opponent:@Opponent arena_key:royal_lists`\n`/joust duel opponent:@Opponent arena_key:royal_lists` (instant testing)",
-        inline=False,
-    )
-    e.add_field(
-        name="Scoring",
-        value=(
-            "Lance break = 1 point\n"
-            "Solid hit = 2 points\n"
-            "Unhorsed = 3 points\n"
-            "First to 3 points or highest score after 5 passes wins."
-        ),
-        inline=False,
-    )
-    return e
-
-
-def profile_help_embed() -> discord.Embed:
-    e = discord.Embed(title="📜 Profiles & History", description="Every completed joust builds your persistent career record.")
-    e.add_field(name="Commands", value="/profile — your career and last five matches\n/profile player:@Member — view another rider\n/knight stats — your rider record\n/horse stats horse_id:<id> — your mount's career", inline=False)
-    e.set_footer(text="Declined and expired challenges do not count.")
-    return e
-
-
-
-def leaderboard_help_embed() -> discord.Embed:
-    e = discord.Embed(
-        title="🏆 Server Leaderboards",
-        description="Compete against other knights in this server. Rankings start from v0.7 because earlier matches have no server ID.",
-    )
-    e.add_field(name="Knight rankings", value=(
-        "/leaderboard wins\n/leaderboard winrate\n/leaderboard unhorsings\n"
-        "/leaderboard lancebreaks\n/leaderboard jousts\n/leaderboard arena"
-    ), inline=False)
-    e.add_field(name="Horse rankings", value=(
-        "/leaderboard reliable_horse\n/leaderboard chaotic_horse"
-    ), inline=False)
-    return e
-
-
-def titles_help_embed() -> discord.Embed:
-    e = discord.Embed(
-        title="🏅 Earned Titles",
-        description="Win jousts, break lances and perform in different arenas to unlock titles.",
-    )
-    e.add_field(name="Commands", value=(
-        "/titles — view unlocked titles and progress\n"
-        "/title equip — equip an earned title\n"
-        "/title unequip — remove your title"
-    ), inline=False)
-    e.add_field(name="Available titles", value=(
-        "The Unhorsed · Shield Splitter · Mud King\n"
-        "Frozen Terror · Crowd Favourite · The Reluctant Rider"
-    ), inline=False)
-    return e
-
-
-class MainMenuView(discord.ui.View):
-    def __init__(self):
+class OwnedView(discord.ui.View):
+    def __init__(self, user_id: int, *, admin: bool = False):
         super().__init__(timeout=300)
+        self.owner_id = user_id
+        self.admin_only = admin
 
-    @discord.ui.button(label="Getting Started", emoji="📜", style=discord.ButtonStyle.primary, row=0)
-    async def getting_started(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.edit_message(embed=getting_started_embed(), view=self)
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id != self.owner_id:
+            await interaction.response.send_message("❌ Open your own /menu.", ephemeral=True)
+            return False
+        if self.admin_only and not is_admin(interaction):
+            await interaction.response.send_message("⛔ Admin access requires Manage Server permission.", ephemeral=True)
+            return False
+        return True
 
-    @discord.ui.button(label="Knight", emoji="⚔️", style=discord.ButtonStyle.secondary, row=0)
-    async def knight(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.edit_message(embed=knight_help_embed(), view=self)
+    def button(self, label: str, callback, *, row: int = 0, style=STYLE.secondary,
+               emoji: str | None = None, disabled: bool = False):
+        self.add_item(Action(label, callback, row=row, style=style, emoji=emoji, disabled=disabled))
 
-    @discord.ui.button(label="Horse", emoji="🐴", style=discord.ButtonStyle.secondary, row=0)
-    async def horse(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.edit_message(embed=horse_help_embed(), view=self)
+    def home(self):
+        self.button("Main Menu", lambda it: navigate(it, MainMenuView(it.user.id, is_admin(it))),
+                    row=4, style=STYLE.success, emoji="🏰")
 
-    @discord.ui.button(label="Equipment", emoji="🛡️", style=discord.ButtonStyle.secondary, row=1)
-    async def equipment(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.edit_message(embed=equipment_help_embed(), view=self)
+    async def on_timeout(self):
+        for component in self.children:
+            component.disabled = True
 
-    @discord.ui.button(label="Arenas", emoji="🏟️", style=discord.ButtonStyle.secondary, row=1)
-    async def arenas(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.edit_message(embed=arena_help_embed(), view=self)
 
-    @discord.ui.button(label="Duel", emoji="🎯", style=discord.ButtonStyle.secondary, row=1)
-    async def duel(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.edit_message(embed=duel_help_embed(), view=self)
+async def navigate(interaction: discord.Interaction, view: "OwnedView", message: str | None = None):
+    await interaction.response.edit_message(content=message, embed=view.make_embed(), view=view)
 
-    @discord.ui.button(label="Profile", emoji="📜", style=discord.ButtonStyle.secondary, row=2)
-    async def profile(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.edit_message(embed=profile_help_embed(), view=self)
 
-    @discord.ui.button(label="Leaderboards", emoji="🏆", style=discord.ButtonStyle.secondary, row=2)
-    async def leaderboards(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.edit_message(embed=leaderboard_help_embed(), view=self)
+class MainMenuView(OwnedView):
+    def __init__(self, user_id: int, allow_admin: bool = False):
+        super().__init__(user_id)
+        pages = [
+            ("Getting Started", "📜", lambda it: navigate(it, StartView(it.user.id))),
+            ("Knight", "⚔️", lambda it: navigate(it, KnightPage(it.user.id))),
+            ("Horse", "🐎", lambda it: navigate(it, HorsePage(it.user.id))),
+            ("Equipment", "🛡️", lambda it: navigate(it, EquipmentPage(it.user.id))),
+            ("Arenas", "🏟️", lambda it: navigate(it, ArenaPage(it.user.id))),
+            ("Challenge", "🎯", lambda it: navigate(it, DuelPage(it.user.id))),
+            ("Profile", "📜", lambda it: navigate(it, ProfilePage(it.user.id))),
+            ("Leaderboards", "🏆", lambda it: navigate(it, LeaderboardPage(it.user.id, it.guild_id))),
+            ("Titles", "🏅", lambda it: navigate(it, TitlePage(it.user.id, it.guild_id))),
+        ]
+        for i, (label, icon, action) in enumerate(pages):
+            self.button(label, action, row=i // 5, emoji=icon)
+        if allow_admin:
+            self.button("Admin", lambda it: navigate(it, AdminPage(it.user.id)),
+                        row=2, style=STYLE.danger, emoji="⚙️")
+        self.home()
 
-    @discord.ui.button(label="Titles", emoji="🏅", style=discord.ButtonStyle.secondary, row=2)
-    async def titles(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.edit_message(embed=titles_help_embed(), view=self)
+    def make_embed(self):
+        return embed("🏰 The Grand Lists — Main Menu",
+                     "Welcome, rider. Build your knight and mount, choose your equipment, "
+                     "challenge another player, and earn your way up the lists.\n\n"
+                     "**Every section below opens usable controls.**\n"
+                     "⚔️ Knight · 🐎 Horse · 🛡️ Equipment · 🏟️ Arenas\n"
+                     "🎯 Challenge · 📜 Profile · 🏆 Leaderboards · 🏅 Titles\n\n"
+                     "Only authorised members see the ⚙️ Admin controls.")
 
-    @discord.ui.button(label="Home", emoji="🏰", style=discord.ButtonStyle.success, row=3)
-    async def home(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.edit_message(embed=main_menu_embed(), view=self)
+
+class StartView(OwnedView):
+    def __init__(self, user_id: int):
+        super().__init__(user_id)
+        self.button("Create Knight", lambda it: navigate(it, KnightPage(it.user.id)), emoji="⚔️")
+        self.button("Build Horse", lambda it: navigate(it, HorsePage(it.user.id)), emoji="🐎")
+        self.button("Choose Equipment", lambda it: navigate(it, EquipmentPage(it.user.id)), row=1, emoji="🛡️")
+        self.button("Challenge", lambda it: navigate(it, DuelPage(it.user.id)), row=1, emoji="🎯")
+        self.home()
+
+    def make_embed(self):
+        return embed("📜 Getting Started", "1. Create a **knight** (20 total stat points).\n"
+                     "2. Create a **horse** (24 points), then bind it.\n"
+                     "3. Equip a lance, armour and barding.\n"
+                     "4. Choose an arena and issue a challenge.\n"
+                     "5. Win jousts to appear on leaderboards and unlock titles.\n\n"
+                     "Private builders, selections and confirmations are available through the buttons below.")
+
+
+class KnightModal(discord.ui.Modal, title="Create Your Knight"):
+    name = discord.ui.TextInput(label="Knight name", placeholder="Sir Raymond", min_length=2, max_length=24)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        try:
+            name = validate_name(str(self.name))
+        except ValueError as exc:
+            return await interaction.response.send_message(f"❌ {exc}", ephemeral=True)
+        if get_knight(load_knights(), interaction.user.id):
+            return await interaction.response.send_message("❌ You already have a knight.", ephemeral=True)
+        view = KnightStatBuilderView(interaction.user.id, name)
+        await interaction.response.send_message(embed=view.make_embed(), view=view, ephemeral=True)
+
+
+class ConfirmKnightDelete(OwnedView):
+    def __init__(self, user_id: int):
+        super().__init__(user_id)
+        self.button("Confirm Delete", self.confirm, style=STYLE.danger, emoji="trash", row=0)
+        self.button("Cancel", lambda it: navigate(it, KnightPage(it.user.id)), row=0)
+        self.home()
+
+    def make_embed(self):
+        return embed("⚠️ Delete Your Knight?", "This removes the active knight but **does not erase historical match results**.")
+
+    async def confirm(self, interaction):
+        db = load_knights()
+        existed = db.get("knights", {}).pop(str(interaction.user.id), None)
+        if existed:
+            save_knights(db)
+        await navigate(interaction, KnightPage(interaction.user.id), "✅ Knight deleted." if existed else "No knight found.")
+
+
+class KnightPage(OwnedView):
+    def __init__(self, user_id: int):
+        super().__init__(user_id)
+        self.button("Create", self.create, emoji="plus")
+        self.button("View Knight", self.view, emoji="shield")
+        self.button("Career Stats", self.stats, emoji="chart-bar")
+        self.button("Delete", lambda it: navigate(it, ConfirmKnightDelete(it.user.id)), style=STYLE.danger)
+        self.home()
+
+    def make_embed(self):
+        knight = get_knight(load_knights(), self.owner_id)
+        return embed("⚔️ Knight Hall", f"Current knight: **{knight.name}**" if knight else
+                     "No knight created yet. Press **Create** to begin.")
+
+    async def create(self, interaction):
+        await interaction.response.send_modal(KnightModal())
+
+    async def view(self, interaction):
+        knight = get_knight(load_knights(), interaction.user.id)
+        await interaction.response.edit_message(
+            embed=knight_embed(knight, interaction.user) if knight else self.make_embed(), view=self)
+
+    async def stats(self, interaction):
+        await interaction.response.edit_message(embed=knight_stats_embed(interaction.user), view=self)
+
+
+class HorseModal(discord.ui.Modal, title="Create Your Horse"):
+    name = discord.ui.TextInput(label="Horse name", placeholder="Thunder", min_length=2, max_length=24)
+    breed = discord.ui.TextInput(label="Breed", placeholder="Destrier", min_length=2, max_length=28)
+
+    async def on_submit(self, interaction):
+        try:
+            name = validate_text(str(self.name), NAME_RE, "Name")
+            breed = validate_text(str(self.breed), BREED_RE, "Breed")
+        except ValueError as exc:
+            return await interaction.response.send_message(f"❌ {exc}", ephemeral=True)
+        view = HorseStatBuilderView(interaction.user.id, name, breed)
+        await interaction.response.send_message(embed=view.make_embed(), view=view, ephemeral=True)
+
+
+class HorsePage(OwnedView):
+    def __init__(self, user_id: int):
+        super().__init__(user_id)
+        self.button("Create Horse", lambda it: it.response.send_modal(HorseModal()), emoji="plus")
+        self.button("Manage Stable", lambda it: navigate(it, StableView(it.user.id)), emoji="list")
+        self.home()
+
+    def make_embed(self):
+        all_horses = load_horses().get("horses", {}).values()
+        owned = [x for x in all_horses if x.get("owner_id") == self.owner_id]
+        return embed("🐎 Your Stables", f"**{len(owned)}** horse(s) in your stable.\n"
+                     "Create a horse or open **Manage Stable** to view, bind, inspect stats or delete it.")
+
+
+class HorsePicker(discord.ui.Select):
+    def __init__(self, parent: "StableView", choices):
+        self.parent = parent
+        options = [discord.SelectOption(
+            label=Horse.from_dict(raw).name[:100], value=Horse.from_dict(raw).horse_id,
+            description=Horse.from_dict(raw).breed[:100],
+            default=parent.selected_id == Horse.from_dict(raw).horse_id,
+        ) for raw in choices]
+        super().__init__(placeholder="Select a horse", options=options, row=0)
+
+    async def callback(self, interaction):
+        self.parent.selected_id = self.values[0]
+        await interaction.response.edit_message(embed=self.parent.make_embed(), view=self.parent)
+
+
+class StableView(OwnedView):
+    PAGE_SIZE = 20
+
+    def __init__(self, user_id: int, page: int = 0):
+        super().__init__(user_id)
+        self.page = page
+        self.raws = [r for r in load_horses().get("horses", {}).values() if r.get("owner_id") == user_id]
+        self.raws.sort(key=lambda x: (x.get("name", "").lower(), x.get("horse_id", "")))
+        self.page = min(self.page, max(0, (len(self.raws) - 1) // self.PAGE_SIZE))
+        choices = self.raws[self.page * self.PAGE_SIZE:(self.page + 1) * self.PAGE_SIZE]
+        self.selected_id = choices[0].get("horse_id") if choices else None
+        if choices:
+            self.add_item(HorsePicker(self, choices))
+        self.button("View", self.show, row=1, disabled=not choices)
+        self.button("Stats", self.stats, row=1, disabled=not choices)
+        self.button("Bind", self.bind, row=1, style=STYLE.primary, disabled=not choices)
+        self.button("Delete", self.delete, row=1, style=STYLE.danger, disabled=not choices)
+        self.button("◀", lambda it: navigate(it, StableView(it.user.id, self.page - 1)),
+                    row=2, disabled=self.page == 0)
+        self.button("▶", lambda it: navigate(it, StableView(it.user.id, self.page + 1)),
+                    row=2, disabled=(self.page + 1) * self.PAGE_SIZE >= len(self.raws))
+        self.button("Back", lambda it: navigate(it, HorsePage(it.user.id)), row=2)
+        self.home()
+
+    def horse(self):
+        raw = load_horses().get("horses", {}).get(self.selected_id)
+        if raw and raw.get("owner_id") == self.owner_id:
+            return Horse.from_dict(raw)
+        return None
+
+    def make_embed(self):
+        h = self.horse()
+        detail = (f"**{h.name}** ({h.breed})\nBarding: {h.equipped_barding_key}\nID: \`{h.horse_id}\`"
+                  if h else "No horse on this page.")
+        return embed("🐎 Stable Management", f"{detail}\n\nPage {self.page + 1} of "
+                     f"{max(1, (len(self.raws) + self.PAGE_SIZE - 1) // self.PAGE_SIZE)}")
+
+    async def show(self, interaction):
+        h = self.horse()
+        await interaction.response.edit_message(embed=horse_embed(h, interaction.user) if h else self.make_embed(), view=self)
+
+    async def stats(self, interaction):
+        h = self.horse()
+        await interaction.response.edit_message(embed=horse_stats_embed(h) if h else self.make_embed(), view=self)
+
+    async def bind(self, interaction):
+        h = self.horse()
+        if not h:
+            return await interaction.response.send_message("❌ Horse not found.", ephemeral=True)
+        db = load_knights()
+        knight = db.get("knights", {}).get(str(interaction.user.id))
+        if not knight:
+            return await interaction.response.send_message("❌ Create your knight first.", ephemeral=True)
+        knight["bound_horse_id"] = h.horse_id
+        save_knights(db)
+        await navigate(interaction, StableView(interaction.user.id, self.page), f"✅ {h.name} is now your mount.")
+
+    async def delete(self, interaction):
+        h = self.horse()
+        if h:
+            await navigate(interaction, ConfirmHorseDelete(interaction.user.id, h.horse_id))
+        else:
+            await interaction.response.send_message("❌ Horse not found.", ephemeral=True)
+
+
+class ConfirmHorseDelete(OwnedView):
+    def __init__(self, user_id: int, horse_id: str):
+        super().__init__(user_id)
+        self.horse_id = horse_id
+        self.button("Confirm Delete", self.confirm, style=STYLE.danger)
+        self.button("Cancel", lambda it: navigate(it, StableView(it.user.id)))
+        self.home()
+
+    def make_embed(self):
+        return embed("⚠️ Delete Horse?", "Deleting a horse will also unbind it from your knight.")
+
+    async def confirm(self, interaction):
+        db = load_horses()
+        raw = db.get("horses", {}).get(self.horse_id)
+        if not raw or raw.get("owner_id") != interaction.user.id:
+            return await interaction.response.send_message("❌ That horse is not yours.", ephemeral=True)
+        del db["horses"][self.horse_id]
+        save_horses(db)
+        knights = load_knights()
+        knight = knights.get("knights", {}).get(str(interaction.user.id))
+        if knight and knight.get("bound_horse_id") == self.horse_id:
+            knight["bound_horse_id"] = None
+            save_knights(knights)
+        await navigate(interaction, StableView(interaction.user.id), "🗑️ Horse deleted.")
+
+
+class EquipmentPage(OwnedView):
+    def __init__(self, user_id: int):
+        super().__init__(user_id)
+        for i, (key, label) in enumerate((("lance", "Lances"), ("armour", "Armour"), ("barding", "Horse Barding"))):
+            self.button(label, lambda it, slot=key: navigate(it, EquipmentPicker(it.user.id, slot)), row=0)
+        self.home()
+
+    def make_embed(self):
+        knight = get_knight(load_knights(), self.owner_id)
+        if knight:
+            detail = (f"**Lance:** {knight.equipped_lance_key}\n"
+                      f"**Armour:** {knight.equipped_armour_key}\n"
+                      f"**Bound Horse:** {knight.bound_horse_id or 'None'}")
+        else:
+            detail = "Create a knight before equipping."
+        return embed("🛡️ Equipment", detail + "\n\nEvery item has trade-offs; choose a category below.")
+
+
+class GearSelect(discord.ui.Select):
+    def __init__(self, parent: "EquipmentPicker"):
+        self.parent = parent
+        choices = items_by_slot(parent.slot)
+        super().__init__(placeholder="Choose your item", row=0, options=[
+            discord.SelectOption(label=item.name[:100], value=key,
+                description=item.description[:100], default=key == parent.selected)
+            for key, item in choices.items()
+        ])
+
+    async def callback(self, interaction):
+        self.parent.selected = self.values[0]
+        await interaction.response.edit_message(embed=self.parent.make_embed(), view=self.parent)
+
+
+class EquipmentPicker(OwnedView):
+    def __init__(self, user_id: int, slot: str):
+        super().__init__(user_id)
+        self.slot = slot
+        self.selected = next(iter(items_by_slot(slot)))
+        self.add_item(GearSelect(self))
+        self.button("Equip Selected", self.equip, row=1, style=STYLE.primary)
+        self.button("Back", lambda it: navigate(it, EquipmentPage(it.user.id)), row=1)
+        self.home()
+
+    def make_embed(self):
+        gear = get_item(self.selected)
+        mods = []
+        for field in ("knight_stat_mods", "horse_stat_mods"):
+            vals = getattr(gear, field)
+            mods += [f"{key}: {value:+}" for key, value in vals.items()]
+        return embed(f"🛡️ {self.slot.title()} Selection", f"**{gear.name}**\n{gear.description}\n"
+                     + (" · ".join(mods) if mods else "Balanced / no stat modifiers"))
+
+    async def equip(self, interaction):
+        gear = get_item(self.selected)
+        if not gear or gear.slot != self.slot:
+            return await interaction.response.send_message("❌ Invalid item.", ephemeral=True)
+        db = load_knights()
+        knight = db.get("knights", {}).get(str(interaction.user.id))
+        if not knight:
+            return await interaction.response.send_message("❌ Create your knight first.", ephemeral=True)
+        if self.slot == "barding":
+            hid = knight.get("bound_horse_id")
+            horse_db = load_horses()
+            raw = horse_db.get("horses", {}).get(hid)
+            if not raw or raw.get("owner_id") != interaction.user.id:
+                return await interaction.response.send_message("❌ Bind one of your horses first.", ephemeral=True)
+            raw["equipped_barding_key"] = self.selected
+            save_horses(horse_db)
+        else:
+            knight["equipped_" + self.slot + "_key"] = self.selected
+            save_knights(db)
+        await navigate(interaction, EquipmentPicker(interaction.user.id, self.slot),
+                       f"✅ Equipped {gear.name}.")
+
+
+class ArenaSelect(discord.ui.Select):
+    def __init__(self, parent: "ArenaPage"):
+        self.parent = parent
+        super().__init__(placeholder="Choose arena", row=0, options=[
+            discord.SelectOption(label=arena.name[:100], value=key, default=key == parent.selected)
+            for key, arena in ARENAS.items()
+        ])
+
+    async def callback(self, interaction):
+        self.parent.selected = self.values[0]
+        await interaction.response.edit_message(embed=self.parent.make_embed(), view=self.parent)
+
+
+class ArenaPage(OwnedView):
+    def __init__(self, user_id: int):
+        super().__init__(user_id)
+        self.selected = "royal_lists"
+        self.add_item(ArenaSelect(self))
+        self.button("Random Arena", self.random, row=1)
+        self.button("Challenge Here", lambda it: navigate(it, DuelPage(it.user.id, arena_key=self.selected)),
+                    row=1, style=STYLE.primary)
+        self.home()
+
+    def make_embed(self):
+        a = ARENAS[self.selected]
+        return embed(f"🏟️ {a.name}", f"{a.description}\n\n"
+                     f"Alignment {a.alignment_mod:+} · Charge {a.charge_mod:+}\n"
+                     f"Slip {a.slip_mod:+} · Panic {a.panic_mod:+} · Impact x{a.impact_mult:.2f}")
+
+    async def random(self, interaction):
+        self.selected = random.choice(list(ARENAS))
+        await interaction.response.edit_message(embed=self.make_embed(), view=self)
+
+
+class ArenaForDuel(discord.ui.Select):
+    def __init__(self, parent: "DuelPage"):
+        self.parent = parent
+        super().__init__(placeholder="Choose arena", row=1, options=[
+            discord.SelectOption(label=v.name, value=k, default=k == parent.arena_key)
+            for k, v in ARENAS.items()
+        ])
+
+    async def callback(self, interaction):
+        self.parent.arena_key = self.values[0]
+        await interaction.response.edit_message(embed=self.parent.make_embed(), view=self.parent)
+
+
+class OpponentSelect(discord.ui.UserSelect):
+    def __init__(self, parent: "DuelPage"):
+        self.parent = parent
+        super().__init__(placeholder="Select a Discord player to challenge", row=0)
+
+    async def callback(self, interaction):
+        self.parent.opponent_id = self.values[0].id
+        await interaction.response.edit_message(embed=self.parent.make_embed(), view=self.parent)
+
+
+class DuelPage(OwnedView):
+    def __init__(self, user_id: int, arena_key: str = "royal_lists", *, instant: bool = False):
+        super().__init__(user_id, admin=instant)
+        self.arena_key = arena_key
+        self.opponent_id = None
+        self.instant = instant
+        self.add_item(OpponentSelect(self))
+        self.add_item(ArenaForDuel(self))
+        self.button("Run Test Duel" if instant else "Issue Challenge", self.start,
+                    row=2, style=STYLE.primary)
+        self.button("Random Arena", self.random, row=2)
+        self.home()
+
+    def make_embed(self):
+        mode = "**ADMIN-ONLY instant test**" if self.instant else "Opponent must accept before the joust runs."
+        opponent = f"<@{self.opponent_id}>" if self.opponent_id else "Not yet selected"
+        return embed("🎯 " + ("Test Duel" if self.instant else "Joust Challenge"),
+                     f"**Opponent:** {opponent}\n**Arena:** {ARENAS[self.arena_key].name}\n\n"
+                     f"{mode}\n\nSelect a player and arena, then press the action button.")
+
+    async def random(self, interaction):
+        self.arena_key = random.choice(list(ARENAS))
+        await interaction.response.edit_message(embed=self.make_embed(), view=self)
+
+    async def start(self, interaction):
+        from cogs.joust import ChallengeView, make_challenge_embed
+        if self.instant and not is_admin(interaction):
+            return await interaction.response.send_message("⛔ Admin only.", ephemeral=True)
+        if not interaction.guild or not interaction.channel or not self.opponent_id:
+            return await interaction.response.send_message("❌ Select an opponent in a server channel.", ephemeral=True)
+        opponent = interaction.guild.get_member(self.opponent_id)
+        if not opponent:
+            try:
+                opponent = await interaction.guild.fetch_member(self.opponent_id)
+            except discord.HTTPException:
+                return await interaction.response.send_message("❌ Player not found in this server.", ephemeral=True)
+        cog = interaction.client.get_cog("JoustCog")
+        if not cog:
+            return await interaction.response.send_message("❌ Joust system unavailable.", ephemeral=True)
+        if cog.is_player_busy(interaction.user.id) or cog.is_player_busy(opponent.id):
+            return await interaction.response.send_message("❌ One rider already has an active challenge.", ephemeral=True)
+        error, prepared = cog.prepare_duel(
+            challenger=interaction.user, opponent=opponent, arena_key=self.arena_key,
+            guild_id=interaction.guild_id,
+        )
+        if error or prepared is None:
+            return await interaction.response.send_message(error or "❌ Could not prepare duel.", ephemeral=True)
+        await interaction.response.defer(ephemeral=True)
+        if self.instant:
+            try:
+                await cog.send_match(interaction.channel, prepared)
+            except discord.HTTPException:
+                return await interaction.followup.send("❌ Unable to send duel messages.", ephemeral=True)
+            return await interaction.followup.send("✅ Test duel posted; it does not affect competitive rankings.", ephemeral=True)
+        prepared.mode = "challenge"
+        cog.lock_challenge(interaction.user.id, opponent.id)
+        challenge_view = ChallengeView(cog, prepared)
+        try:
+            challenge_view.message = await interaction.channel.send(embed=make_challenge_embed(prepared), view=challenge_view)
+        except Exception:
+            cog.release_challenge(interaction.user.id, opponent.id)
+            challenge_view.stop()
+            return await interaction.followup.send("❌ Could not post the challenge in this channel.", ephemeral=True)
+        await interaction.followup.send("✅ Challenge posted for your opponent to accept.", ephemeral=True)
+
+
+class OtherPlayerSelect(discord.ui.UserSelect):
+    def __init__(self, parent: "ProfilePage"):
+        self.parent = parent
+        super().__init__(placeholder="Choose a rider to view", row=0)
+
+    async def callback(self, interaction):
+        self.parent.target = self.values[0]
+        await interaction.response.edit_message(embed=self.parent.make_embed(), view=self.parent)
+
+
+class ProfilePage(OwnedView):
+    def __init__(self, user_id: int):
+        super().__init__(user_id)
+        self.target = None
+        self.add_item(OtherPlayerSelect(self))
+        self.button("My Profile", self.mine, row=1)
+        self.button("Career Stats", self.stats, row=1)
+        self.button("Match History", self.history, row=1)
+        self.home()
+
+    def make_embed(self):
+        # Other riders are selected by Discord's user selector; they need not be online.
+        if self.target is None:
+            return embed("📜 Rider Profiles",
+                         "Press **My Profile**, or select another Discord user above.\n"
+                         "Career summaries show historical results and equipped titles.")
+        e = knight_stats_embed(self.target)
+        e.add_field(name="📜 Last Five Matches", value=history_lines(self.target.id)[:1024], inline=False)
+        return e
+
+    async def mine(self, interaction):
+        self.target = interaction.user
+        await interaction.response.edit_message(embed=self.make_embed(), view=self)
+
+    async def stats(self, interaction):
+        user = self.target or interaction.user
+        await interaction.response.edit_message(embed=knight_stats_embed(user), view=self)
+
+    async def history(self, interaction):
+        user = self.target or interaction.user
+        await interaction.response.edit_message(embed=embed("📜 Last Five Jousts", history_lines(user.id)[:4000]), view=self)
+
+
+class RankingSelect(discord.ui.Select):
+    def __init__(self, parent: "LeaderboardPage"):
+        self.parent = parent
+        super().__init__(placeholder="Select leaderboard", row=0, options=[
+            discord.SelectOption(label=name[:100], value=key, default=key == parent.category)
+            for key, name in CATEGORIES.items()
+        ])
+
+    async def callback(self, interaction):
+        self.parent.category = self.values[0]
+        await interaction.response.edit_message(embed=self.parent.make_embed(), view=self.parent)
+
+
+class LeaderboardPage(OwnedView):
+    def __init__(self, user_id: int, guild_id: int | None):
+        super().__init__(user_id)
+        self.guild_id = guild_id
+        self.category = "wins"
+        self.add_item(RankingSelect(self))
+        self.button("Refresh Board", lambda it: navigate(it, LeaderboardPage(it.user.id, it.guild_id)),
+                    row=1, style=STYLE.primary)
+        self.home()
+
+    def make_embed(self):
+        if self.guild_id is None:
+            return embed("🏆 Server Leaderboards", "Use this section inside a Discord server.")
+        entries = ranked(self.guild_id, self.category)
+        e = embed(f"🏆 {CATEGORIES[self.category]}", "Accepted challenges only · Top 10")
+        if not entries:
+            e.add_field(name="No qualifying results yet", value="Complete accepted challenges to build your rankings.", inline=False)
+        else:
+            lines = []
+            for i, row in enumerate(entries):
+                if "owner_id" in row:
+                    label = f"**{discord.utils.escape_markdown(row['name'])}** (<@{row['owner_id']}>)"
+                else:
+                    label = f"**{discord.utils.escape_markdown(row['name'])}** (<@{row['id']}>)"
+                    title = equipped_title(self.guild_id, row["id"])
+                    if title:
+                        label += f" · *{title}*"
+                lines.append(f"**{i + 1}.** {label} — {row['detail']}")
+            e.add_field(name="Standings", value="\n".join(lines)[:1024], inline=False)
+        return e
+
+
+class TitleSelect(discord.ui.Select):
+    def __init__(self, parent: "TitlePage"):
+        self.parent = parent
+        options = [
+            discord.SelectOption(label=label, value=key, default=key == parent.selected)
+            for key, (label, _d, _f, _n) in TITLE_RULES.items()
+        ]
+        super().__init__(placeholder="Choose title to equip (must be earned)", options=options, row=0)
+
+    async def callback(self, interaction):
+        self.parent.selected = self.values[0]
+        await interaction.response.edit_message(embed=self.parent.make_embed(), view=self.parent)
+
+
+class TitlePage(OwnedView):
+    PER_PAGE = 6
+
+    def __init__(self, user_id: int, guild_id: int | None, page: int = 0):
+        super().__init__(user_id)
+        self.guild_id = guild_id
+        self.page = page
+        self.selected = next(iter(TITLE_RULES))
+        self.add_item(TitleSelect(self))
+        self.button("Equip Selected", self.equip, row=1, style=STYLE.primary)
+        self.button("Unequip", self.unequip, row=1)
+        self.button("◀ Previous", self.previous, row=2, disabled=page == 0)
+        self.button("Next ▶", self.next, row=2, disabled=(page + 1) * self.PER_PAGE >= len(TITLE_RULES))
+        self.home()
+
+    def make_embed(self):
+        if self.guild_id is None:
+            return embed("🏅 Titles", "Titles are earned separately in each Discord server.")
+        status = title_progress(self.guild_id, self.owner_id)
+        equipped = equipped_title(self.guild_id, self.owner_id)
+        entries = list(status.items())
+        chunks = entries[self.page * self.PER_PAGE:(self.page + 1) * self.PER_PAGE]
+        lines = [f"{'✅' if val['earned'] else '🔒'} **{val['name']}** — {val['progress']}/{val['required']}\n"
+                 f"    {val['description']}" for _, val in chunks]
+        e = embed("🏅 Your Title Collection",
+                  f"**Equipped:** {equipped or 'None'}\n**Earned:** {sum(p['earned'] for p in status.values())}/{len(status)}\n\n"
+                  + "\n".join(lines))
+        e.add_field(name="Browsing", value=f"Page {self.page + 1} of {(len(entries) + self.PER_PAGE - 1) // self.PER_PAGE}\n"
+                    f"Selected: **{status[self.selected]['name']}**", inline=False)
+        return e
+
+    async def previous(self, interaction):
+        await navigate(interaction, TitlePage(interaction.user.id, interaction.guild_id, self.page - 1))
+
+    async def next(self, interaction):
+        await navigate(interaction, TitlePage(interaction.user.id, interaction.guild_id, self.page + 1))
+
+    async def equip(self, interaction):
+        if self.guild_id is None:
+            return await interaction.response.send_message("❌ Use this in a server.", ephemeral=True)
+        try:
+            set_title(self.guild_id, interaction.user.id, self.selected)
+        except ValueError as exc:
+            return await interaction.response.send_message(f"🔒 {exc}", ephemeral=True)
+        await interaction.response.edit_message(content="✅ Title equipped.", embed=self.make_embed(), view=self)
+
+    async def unequip(self, interaction):
+        if self.guild_id is None:
+            return await interaction.response.send_message("❌ Use this in a server.", ephemeral=True)
+        set_title(self.guild_id, interaction.user.id, None)
+        await interaction.response.edit_message(content="✅ Title unequipped.", embed=self.make_embed(), view=self)
+
+
+class AdminPage(OwnedView):
+    def __init__(self, user_id: int):
+        super().__init__(user_id, admin=True)
+        self.button("System Health", self.health, row=0, emoji="heart-pulse")
+        self.button("Server Summary", self.summary, row=0, emoji="chart-bar")
+        self.button("Backup Data", self.backup, row=1, style=STYLE.primary, emoji="save")
+        self.button("Instant Test Duel", lambda it: navigate(it, DuelPage(it.user.id, instant=True)), row=1)
+        self.home()
+
+    def make_embed(self):
+        return embed("⚙️ Admin Control Room",
+                     "**Restricted: Manage Server permission required.**\n"
+                     "Inspect storage, view guild totals, back up local JSON data, "
+                     "or run an instant unranked test match.")
+
+    async def health(self, interaction):
+        from services.storage import load_json
+        checks = []
+        for path in ("storage/knights.json", "storage/horses.json", "storage/matches.json", "storage/titles.json"):
+            file = Path(path)
+            if not file.exists():
+                checks.append(f"⚪ {file.name}: not yet created")
+                continue
+            try:
+                load_json(path, {})
+                checks.append(f"✅ {file.name}: readable ({file.stat().st_size:,} bytes)")
+            except (OSError, ValueError, TypeError) as exc:
+                checks.append(f"❌ {file.name}: {type(exc).__name__}")
+        await interaction.response.edit_message(embed=embed("⚙️ Storage Health", "\n".join(checks)), view=self)
+
+    async def summary(self, interaction):
+        from services.competition import aggregate
+        from services.records import load_history
+        total = load_history().get("matches", [])
+        guild = interaction.guild_id
+        relevant = [m for m in total if m.get("guild_id") == guild]
+        knights, horses = aggregate(guild)
+        await interaction.response.edit_message(embed=embed(
+            "⚙️ Server Summary",
+            f"**Recorded matches:** {len(relevant)}\n**Competitive riders:** {len(knights)}\n"
+            f"**Horses used:** {len(horses)}\n\n"
+            "Instant test duels appear in records but are excluded from competitive totals."
+        ), view=self)
+
+    async def backup(self, interaction):
+        stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+        dest = Path("backups") / stamp
+        try:
+            dest.mkdir(parents=True, exist_ok=False)
+            copied = []
+            for name in ("knights.json", "horses.json", "matches.json", "titles.json"):
+                src = Path("storage") / name
+                if src.is_file():
+                    shutil.copy2(src, dest / name)
+                    copied.append(name)
+        except OSError as exc:
+            return await interaction.response.send_message(
+                f"❌ Backup could not be created: {type(exc).__name__}.", ephemeral=True)
+        await interaction.response.edit_message(
+            embed=embed("💾 Backup Created", f"Path: \`{dest}\`\nFiles: {', '.join(copied) or 'No data files exist yet.'}\n"
+                        "Keep this directory private and backed up off-host too."),
+            view=self,
+        )
 
 
 class MenuCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-    @app_commands.command(name="menu", description="Open the Jousting Bot main menu.")
+    @app_commands.command(name="menu", description="Open the interactive JoustingBot game hub.")
     async def menu(self, interaction: discord.Interaction):
-        await interaction.response.send_message(
-            embed=main_menu_embed(),
-            view=MainMenuView(),
-            ephemeral=True,
-        )
+        view = MainMenuView(interaction.user.id, is_admin(interaction))
+        await interaction.response.send_message(embed=view.make_embed(), view=view, ephemeral=True)
 
-    @app_commands.command(name="help_joust", description="Open the Jousting Bot help menu.")
+    @app_commands.command(name="help_joust", description="Open JoustingBot controls and help.")
     async def help_joust(self, interaction: discord.Interaction):
-        await interaction.response.send_message(
-            embed=main_menu_embed(),
-            view=MainMenuView(),
-            ephemeral=True,
-        )
+        view = MainMenuView(interaction.user.id, is_admin(interaction))
+        await interaction.response.send_message(embed=view.make_embed(), view=view, ephemeral=True)
+
+    @app_commands.command(name="admin", description="Open the restricted JoustingBot admin dashboard.")
+    @app_commands.default_permissions(manage_guild=True)
+    @app_commands.guild_only()
+    async def admin(self, interaction: discord.Interaction):
+        if not is_admin(interaction):
+            return await interaction.response.send_message("⛔ Manage Server permission required.", ephemeral=True)
+        view = AdminPage(interaction.user.id)
+        await interaction.response.send_message(embed=view.make_embed(), view=view, ephemeral=True)
 
 
 async def setup(bot: commands.Bot):
