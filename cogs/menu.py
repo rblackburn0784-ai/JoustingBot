@@ -242,7 +242,7 @@ class HorsePage(OwnedView):
 
 class HorsePicker(discord.ui.Select):
     def __init__(self, parent: "StableView", choices):
-        self.parent = parent
+        self.screen = parent
         options = [discord.SelectOption(
             label=Horse.from_dict(raw).name[:100], value=Horse.from_dict(raw).horse_id,
             description=Horse.from_dict(raw).breed[:100],
@@ -251,8 +251,8 @@ class HorsePicker(discord.ui.Select):
         super().__init__(placeholder="Select a horse", options=options, row=0)
 
     async def callback(self, interaction):
-        self.parent.selected_id = self.values[0]
-        await interaction.response.edit_message(embed=self.parent.make_embed(), view=self.parent)
+        self.screen.selected_id = self.values[0]
+        await interaction.response.edit_message(embed=self.screen.make_embed(), view=self.screen)
 
 
 class StableView(OwnedView):
@@ -366,7 +366,7 @@ class EquipmentPage(OwnedView):
 
 class GearSelect(discord.ui.Select):
     def __init__(self, parent: "EquipmentPicker"):
-        self.parent = parent
+        self.screen = parent
         choices = items_by_slot(parent.slot)
         super().__init__(placeholder="Choose your item", row=0, options=[
             discord.SelectOption(label=item.name[:100], value=key,
@@ -375,8 +375,8 @@ class GearSelect(discord.ui.Select):
         ])
 
     async def callback(self, interaction):
-        self.parent.selected = self.values[0]
-        await interaction.response.edit_message(embed=self.parent.make_embed(), view=self.parent)
+        self.screen.selected = self.values[0]
+        await interaction.response.edit_message(embed=self.screen.make_embed(), view=self.screen)
 
 
 class EquipmentPicker(OwnedView):
@@ -423,15 +423,15 @@ class EquipmentPicker(OwnedView):
 
 class ArenaSelect(discord.ui.Select):
     def __init__(self, parent: "ArenaPage"):
-        self.parent = parent
+        self.screen = parent
         super().__init__(placeholder="Choose arena", row=0, options=[
             discord.SelectOption(label=arena.name[:100], value=key, default=key == parent.selected)
             for key, arena in ARENAS.items()
         ])
 
     async def callback(self, interaction):
-        self.parent.selected = self.values[0]
-        await interaction.response.edit_message(embed=self.parent.make_embed(), view=self.parent)
+        self.screen.selected = self.values[0]
+        await interaction.response.edit_message(embed=self.screen.make_embed(), view=self.screen)
 
 
 class ArenaPage(OwnedView):
@@ -457,25 +457,25 @@ class ArenaPage(OwnedView):
 
 class ArenaForDuel(discord.ui.Select):
     def __init__(self, parent: "DuelPage"):
-        self.parent = parent
+        self.screen = parent
         super().__init__(placeholder="Choose arena", row=1, options=[
             discord.SelectOption(label=v.name, value=k, default=k == parent.arena_key)
             for k, v in ARENAS.items()
         ])
 
     async def callback(self, interaction):
-        self.parent.arena_key = self.values[0]
-        await interaction.response.edit_message(embed=self.parent.make_embed(), view=self.parent)
+        self.screen.arena_key = self.values[0]
+        await interaction.response.edit_message(embed=self.screen.make_embed(), view=self.screen)
 
 
 class OpponentSelect(discord.ui.UserSelect):
     def __init__(self, parent: "DuelPage"):
-        self.parent = parent
+        self.screen = parent
         super().__init__(placeholder="Select a Discord player to challenge", row=0)
 
     async def callback(self, interaction):
-        self.parent.opponent_id = self.values[0].id
-        await interaction.response.edit_message(embed=self.parent.make_embed(), view=self.parent)
+        self.screen.opponent_id = self.values[0].id
+        await interaction.response.edit_message(embed=self.screen.make_embed(), view=self.screen)
 
 
 class DuelPage(OwnedView):
@@ -546,12 +546,12 @@ class DuelPage(OwnedView):
 
 class OtherPlayerSelect(discord.ui.UserSelect):
     def __init__(self, parent: "ProfilePage"):
-        self.parent = parent
+        self.screen = parent
         super().__init__(placeholder="Choose a rider to view", row=0)
 
     async def callback(self, interaction):
-        self.parent.target = self.values[0]
-        await interaction.response.edit_message(embed=self.parent.make_embed(), view=self.parent)
+        self.screen.target = self.values[0]
+        await interaction.response.edit_message(embed=self.screen.make_embed(), view=self.screen)
 
 
 class ProfilePage(OwnedView):
@@ -589,15 +589,15 @@ class ProfilePage(OwnedView):
 
 class RankingSelect(discord.ui.Select):
     def __init__(self, parent: "LeaderboardPage"):
-        self.parent = parent
+        self.screen = parent
         super().__init__(placeholder="Select leaderboard", row=0, options=[
             discord.SelectOption(label=name[:100], value=key, default=key == parent.category)
             for key, name in CATEGORIES.items()
         ])
 
     async def callback(self, interaction):
-        self.parent.category = self.values[0]
-        await interaction.response.edit_message(embed=self.parent.make_embed(), view=self.parent)
+        self.screen.category = self.values[0]
+        await interaction.response.edit_message(embed=self.screen.make_embed(), view=self.screen)
 
 
 class LeaderboardPage(OwnedView):
@@ -634,7 +634,7 @@ class LeaderboardPage(OwnedView):
 
 class TitleSelect(discord.ui.Select):
     def __init__(self, parent: "TitlePage"):
-        self.parent = parent
+        self.screen = parent
         options = [
             discord.SelectOption(label=label, value=key, default=key == parent.selected)
             for key, (label, _d, _f, _n) in TITLE_RULES.items()
@@ -642,8 +642,8 @@ class TitleSelect(discord.ui.Select):
         super().__init__(placeholder="Choose title to equip (must be earned)", options=options, row=0)
 
     async def callback(self, interaction):
-        self.parent.selected = self.values[0]
-        await interaction.response.edit_message(embed=self.parent.make_embed(), view=self.parent)
+        self.screen.selected = self.values[0]
+        await interaction.response.edit_message(embed=self.screen.make_embed(), view=self.screen)
 
 
 class TitlePage(OwnedView):
