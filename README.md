@@ -26,7 +26,7 @@ Every **completed** joust (including instant test duels) is saved to `storage/ma
 
 ## v0.7 — Leaderboards & Titles
 
-Eight server-scoped leaderboards are available:
+Eight server-scoped leaderboards are available, based on **accepted challenges only**:
 
 | Command | Ranking | Minimum |
 | --- | --- | --- |
@@ -52,7 +52,7 @@ Eight server-scoped leaderboards are available:
 
 Use /titles to check progress, /title equip to select a title and /title unequip to remove it. Equipped titles appear on your profile and alongside your name in server leaderboards. They provide no combat bonuses.
 
-**Server scoping and historical data:** From v0.7 onwards, new match records include the Discord guild ID. Historical v0.6 match records did not capture guild IDs, so they remain available in global career history but are excluded from new *server* rankings and title unlocks. Instant /joust duel results also count; use /joust challenge for fair player competition.
+**Server scoping and historical data:** From v0.7 onwards, new match records include the Discord guild ID. Historical v0.6 match records did not capture guild IDs, so they remain available in global career history but are excluded from new *server* rankings and title unlocks. **Only accepted /joust challenge matches count towards server leaderboards and earned titles.** Instant /joust duel tests continue to be saved in personal match history, but do not affect competitive standings.
 
 Back up both storage/matches.json and storage/titles.json; these files are intentionally ignored by Git. Automated Python syntax, tests and Discord command-registration checks run under GitHub Actions.
 
