@@ -98,6 +98,7 @@ class PreparedDuel:
     seed: Optional[int] = None
     debug_requested: bool = False
     guild_id: Optional[int] = None
+    mode: str = "instant"
 
 
 def equipment_name(key: Optional[str]) -> str:
@@ -376,6 +377,8 @@ class ChallengeView(discord.ui.View):
         if interaction.user.id != self.prepared.opponent.id:
             return await interaction.response.send_message("❌ Only the challenged player can accept this joust.", ephemeral=True)
 
+        if self.completed:
+            return await interaction.response.send_message("❌ This challenge is already closed.", ephemeral=True)
         self.completed = True
 
         for item in self.children:
@@ -402,6 +405,8 @@ class ChallengeView(discord.ui.View):
         if interaction.user.id not in {self.prepared.challenger.id, self.prepared.opponent.id}:
             return await interaction.response.send_message("❌ This challenge is not yours to decline.", ephemeral=True)
 
+        if self.completed:
+            return await interaction.response.send_message("❌ This challenge is already closed.", ephemeral=True)
         self.completed = True
         self.cog.release_challenge(self.prepared.challenger.id, self.prepared.opponent.id)
 
@@ -605,6 +610,7 @@ class JoustCog(commands.Cog):
         if error or not prepared:
             return await interaction.response.send_message(error or "❌ Could not prepare challenge.", ephemeral=True)
 
+        prepared.mode = "challenge"
         self.lock_challenge(interaction.user.id, opponent.id)
 
         view = ChallengeView(self, prepared)
