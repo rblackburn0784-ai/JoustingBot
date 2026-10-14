@@ -45,6 +45,8 @@ def record_match(prepared: Any, result: Any) -> str:
               "score": result.score_b},
         "passes": passes,
     }
+    from services.injuries import make_events
+    entry["injuries"] = make_events(entry)
     data["matches"].append(entry)
     save_json(HISTORY_PATH, data)
     return match_id
