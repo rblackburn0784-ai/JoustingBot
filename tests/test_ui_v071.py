@@ -20,6 +20,49 @@ class UIReleaseTests(unittest.TestCase):
             self.assertGreater(threshold, 0)
         self.assertEqual(len(title_progress(1, 123, {"matches": []})), 18)
 
+    def test_all_twelve_new_titles_are_unlockable(self):
+        old_keys = {
+            "the_unhorsed", "shield_splitter", "mud_king",
+            "frozen_terror", "crowd_favourite", "the_reluctant_rider",
+        }
+        arenas = [
+            "royal_lists", "wind_swept", "festival_arena",
+            "war_torn", "muddy_field", "frozen_ground",
+        ]
+        matches = []
+        for index in range(30):
+            passes = [
+                {"category": "lance_break", "result": "Arthur: lance break",
+                 "points_a": 1, "points_b": 0, "notes": []},
+                {"category": "unhorsing", "result": "Arthur: unhorsing",
+                 "points_a": 3, "points_b": 0, "notes": []},
+            ]
+            matches.append({
+                "id": f"win{index}", "guild_id": 99, "mode": "challenge",
+                "arena_key": arenas[index % len(arenas)],
+                "a": {"user_id": 5, "knight": "Arthur", "horse": "Swift",
+                      "horse_id": "h5", "score": 3},
+                "b": {"user_id": 6, "knight": "Basil", "horse": "Slow",
+                      "horse_id": "h6", "score": 0},
+                "passes": passes,
+            })
+        for index in range(3):
+            matches.append({
+                "id": f"draw{index}", "guild_id": 99, "mode": "challenge",
+                "arena_key": "royal_lists",
+                "a": {"user_id": 5, "knight": "Arthur", "horse": "Swift",
+                      "horse_id": "h5", "score": 0},
+                "b": {"user_id": 6, "knight": "Basil", "horse": "Slow",
+                      "horse_id": "h6", "score": 0},
+                "passes": [],
+            })
+        progress = title_progress(99, 5, {"matches": matches})
+        self.assertEqual(
+            set(progress) - old_keys,
+            {k for k in TITLE_RULES if k not in old_keys},
+        )
+        self.assertTrue(all(progress[k]["earned"] for k in progress if k not in old_keys))
+
     def test_main_menu_admin_visibility(self):
         public = menu.MainMenuView(123, False)
         admin = menu.MainMenuView(123, True)
