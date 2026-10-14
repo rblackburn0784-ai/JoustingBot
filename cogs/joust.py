@@ -16,7 +16,7 @@ from services.equipment import get_item
 from services.records import record_match
 
 
-VERSION_LABEL = "JoustingBot v0.5 — Match Engine Polish"
+VERSION_LABEL = "JoustingBot v0.7 — Leaderboards & Titles"
 CHALLENGE_TIMEOUT_SECONDS = 120
 
 
