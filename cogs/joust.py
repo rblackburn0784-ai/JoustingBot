@@ -343,6 +343,18 @@ def make_challenge_closed_embed(prepared: PreparedDuel, title: str, description:
     return e
 
 
+class ChallengeHomeView(discord.ui.View):
+    """A public return-to-menu button; each click opens a private hub."""
+    def __init__(self):
+        super().__init__(timeout=300)
+
+    @discord.ui.button(label="Main Menu", emoji="🏰", style=discord.ButtonStyle.success, row=1)
+    async def home(self, interaction: discord.Interaction, button: discord.ui.Button):
+        from cogs.menu import MainMenuView, is_admin
+        view = MainMenuView(interaction.user.id, is_admin(interaction))
+        await interaction.response.send_message(embed=view.make_embed(), view=view, ephemeral=True)
+
+
 class ChallengeView(discord.ui.View):
     def __init__(self, cog: "JoustCog", prepared: PreparedDuel):
         super().__init__(timeout=CHALLENGE_TIMEOUT_SECONDS)
@@ -368,9 +380,15 @@ class ChallengeView(discord.ui.View):
                 f"{self.prepared.opponent.mention} did not answer the challenge in time.",
             )
             try:
-                await self.message.edit(embed=embed, view=self)
+                await self.message.edit(embed=embed, view=ChallengeHomeView())
             except discord.HTTPException:
                 pass
+
+    @discord.ui.button(label="Main Menu", emoji="🏰", style=discord.ButtonStyle.secondary, row=1)
+    async def home_menu(self, interaction: discord.Interaction, button: discord.ui.Button):
+        from cogs.menu import MainMenuView, is_admin
+        view = MainMenuView(interaction.user.id, is_admin(interaction))
+        await interaction.response.send_message(embed=view.make_embed(), view=view, ephemeral=True)
 
     @discord.ui.button(label="Accept Challenge", style=discord.ButtonStyle.success)
     async def accept(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -390,7 +408,7 @@ class ChallengeView(discord.ui.View):
             f"{self.prepared.opponent.mention} accepts {self.prepared.challenger.mention}'s challenge. The riders take the field.",
         )
 
-        await interaction.response.edit_message(embed=accepted_embed, view=self)
+        await interaction.response.edit_message(embed=accepted_embed, view=ChallengeHomeView())
 
         try:
             result = await self.cog.send_match(interaction.followup, self.prepared)
@@ -416,7 +434,7 @@ class ChallengeView(discord.ui.View):
         declined_by = "challenger" if interaction.user.id == self.prepared.challenger.id else "opponent"
         embed = make_challenge_closed_embed(self.prepared, "❌ Challenge Declined", f"The joust was declined by the {declined_by}.")
 
-        await interaction.response.edit_message(embed=embed, view=self)
+        await interaction.response.edit_message(embed=embed, view=ChallengeHomeView())
         self.stop()
 
     @discord.ui.button(label="Random Arena", style=discord.ButtonStyle.secondary)
@@ -548,10 +566,12 @@ class JoustCog(commands.Cog):
         result_embed = make_result_embed(result, prepared.arena_key)
         match_id = record_match(prepared, result)
         result_embed.add_field(name="📜 Match ID", value=f"`{match_id}`", inline=False)
-        await sender.send(embed=result_embed)
+        await sender.send(embed=result_embed, view=ChallengeHomeView())
         return result
 
     @joust_group.command(name="duel", description="Run a cinematic single joust match immediately.")
+    @app_commands.default_permissions(manage_guild=True)
+    @app_commands.guild_only()
     async def duel(
         self,
         interaction: discord.Interaction,
@@ -560,6 +580,10 @@ class JoustCog(commands.Cog):
         seed: Optional[int] = None,
         debug: bool = False,
     ):
+        permissions = getattr(interaction.user, "guild_permissions", None)
+        if not (permissions and permissions.manage_guild):
+            return await interaction.response.send_message(
+                "⛔ Instant duels are admin test tools. Use /joust challenge instead.", ephemeral=True)
         await interaction.response.defer(ephemeral=False)
 
         debug_allowed = self.can_debug(interaction, debug)
