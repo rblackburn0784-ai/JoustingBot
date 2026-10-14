@@ -397,6 +397,9 @@ class KnightCog(commands.Cog):
                 ephemeral=True,
             )
 
+        from services.progression import loadout
+        knight.equipped_lance_key = loadout(interaction.guild_id, interaction.user.id, "lance", knight.equipped_lance_key)
+        knight.equipped_armour_key = loadout(interaction.guild_id, interaction.user.id, "armour", knight.equipped_armour_key)
         await interaction.response.send_message(
             embed=knight_embed(knight, interaction.user),
             ephemeral=True,
