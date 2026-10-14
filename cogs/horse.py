@@ -417,6 +417,17 @@ class HorseCog(commands.Cog):
             ephemeral=True,
         )
 
+    @horse_group.command(name="stats", description="View career stats for one of your horses.")
+    async def career_stats(self, interaction: discord.Interaction, horse_id: str):
+        raw = load_horses().get("horses", {}).get(horse_id)
+        if not raw:
+            return await interaction.response.send_message("❌ Horse not found.", ephemeral=True)
+        horse = Horse.from_dict(raw)
+        if horse.owner_id != interaction.user.id:
+            return await interaction.response.send_message("❌ That horse is not yours.", ephemeral=True)
+        from cogs.profile import horse_stats_embed
+        await interaction.response.send_message(embed=horse_stats_embed(horse), ephemeral=True)
+
     @horse_group.command(name="bind", description="Bind one of your horses to your knight.")
     async def bind(self, interaction: discord.Interaction, horse_id: str):
         await interaction.response.defer(ephemeral=True)
