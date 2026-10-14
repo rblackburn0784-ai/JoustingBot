@@ -82,6 +82,20 @@ class ProgressionTests(unittest.TestCase):
                     self.assertEqual(p.wallet(7, 101), 130)
                     self.assertFalse(p.unlocked(8, 101, "lance_oakbreaker"))
 
+    def test_barding_is_individual_to_each_horse(self):
+        matches = {"matches": [fight(i, arena="frozen_ground") for i in range(8)]}
+        with tempfile.TemporaryDirectory() as td:
+            with patch.object(p, "PATH", os.path.join(td, "progression.json")):
+                with patch.object(p, "load_history", return_value=matches):
+                    self.assertGreaterEqual(p.progress(7, 101)["frozen_survivals"], 3)
+                    p.buy(7, 101, "barding_marsh")
+                    with self.assertRaises(ValueError):
+                        p.set_loadout(7, 101, "barding", "barding_marsh")
+                    p.set_loadout(7, 101, "barding", "barding_marsh", horse_id="h101")
+                    self.assertEqual(p.loadout(7, 101, "barding", "barding_none", "h101"), "barding_marsh")
+                    self.assertEqual(p.loadout(7, 101, "barding", "barding_none", "h103"), "barding_none")
+                    self.assertEqual(p.loadout(8, 101, "barding", "barding_none", "h101"), "barding_none")
+
     def test_unmet_unlock_and_insufficient_funds(self):
         history = {"matches": [fight(i) for i in range(5)]}
         with tempfile.TemporaryDirectory() as td:
