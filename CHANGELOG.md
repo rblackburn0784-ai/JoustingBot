@@ -1,5 +1,22 @@
 # Changelog
 
+## v0.8 — Equipment Progression & Unlocks
+
+- Added server-specific gold earned from accepted challenge results only: +12 per match, +8 per win, +4 per draw.
+- Added prestige tiers based on completed matches and wins; prestige is cosmetic and cannot be spent.
+- Added six unlockable equipment sidegrades with trade-offs and a milestone + gold purchase requirement.
+- Preserved twelve existing pieces of starter equipment as free choices; original JSON data continues working.
+- Added permanent per-server purchases and per-guild knight loadouts; barding belongs to an individual horse.
+- Added three earned, purely cosmetic standards (Royal, Frost, Mud) shown in duel intros and profiles.
+- Added /progress, /armory, /standards, /equip unlock and /equip wallet, plus an actionable progression screen in /menu.
+- Added equipment snapshots to new match records for no-barding wins; kept older history compatible.
+- Updated knight/horse views to reflect effective unlocked guild gear.
+- Added regression tests for gold calculation, purchasing, inventory isolation, prestige, standards and gear disadvantages.
+- Updated admin backup/health tools to include progression.json.
+
+---
+
+
 ## v0.7.1 — Titles & Interactive UI
 
 - Added 12 new earned titles (18 total), preserving the original six and existing title selections.
