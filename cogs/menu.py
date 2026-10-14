@@ -489,16 +489,17 @@ class ProgressionPage(OwnedView):
         self.home()
 
     def make_embed(self):
-        from services.progression import UNLOCKS, earned_gold, prestige, wallet, purchased, progress
+        from services.progression import UNLOCKS, earned_gold, prestige, reputation, wallet, purchased, progress
         if self.guild_id is None:
             return embed("🪙 Career Progression", "Progression is tracked per Discord server. Open /menu in a server.")
         scores = progress(self.guild_id, self.owner_id)
         points, tier = prestige(self.guild_id, self.owner_id)
+        rep = reputation(self.guild_id, self.owner_id)
         owned = purchased(self.guild_id, self.owner_id)
         remaining = wallet(self.guild_id, self.owner_id)
         total = earned_gold(self.guild_id, self.owner_id)
         e = embed("🪙 Progression & Unlocks",
-                  f"**Rank:** {tier} · **Prestige:** {points}\n"
+                  f"**Rank:** {tier} · **Prestige:** {points} · **Reputation:** {rep}\n"
                   f"**Gold:** {remaining} available · {total} lifetime earned\n"
                   f"**Career:** {scores['jousts']} accepted jousts · {scores['wins']} victories\n\n"
                   "Play accepted challenges to earn gold and prestige. "
