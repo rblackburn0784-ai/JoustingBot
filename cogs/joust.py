@@ -13,6 +13,7 @@ from cogs.knight import get_knight, load_knights
 from services.arenas import ARENAS, get_arena
 from services.combat import Fighter, MatchResult, PassLog, run_single_match
 from services.equipment import get_item
+from services.records import record_match
 
 
 VERSION_LABEL = "JoustingBot v0.5 — Match Engine Polish"
@@ -537,6 +538,8 @@ class JoustCog(commands.Cog):
 
         result = run_single_match(prepared.fighter_a, prepared.fighter_b, prepared.arena_key, seed=prepared.seed)
         result_embed = make_result_embed(result, prepared.arena_key)
+        match_id = record_match(prepared, result)
+        result_embed.add_field(name="📜 Match ID", value=`${match_id}`, inline=False)
         await sender.send(embed=result_embed)
         return result
 
