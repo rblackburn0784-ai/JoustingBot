@@ -22,6 +22,18 @@ TITLE_RULES = {
     "frozen_terror": ("Frozen Terror", "Win 3 jousts on Frozen Ground.", "frozen_wins", 3),
     "crowd_favourite": ("Crowd Favourite", "Complete 10 jousts.", "jousts", 10),
     "the_reluctant_rider": ("The Reluctant Rider", "Experience 3 horse refusals.", "refusals", 3),
+    "first_lance": ("First Lance", "Win your first accepted joust.", "wins", 1),
+    "iron_will": ("Iron Will", "Win 10 accepted jousts.", "wins", 10),
+    "grand_champion": ("Grand Champion", "Win 25 accepted jousts.", "wins", 25),
+    "veteran_of_the_lists": ("Veteran of the Lists", "Complete 25 accepted jousts.", "jousts", 25),
+    "saddlebreaker": ("Saddlebreaker", "Unhorse opponents 10 times.", "unhorsings", 10),
+    "timberstorm": ("Timberstorm", "Break 15 lances.", "lance_breaks", 15),
+    "royal_standard": ("Royal Standard", "Win 3 jousts in the Royal Lists.", "royal_wins", 3),
+    "gale_rider": ("Gale Rider", "Win 3 jousts on Wind-Swept Field.", "wind_wins", 3),
+    "festival_hero": ("Festival Hero", "Win 3 jousts in Festival Arena.", "festival_wins", 3),
+    "battle_hardened": ("Battle Hardened", "Win 3 jousts on War-Torn Battlefield.", "war_wins", 3),
+    "honour_bound": ("Honour Bound", "Fight 3 drawn jousts.", "draws", 3),
+    "steady_in_the_saddle": ("Steady in the Saddle", "Complete 10 jousts without horse slips or refusals.", "clean_jousts", 10),
 }
 
 CATEGORIES = {
@@ -56,7 +68,8 @@ def guild_matches(guild_id: int, history: dict | None = None) -> list[dict]:
 
 def _knight() -> dict:
     return dict(name="", wins=0, losses=0, draws=0, jousts=0, unhorsings=0,
-                unhorsed=0, lance_breaks=0, refusals=0, mud_wins=0, frozen_wins=0,
+                unhorsed=0, lance_breaks=0, refusals=0, mud_wins=0, frozen_wins=0, royal_wins=0, wind_wins=0,
+                festival_wins=0, war_wins=0, clean_jousts=0,
                 arenas=defaultdict(lambda: {"wins": 0, "jousts": 0}))
 
 
@@ -101,6 +114,14 @@ def aggregate(guild_id: int, history: dict | None = None) -> tuple[dict[int, dic
                     user["mud_wins"] += 1
                 if arena == "frozen_ground":
                     user["frozen_wins"] += 1
+                for arena_key, field in (
+                    ("royal_lists", "royal_wins"),
+                    ("wind_swept", "wind_wins"),
+                    ("festival_arena", "festival_wins"),
+                    ("war_torn", "war_wins"),
+                ):
+                    if arena == arena_key:
+                        user[field] += 1
 
             hid = str(entry.get("horse_id") or "")
             horse_ids[side] = hid
@@ -161,6 +182,7 @@ def aggregate(guild_id: int, history: dict | None = None) -> tuple[dict[int, dic
             hid = horse_ids[side]
             if hid and not incidents[side]:
                 horses[hid]["clean_jousts"] += 1
+                knights[ids[side]]["clean_jousts"] += 1
 
     return dict(knights), dict(horses)
 
@@ -217,6 +239,10 @@ def title_progress(guild_id: int, user_id: int, history: dict | None = None) -> 
         "unhorsed": s["unhorsed"], "lance_breaks": s["lance_breaks"],
         "mud_wins": s["mud_wins"], "frozen_wins": s["frozen_wins"],
         "jousts": s["jousts"], "refusals": s["refusals"],
+        "wins": s["wins"], "draws": s["draws"], "unhorsings": s["unhorsings"],
+        "royal_wins": s["royal_wins"], "wind_wins": s["wind_wins"],
+        "festival_wins": s["festival_wins"], "war_wins": s["war_wins"],
+        "clean_jousts": s["clean_jousts"],
     }
     return {key: {"name": name, "description": desc, "progress": fields[field],
                   "required": target, "earned": fields[field] >= target}
