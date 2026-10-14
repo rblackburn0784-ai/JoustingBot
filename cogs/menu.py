@@ -63,48 +63,28 @@ def getting_started_embed() -> discord.Embed:
 
 
 def knight_help_embed() -> discord.Embed:
-    e = discord.Embed(
-        title="⚔️ Knight Commands",
-        description="Knights are the rider/player character.",
-    )
-    e.add_field(
-        name="Commands",
-        value=(
-            "`/knight create name:<name>` — open the knight stat builder\n"
-            "`/knight view` — view your knight\n"
-            "`/knight delete` — delete your knight\n"\n            "`/knight stats` — view career record"
-        ),
-        inline=False,
-    )
-    e.add_field(
-        name="Stats",
-        value="Strength, Control, Endurance, Agility, Resolve, Tactics. Spend exactly **20** points.",
-        inline=False,
-    )
+    e = discord.Embed(title="⚔️ Knight Commands", description="Knights are your riders.")
+    e.add_field(name="Commands", value=(
+        "/knight create name:<name> — create your knight\n"
+        "/knight view — view your knight\n"
+        "/knight stats — inspect your career\n"
+        "/knight delete — delete your knight"
+    ), inline=False)
+    e.add_field(name="Stats", value="Strength, Control, Endurance, Agility, Resolve, Tactics. Spend exactly 20 points.", inline=False)
     return e
 
 
 def horse_help_embed() -> discord.Embed:
-    e = discord.Embed(
-        title="🐴 Horse Commands",
-        description="Horses are created separately and must be bound to your knight before jousting.",
-    )
-    e.add_field(
-        name="Commands",
-        value=(
-            "`/horse create name:<name> breed:<breed>` — open the horse stat builder\n"
-            "`/horse list` — list your horses and IDs\n"
-            "`/horse view horse_id:<id>` — view a horse\n"
-            "`/horse bind horse_id:<id>` — bind a horse to your knight\n"
-            "`/horse delete horse_id:<id>` — delete a horse\n"\n            "`/horse stats horse_id:<id>` — view career record"
-        ),
-        inline=False,
-    )
-    e.add_field(
-        name="Stats",
-        value="Speed, Stamina, Power, Obedience, Courage. Spend exactly **24** points.",
-        inline=False,
-    )
+    e = discord.Embed(title="🐴 Horse Commands", description="Create and bind your mount to compete.")
+    e.add_field(name="Commands", value=(
+        "/horse create name:<name> breed:<breed> — create a horse\n"
+        "/horse list — list your horses\n"
+        "/horse view horse_id:<id> — view your horse\n"
+        "/horse stats horse_id:<id> — view its career\n"
+        "/horse bind horse_id:<id> — set current mount\n"
+        "/horse delete horse_id:<id> — delete a horse"
+    ), inline=False)
+    e.add_field(name="Stats", value="Speed, Stamina, Power, Obedience, Courage. Spend exactly 24 points.", inline=False)
     return e
 
 
