@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import random
 from dataclasses import dataclass
 from typing import Optional
 
@@ -14,7 +15,7 @@ from services.combat import Fighter, MatchResult, PassLog, run_single_match
 from services.equipment import get_item
 
 
-VERSION_LABEL = "JoustingBot v0.4 — Challenge Flow"
+VERSION_LABEL = "JoustingBot v0.5 — Match Engine Polish"
 CHALLENGE_TIMEOUT_SECONDS = 120
 
 
@@ -23,8 +24,9 @@ CHALLENGE_TIMEOUT_SECONDS = 120
 GIF_PLACEHOLDERS = {
     "intro": "",
     "lance_break": "",
-    "solid_hit": "",
-    "unhorsed": "",
+    "heavy_shield_hit": "",
+    "saddle_stagger": "",
+    "unhorsing": "",
     "miss": "",
     "draw": "",
     "victory": "",
@@ -42,39 +44,39 @@ ARENA_FLAVOUR = {
 
 
 RESULT_FLAVOUR = {
-    "unhorsed": [
-        "The impact lands like a thunderclap — saddle, pride and balance all vanish at once.",
-        "A brutal hit crashes home and the rider is torn from the saddle before the crowd can breathe.",
-        "The lance finds its mark with savage force. One knight stays mounted. The other does not.",
+    "clean_miss": [
+        "The horses thunder past, but both lance tips cut empty air.",
+        "A wild pass. Plenty of speed, no clean contact, and the crowd lets them hear it.",
     ],
-    "solid hit": [
-        "A heavy strike lands square and rattles armour from helm to boot.",
-        "The hit connects cleanly, drawing a roar from the rail and a grim nod from the marshals.",
-        "Wood cracks, armour rings, and the rider absorbs a punishing blow.",
+    "shield_scrape": [
+        "The lance skims across the shield, close enough to sting but not enough to score.",
+        "A scrape of wood and paint marks the shield, but the marshals wave away the point.",
     ],
-    "lance break": [
+    "lance_break": [
         "The lance splinters across the shield in a shower of timber.",
         "A sharp crack echoes down the lists as the lance breaks cleanly on impact.",
-        "The strike is not decisive, but the broken lance earns the crowd's approval.",
     ],
-    "glancing clash": [
-        "The lances scrape past with a glancing clash and neither rider gives ground.",
-        "A near thing — close enough to sting, not enough to score.",
-        "Both riders survive the exchange with little more than scraped paint and bruised pride.",
+    "heavy_shield_hit": [
+        "A heavy strike lands square and rattles armour from helm to boot.",
+        "The blow crashes into the shield with enough force to turn the rider in the saddle.",
     ],
-    "Horse refused": [
-        "A horse checks hard at the line, refusing the thunder of the charge.",
+    "saddle_stagger": [
+        "The rider nearly goes. One boot kicks loose before they drag themselves back into the seat.",
+        "The saddle rocks, the crowd rises, but the rider somehow clings on.",
+    ],
+    "unhorsing": [
+        "The impact lands like a thunderclap — saddle, pride and balance all vanish at once.",
+        "A brutal hit crashes home and the rider is torn from the saddle before the crowd can breathe.",
+    ],
+    "horse_refusal": [
+        "The horse checks hard at the line, refusing the thunder of the charge.",
         "The mount will not commit. The opposing rider claims the advantage without a clean strike.",
     ],
-    "Both horses refused": [
-        "Both horses decide the wisest knight is the one who stays exactly where they are.",
-        "The lists fall into awkward silence as neither mount accepts the charge.",
+    "horse_slip": [
+        "Hooves skid out from under the charge and the pass collapses before the lance can tell its story.",
+        "The mount loses the ground, and with it goes the chance of a clean strike.",
     ],
-    "Double miss": [
-        "Both lances cut empty air. The crowd groans as the riders thunder past untouched.",
-        "A wild exchange — all speed, no steel, no score.",
-    ],
-    "Even clash": [
+    "double_clash": [
         "Both knights meet with equal force, armour ringing but neither yielding.",
         "A perfect collision of stubbornness. Neither rider gains the advantage.",
     ],
@@ -92,6 +94,8 @@ class PreparedDuel:
     horse_b: Horse
     fighter_a: Fighter
     fighter_b: Fighter
+    seed: Optional[int] = None
+    debug_requested: bool = False
 
 
 def equipment_name(key: Optional[str]) -> str:
@@ -99,46 +103,46 @@ def equipment_name(key: Optional[str]) -> str:
     return item.name if item else str(key or "None")
 
 
+def stats_line(stats: dict[str, int]) -> str:
+    return " · ".join(f"{key[:3].title()} {value}" for key, value in stats.items())
+
+
+def total_stats(stats: dict[str, int]) -> int:
+    return sum(int(v) for v in stats.values())
+
+
 def pick_flavour(pass_log: PassLog) -> str:
-    result = pass_log.result
-
-    for key, lines in RESULT_FLAVOUR.items():
-        if key in result:
-            return lines[(pass_log.pass_no - 1) % len(lines)]
-
+    lines = RESULT_FLAVOUR.get(pass_log.category)
+    if lines:
+        return lines[(pass_log.pass_no - 1) % len(lines)]
     return "The pass is judged, the points are marked, and the riders wheel back for another run."
 
 
 def pass_icon(pass_log: PassLog) -> str:
-    result = pass_log.result.lower()
-
-    if "unhorsed" in result:
-        return "💥"
-    if "solid hit" in result:
-        return "🛡️"
-    if "lance break" in result:
-        return "🪵"
-    if "miss" in result:
-        return "💨"
-    if "refused" in result:
-        return "🐎"
-    if "even" in result or "glancing" in result:
-        return "⚔️"
-
-    return "🏇"
+    icons = {
+        "clean_miss": "💨",
+        "shield_scrape": "🛡️",
+        "lance_break": "🪵",
+        "heavy_shield_hit": "💢",
+        "saddle_stagger": "😬",
+        "unhorsing": "💥",
+        "horse_refusal": "🐎",
+        "horse_slip": "🧊",
+        "double_clash": "⚔️",
+    }
+    return icons.get(pass_log.category, "🏇")
 
 
 def gif_for_result(result: MatchResult) -> str:
     if result.winner == "Draw":
         return GIF_PLACEHOLDERS.get("draw", "")
 
-    for p in result.passes:
-        if "unhorsed" in p.result.lower():
-            return GIF_PLACEHOLDERS.get("unhorsed", "")
-        if "solid hit" in p.result.lower():
-            return GIF_PLACEHOLDERS.get("solid_hit", "")
-        if "lance break" in p.result.lower():
-            return GIF_PLACEHOLDERS.get("lance_break", "")
+    priority = ["unhorsing", "saddle_stagger", "heavy_shield_hit", "lance_break", "clean_miss"]
+    for category in priority:
+        if any(p.category == category for p in result.passes):
+            if category == "clean_miss":
+                return GIF_PLACEHOLDERS.get("miss", "")
+            return GIF_PLACEHOLDERS.get(category, "")
 
     return GIF_PLACEHOLDERS.get("victory", "")
 
@@ -178,9 +182,10 @@ def make_intro_embed(prepared: PreparedDuel) -> discord.Embed:
         inline=True,
     )
 
+    seed_text = f"Seed `{prepared.seed}`" if prepared.seed is not None else "Seed will be generated at match start."
     e.add_field(
         name="🎺 Marshal's Call",
-        value="Visors down. Lances couched. At the signal, ride hard and hold the line.",
+        value=f"Visors down. Lances couched. At the signal, ride hard and hold the line.\n{seed_text}",
         inline=False,
     )
 
@@ -209,7 +214,8 @@ def make_result_embed(result: MatchResult, arena_key: str) -> discord.Embed:
             f"{outcome}\n\n"
             f"**Final Score**\n"
             f"{result.fighter_a}: **{result.score_a}**\n"
-            f"{result.fighter_b}: **{result.score_b}**"
+            f"{result.fighter_b}: **{result.score_b}**\n"
+            f"🎲 Seed: `{result.seed}`"
         ),
     )
 
@@ -218,7 +224,9 @@ def make_result_embed(result: MatchResult, arena_key: str) -> discord.Embed:
         point_text = f"+{p.points_a}/+{p.points_b}"
         line = (
             f"{pass_icon(p)} **Pass {p.pass_no}** — {p.result}\n"
+            f"_{p.arena_line}_\n"
             f"_{pick_flavour(p)}_\n"
+            f"_{p.gear_line}_\n"
             f"Score: `{point_text}` · Margin: `{p.margin}`"
         )
 
@@ -239,18 +247,31 @@ def make_result_embed(result: MatchResult, arena_key: str) -> discord.Embed:
         loser = result.fighter_b if result.winner == result.fighter_a else result.fighter_a
         summary = f"{result.winner} edges out {loser}, turning pressure into points when it mattered."
 
-    e.add_field(
-        name="🧾 Match Summary",
-        value=summary,
-        inline=False,
-    )
-
+    e.add_field(name="🧾 Match Summary", value=summary, inline=False)
     e.set_footer(text=VERSION_LABEL)
 
     result_gif = gif_for_result(result)
     if result_gif:
         e.set_image(url=result_gif)
 
+    return e
+
+
+def make_debug_embed(result: MatchResult) -> discord.Embed:
+    e = discord.Embed(
+        title="🧪 Hidden Debug Roll Breakdown",
+        description=f"Seed: `{result.seed}`\nThis is intended for admin/debug tuning only.",
+    )
+
+    for p in result.passes:
+        debug_text = "\n".join(p.debug_rolls) or "No debug rolls captured."
+        e.add_field(
+            name=f"Pass {p.pass_no} — {p.category}",
+            value=debug_text[:1024],
+            inline=False,
+        )
+
+    e.set_footer(text=VERSION_LABEL)
     return e
 
 
@@ -269,18 +290,39 @@ def make_challenge_embed(prepared: PreparedDuel) -> discord.Embed:
     )
 
     e.add_field(
-        name="Challenger",
-        value=f"**{prepared.knight_a.name}** riding **{prepared.horse_a.name}**",
-        inline=True,
+        name=f"Challenger — {prepared.knight_a.name}",
+        value=(
+            f"Horse: **{prepared.horse_a.name}** ({prepared.horse_a.breed})\n"
+            f"Knight total: **{total_stats(prepared.knight_a.stats)}** · Horse total: **{total_stats(prepared.horse_a.stats)}**\n"
+            f"Knight: `{stats_line(prepared.knight_a.stats)}`\n"
+            f"Horse: `{stats_line(prepared.horse_a.stats)}`\n"
+            f"Gear: {equipment_name(prepared.knight_a.equipped_lance_key)}, {equipment_name(prepared.knight_a.equipped_armour_key)}, {equipment_name(prepared.horse_a.equipped_barding_key)}"
+        ),
+        inline=False,
     )
     e.add_field(
-        name="Opponent",
-        value=f"**{prepared.knight_b.name}** riding **{prepared.horse_b.name}**",
-        inline=True,
+        name=f"Opponent — {prepared.knight_b.name}",
+        value=(
+            f"Horse: **{prepared.horse_b.name}** ({prepared.horse_b.breed})\n"
+            f"Knight total: **{total_stats(prepared.knight_b.stats)}** · Horse total: **{total_stats(prepared.horse_b.stats)}**\n"
+            f"Knight: `{stats_line(prepared.knight_b.stats)}`\n"
+            f"Horse: `{stats_line(prepared.horse_b.stats)}`\n"
+            f"Gear: {equipment_name(prepared.knight_b.equipped_lance_key)}, {equipment_name(prepared.knight_b.equipped_armour_key)}, {equipment_name(prepared.horse_b.equipped_barding_key)}"
+        ),
+        inline=False,
     )
     e.add_field(
-        name="Timeout",
-        value=f"This challenge expires in {CHALLENGE_TIMEOUT_SECONDS} seconds.",
+        name="Arena Modifiers",
+        value=(
+            f"Alignment `{arena.alignment_mod:+d}` · Charge `{arena.charge_mod:+d}` · "
+            f"Slip `{arena.slip_mod:+d}` · Panic `{arena.panic_mod:+d}` · Impact `x{arena.impact_mult:.2f}`"
+        ),
+        inline=False,
+    )
+    seed_text = f"Seed `{prepared.seed}`" if prepared.seed is not None else "Random seed will be generated when accepted."
+    e.add_field(
+        name="Challenge Rules",
+        value=f"Expires in {CHALLENGE_TIMEOUT_SECONDS} seconds. {seed_text}",
         inline=False,
     )
 
@@ -290,10 +332,7 @@ def make_challenge_embed(prepared: PreparedDuel) -> discord.Embed:
 
 def make_challenge_closed_embed(prepared: PreparedDuel, title: str, description: str) -> discord.Embed:
     arena = get_arena(prepared.arena_key)
-    e = discord.Embed(
-        title=title,
-        description=description,
-    )
+    e = discord.Embed(title=title, description=description)
     e.add_field(name="Arena", value=arena.name, inline=True)
     e.add_field(name="Challenger", value=prepared.knight_a.name, inline=True)
     e.add_field(name="Opponent", value=prepared.knight_b.name, inline=True)
@@ -333,10 +372,7 @@ class ChallengeView(discord.ui.View):
     @discord.ui.button(label="Accept Challenge", style=discord.ButtonStyle.success)
     async def accept(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user.id != self.prepared.opponent.id:
-            return await interaction.response.send_message(
-                "❌ Only the challenged player can accept this joust.",
-                ephemeral=True,
-            )
+            return await interaction.response.send_message("❌ Only the challenged player can accept this joust.", ephemeral=True)
 
         self.completed = True
 
@@ -352,7 +388,9 @@ class ChallengeView(discord.ui.View):
         await interaction.response.edit_message(embed=accepted_embed, view=self)
 
         try:
-            await self.cog.send_match(interaction.followup, self.prepared)
+            result = await self.cog.send_match(interaction.followup, self.prepared)
+            if self.prepared.debug_requested:
+                await interaction.followup.send(embed=make_debug_embed(result), ephemeral=True)
         finally:
             self.cog.release_challenge(self.prepared.challenger.id, self.prepared.opponent.id)
             self.stop()
@@ -360,10 +398,7 @@ class ChallengeView(discord.ui.View):
     @discord.ui.button(label="Decline", style=discord.ButtonStyle.danger)
     async def decline(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user.id not in {self.prepared.challenger.id, self.prepared.opponent.id}:
-            return await interaction.response.send_message(
-                "❌ This challenge is not yours to decline.",
-                ephemeral=True,
-            )
+            return await interaction.response.send_message("❌ This challenge is not yours to decline.", ephemeral=True)
 
         self.completed = True
         self.cog.release_challenge(self.prepared.challenger.id, self.prepared.opponent.id)
@@ -372,14 +407,25 @@ class ChallengeView(discord.ui.View):
             item.disabled = True
 
         declined_by = "challenger" if interaction.user.id == self.prepared.challenger.id else "opponent"
-        embed = make_challenge_closed_embed(
-            self.prepared,
-            "❌ Challenge Declined",
-            f"The joust was declined by the {declined_by}.",
-        )
+        embed = make_challenge_closed_embed(self.prepared, "❌ Challenge Declined", f"The joust was declined by the {declined_by}.")
 
         await interaction.response.edit_message(embed=embed, view=self)
         self.stop()
+
+    @discord.ui.button(label="Random Arena", style=discord.ButtonStyle.secondary)
+    async def random_arena(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id not in {self.prepared.challenger.id, self.prepared.opponent.id}:
+            return await interaction.response.send_message("❌ Only the two riders can randomise this arena.", ephemeral=True)
+
+        if self.completed:
+            return await interaction.response.send_message("❌ This challenge is already closed.", ephemeral=True)
+
+        keys = list(ARENAS.keys())
+        if len(keys) > 1 and self.prepared.arena_key in keys:
+            keys.remove(self.prepared.arena_key)
+
+        self.prepared.arena_key = random.choice(keys)
+        await interaction.response.edit_message(embed=make_challenge_embed(self.prepared), view=self)
 
 
 class JoustCog(commands.Cog):
@@ -387,10 +433,7 @@ class JoustCog(commands.Cog):
         self.bot = bot
         self.active_challenge_players: set[int] = set()
 
-    joust_group = app_commands.Group(
-        name="joust",
-        description="Single joust matches",
-    )
+    joust_group = app_commands.Group(name="joust", description="Single joust matches")
 
     def is_player_busy(self, user_id: int) -> bool:
         return user_id in self.active_challenge_players
@@ -403,12 +446,19 @@ class JoustCog(commands.Cog):
         self.active_challenge_players.discard(challenger_id)
         self.active_challenge_players.discard(opponent_id)
 
+    @staticmethod
+    def can_debug(interaction: discord.Interaction, requested: bool) -> bool:
+        perms = getattr(interaction.user, "guild_permissions", None)
+        return bool(requested and perms and perms.manage_guild)
+
     def prepare_duel(
         self,
         *,
         challenger: discord.Member | discord.User,
         opponent: discord.Member,
         arena_key: str,
+        seed: Optional[int] = None,
+        debug_requested: bool = False,
     ) -> tuple[Optional[str], Optional[PreparedDuel]]:
         if opponent.id == challenger.id:
             return "❌ You cannot joust yourself.", None
@@ -418,8 +468,11 @@ class JoustCog(commands.Cog):
 
         arena_key = arena_key.strip().lower()
 
+        if arena_key == "random":
+            arena_key = random.choice(list(ARENAS.keys()))
+
         if arena_key not in ARENAS:
-            return "❌ Unknown arena. Use `/arena list`.", None
+            return "❌ Unknown arena. Use `/arena list`, or use `random`.", None
 
         knights_db = load_knights()
         horses_db = load_horses()
@@ -474,49 +527,71 @@ class JoustCog(commands.Cog):
             horse_b=horse_b,
             fighter_a=fighter_a,
             fighter_b=fighter_b,
+            seed=seed,
+            debug_requested=debug_requested,
         )
 
-    async def send_match(self, sender, prepared: PreparedDuel) -> None:
+    async def send_match(self, sender, prepared: PreparedDuel) -> MatchResult:
         intro_embed = make_intro_embed(prepared)
         await sender.send(embed=intro_embed)
 
-        result = run_single_match(prepared.fighter_a, prepared.fighter_b, prepared.arena_key)
+        result = run_single_match(prepared.fighter_a, prepared.fighter_b, prepared.arena_key, seed=prepared.seed)
         result_embed = make_result_embed(result, prepared.arena_key)
         await sender.send(embed=result_embed)
+        return result
 
     @joust_group.command(name="duel", description="Run a cinematic single joust match immediately.")
-    async def duel(self, interaction: discord.Interaction, opponent: discord.Member, arena_key: str = "royal_lists"):
+    async def duel(
+        self,
+        interaction: discord.Interaction,
+        opponent: discord.Member,
+        arena_key: str = "royal_lists",
+        seed: Optional[int] = None,
+        debug: bool = False,
+    ):
         await interaction.response.defer(ephemeral=False)
 
+        debug_allowed = self.can_debug(interaction, debug)
         error, prepared = self.prepare_duel(
             challenger=interaction.user,
             opponent=opponent,
             arena_key=arena_key,
+            seed=seed,
+            debug_requested=debug_allowed,
         )
 
         if error or not prepared:
             return await interaction.followup.send(error or "❌ Could not prepare joust.")
 
-        await self.send_match(interaction.followup, prepared)
+        result = await self.send_match(interaction.followup, prepared)
+
+        if debug_allowed:
+            await interaction.followup.send(embed=make_debug_embed(result), ephemeral=True)
+        elif debug:
+            await interaction.followup.send("❌ Debug output requires Manage Server permission.", ephemeral=True)
 
     @joust_group.command(name="challenge", description="Challenge another player to a joust with accept/decline buttons.")
-    async def challenge(self, interaction: discord.Interaction, opponent: discord.Member, arena_key: str = "royal_lists"):
+    async def challenge(
+        self,
+        interaction: discord.Interaction,
+        opponent: discord.Member,
+        arena_key: str = "royal_lists",
+        seed: Optional[int] = None,
+        debug: bool = False,
+    ):
         if self.is_player_busy(interaction.user.id):
-            return await interaction.response.send_message(
-                "❌ You already have an active joust challenge.",
-                ephemeral=True,
-            )
+            return await interaction.response.send_message("❌ You already have an active joust challenge.", ephemeral=True)
 
         if self.is_player_busy(opponent.id):
-            return await interaction.response.send_message(
-                "❌ That player already has an active joust challenge.",
-                ephemeral=True,
-            )
+            return await interaction.response.send_message("❌ That player already has an active joust challenge.", ephemeral=True)
 
+        debug_allowed = self.can_debug(interaction, debug)
         error, prepared = self.prepare_duel(
             challenger=interaction.user,
             opponent=opponent,
             arena_key=arena_key,
+            seed=seed,
+            debug_requested=debug_allowed,
         )
 
         if error or not prepared:
@@ -527,6 +602,9 @@ class JoustCog(commands.Cog):
         view = ChallengeView(self, prepared)
         await interaction.response.send_message(embed=make_challenge_embed(prepared), view=view)
         view.message = await interaction.original_response()
+
+        if debug and not debug_allowed:
+            await interaction.followup.send("❌ Debug output requires Manage Server permission.", ephemeral=True)
 
 
 async def setup(bot: commands.Bot):
