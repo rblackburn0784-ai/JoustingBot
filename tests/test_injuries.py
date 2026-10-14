@@ -36,7 +36,7 @@ class InjuryTests(unittest.TestCase):
         self.assertEqual(first[0]["user_id"], 102)
         self.assertEqual(first[0]["stat"], "endurance")
         self.assertEqual((inj.utc(first[0]["expires_at"]) -
-                          inj.utc(first[0]["started_at"])).total_seconds(), 24*3600)
+                          inj.utc(first[0]["started_at"])).total_seconds(), 19*3600)
 
     def test_no_injury_for_instant_test_or_uncharged_pass(self):
         m = fixture(mode="instant")
@@ -81,7 +81,7 @@ class InjuryTests(unittest.TestCase):
         history = {"matches": [m]}
         self.assertEqual(inj.active(7, 102, history, {"guilds": {}}), [])
 
-    def test_healing_spends_gold_and_accelerates_recovery(self):
+    def test_healing_spends_gold_without_instant_recovery(self):
         start = datetime.now(timezone.utc)
         event_match = fixture("injured", started=start)
         with patch.object(inj, "roll", return_value=0):
@@ -91,18 +91,21 @@ class InjuryTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             with patch.object(pr, "PATH", str(Path(td) / "progression.json")), \
                  patch.object(inj, "load_history", return_value=history), \
-                 patch.object(pr, "load_history", return_value=history):
+                 patch.object(pr, "load_history", return_value=history), \
+                 patch.object(inj, "_treatment_roll", return_value=99):
                 self.assertEqual(pr.wallet(7, 102), 24)
-                with self.assertRaisesRegex(ValueError, "30 gold"):
+                with self.assertRaisesRegex(ValueError, "27 gold"):
                     inj.heal(7, 102, injury_id, now=start)
-                # Add one more loss -> 36 gold, enough for a treatment.
                 history["matches"].append(fixture("third", started=start))
                 self.assertEqual(pr.wallet(7, 102), 36)
-                gold, _ = inj.heal(7, 102, injury_id, now=start)
-                self.assertEqual(gold, 6)
-                self.assertEqual(pr.wallet(7, 102), 6)
-                self.assertEqual(inj.active(7, 102, history, now=start), [])
-                with self.assertRaises(ValueError):
+                gold, response = inj.heal(7, 102, injury_id, now=start)
+                self.assertTrue(response["success"])
+                self.assertEqual(gold, 9)
+                self.assertEqual(pr.wallet(7, 102), 9)
+                wounded = inj.active(7, 102, history, now=start)
+                self.assertEqual(len(wounded), 1)
+                self.assertAlmostEqual(wounded[0]["remaining_seconds"], 3 * 3600, delta=1)
+                with self.assertRaisesRegex(ValueError, "nearly complete"):
                     inj.heal(7, 102, injury_id, now=start)
                 self.assertEqual(pr.wallet(7, 101), 60)
 
