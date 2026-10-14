@@ -170,7 +170,7 @@ def buy(guild_id: int | None, user_id: int, key: str) -> int:
     return wallet(guild_id, user_id, history, data)
 
 
-def set_loadout(guild_id: int | None, user_id: int, slot: str, key: str) -> None:
+def set_loadout(guild_id: int | None, user_id: int, slot: str, key: str, horse_id: str | None = None) -> None:
     item = ITEMS.get(key)
     if item is None or item.slot != slot:
         raise ValueError("This equipment does not belong in that slot.")
@@ -179,14 +179,23 @@ def set_loadout(guild_id: int | None, user_id: int, slot: str, key: str) -> None
     data = _db()
     if not unlocked(guild_id, user_id, key, data):
         raise ValueError("That gear is locked. Unlock it in the Armory first.")
-    _ensure_player(data, guild_id, user_id).setdefault("loadout", {})[slot] = key
+    player = _ensure_player(data, guild_id, user_id)
+    if slot == "barding":
+        if not horse_id:
+            raise ValueError("Select your bound horse before equipping barding.")
+        player.setdefault("horse_barding", {})[horse_id] = key
+    else:
+        player.setdefault("loadout", {})[slot] = key
     save_json(PATH, data)
 
 
-def loadout(guild_id: int | None, user_id: int, slot: str, old_key: str | None = None) -> str:
+def loadout(guild_id: int | None, user_id: int, slot: str, old_key: str | None = None, horse_id: str | None = None) -> str:
     data = _db()
     if guild_id is not None:
-        selected = _player(data, guild_id, user_id).get("loadout", {}).get(slot)
+        player = _player(data, guild_id, user_id)
+        selected = player.get("loadout", {}).get(slot)
+        if slot == "barding" and horse_id:
+            selected = player.get("horse_barding", {}).get(horse_id, selected)
         if selected and unlocked(guild_id, user_id, selected, data):
             return selected
     if old_key and old_key in ITEMS and ITEMS[old_key].slot == slot and unlocked(guild_id, user_id, old_key, data):
