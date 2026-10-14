@@ -26,7 +26,7 @@ from services.competition import (
 from services.equipment import items_by_slot, get_item
 from services.records import load_history
 
-VERSION = "v0.8.1"
+VERSION = "v0.8.1a"
 STYLE = discord.ButtonStyle
 
 
@@ -370,17 +370,15 @@ class ConfirmHorseDelete(OwnedView):
 class InjurySelect(discord.ui.Select):
     def __init__(self, screen: "InjuryPage"):
         self.screen = screen
-        choices = screen.current[:25]
         super().__init__(
-            placeholder="Select an injury to treat",
-            row=0,
+            placeholder="Select an active injury", row=0,
             options=[
                 discord.SelectOption(
-                    label=f"{i['name']} ({i['stat']})"[:100],
-                    value=i["id"],
-                    description=f"Recovery: {screen.duration(i['remaining_seconds'])}"[:100],
-                    default=i["id"] == screen.selected,
-                ) for i in choices
+                    label=f"{w['name']} ({w['stat']})"[:100],
+                    value=w["id"],
+                    description=f"{screen.duration(w['remaining_seconds'])} to natural recovery"[:100],
+                    default=w["id"] == screen.selected,
+                ) for w in screen.current[:25]
             ],
         )
 
@@ -389,68 +387,107 @@ class InjurySelect(discord.ui.Select):
         await interaction.response.edit_message(embed=self.screen.make_embed(), view=self.screen)
 
 
+class TreatmentSelect(discord.ui.Select):
+    def __init__(self, screen: "InjuryPage"):
+        from services.injuries import TREATMENTS
+        self.screen = screen
+        super().__init__(
+            placeholder="Choose a treatment provider", row=1,
+            options=[
+                discord.SelectOption(
+                    label=t["name"], value=key,
+                    description=f"{t['cost']} gold · up to {t['hours']}h recovery · {t['failure']}% fail",
+                    default=key == screen.provider,
+                ) for key, t in TREATMENTS.items()
+            ],
+        )
+
+    async def callback(self, interaction):
+        self.screen.provider = self.values[0]
+        await interaction.response.edit_message(embed=self.screen.make_embed(), view=self.screen)
+
+
 class InjuryPage(OwnedView):
-    """Fully private injury management, with owner-only payments and Home."""
-    def __init__(self, user_id: int, guild_id: int | None, selected: str | None = None):
+    """Private injury ward with tiered healing and owned Main Menu navigation."""
+    def __init__(self, user_id: int, guild_id: int | None,
+                 selected: str | None = None, provider: str = "shady_doctor"):
         super().__init__(user_id)
-        from services.injuries import active, duration
+        from services.injuries import active, duration, TREATMENTS
         self.guild_id = guild_id
         self.duration = duration
+        self.provider = provider if provider in TREATMENTS else "shady_doctor"
         self.current = active(guild_id, user_id) if guild_id is not None else []
         self.selected = selected if selected in {i["id"] for i in self.current} else (
             self.current[0]["id"] if self.current else None
         )
         if self.current:
             self.add_item(InjurySelect(self))
-        self.button("Treat Selected", self.treat, row=1, style=STYLE.primary,
+            self.add_item(TreatmentSelect(self))
+        self.button("Treat Selected", self.treat, row=2, style=STYLE.primary,
                     emoji="🩹", disabled=self.selected is None)
-        self.button("Refresh", self.refresh, row=1)
-        self.button("Career Profile", lambda it: navigate(it, ProfilePage(it.user.id)), row=2)
+        self.button("Refresh", self.refresh, row=2)
+        self.button("Career Profile", lambda it: navigate(it, ProfilePage(it.user.id)), row=3)
         self.home()
 
     def make_embed(self):
-        from services.injuries import HEAL_COST, HEAL_HOURS, PENALTY_CAP
+        from services.injuries import TREATMENTS, PENALTY_CAP, MIN_RECOVERY_HOURS, support_for_next_bout
         from services.progression import wallet
         if self.guild_id is None:
-            return embed("🩹 Injury Ward", "Open this section inside a Discord server.")
+            return embed("🩹 Injury Ward", "Open the injury ward in a Discord server.")
         gold = wallet(self.guild_id, self.owner_id)
+        title = "🩹 Injury Ward — Recovery"
         if not self.current:
-            return embed("🩹 Injury Ward",
-                         f"✅ You are fully recovered.\n\n🪙 **Gold:** {gold}\n"
-                         "Injuries can occur after significant impacts in accepted jousts.")
+            return embed(title, f"✅ Fully recovered.\n🪙 **Gold:** {gold}\n"
+                         "Serious jousting impacts can cause temporary injuries. No treatment is needed now.")
+        tier = TREATMENTS[self.provider]
         lines = []
-        for i in self.current[:12]:
-            marker = "➡️" if i["id"] == self.selected else "•"
+        for wound in self.current[:12]:
+            marker = "➡️" if wound["id"] == self.selected else "•"
+            sev = wound.get("severity", "moderate").title()
+            chance = wound.get("risk")
+            info = f" · {chance}% risk at injury" if chance is not None else ""
             lines.append(
-                f"{marker} **{i['name']}** — −1 {i['stat'].title()} · "
-                f"{self.duration(i['remaining_seconds'])} remaining"
+                f"{marker} **{wound['name']}** ({sev}) — −1 {wound['stat'].title()} · "
+                f"{self.duration(wound['remaining_seconds'])} remaining{info}"
             )
-        return embed(
-            "🩹 Injury Ward — Recovery",
-            f"🪙 **Gold:** {gold}\n"
-            f"**Recovery treatment:** {HEAL_COST} gold = {HEAL_HOURS} hours faster recovery.\n"
-            f"**Maximum combat penalty:** {PENALTY_CAP} stat points total.\n"
-            "All injuries heal automatically with real time, even when the bot is offline.\n\n"
-            + "\n".join(lines)
-        )
+        next_help = support_for_next_bout(self.guild_id, self.owner_id)
+        e = embed(title,
+            f"🪙 **Gold:** {gold} · **Effective debuff cap:** −{PENALTY_CAP} total stat points\n"
+            f"**Selected treatment:** {tier['name']} · {tier['cost']} gold\n"
+            f"Up to **{tier['hours']}h** recovery reduction · {tier['failure']}% failure\n"
+            f"On successful treatment: **{tier['support']}%** chance of one-bout pain relief.\n"
+            f"Treatment cannot cut natural recovery below **{MIN_RECOVERY_HOURS}h**.\n"
+            f"**Relief ready for next injured bout:** {'✅ Yes' if next_help else 'No'}\n\n"
+            + "\n".join(lines))
+        return e
 
     async def treat(self, interaction):
         if not self.selected:
             return await interaction.response.send_message("✅ No injury needs treatment.", ephemeral=True)
         from services.injuries import heal
         try:
-            balance, injury = heal(interaction.guild_id, interaction.user.id, self.selected)
+            balance, result = heal(
+                interaction.guild_id, interaction.user.id, self.selected, provider=self.provider
+            )
         except ValueError as exc:
             return await interaction.response.send_message(f"❌ {exc}", ephemeral=True)
+        if result["success"]:
+            outcome = (f"✅ **{result['provider']}** helped {result['name']}: "
+                       f"recovery shortened by {result['hours_reduced']:.1f} hours.")
+            if result["support_ready"]:
+                outcome += " 🛡️ Temporary aid available for the next injured bout."
+        else:
+            outcome = f"⚠️ **{result['provider']}** treatment failed. No recovery time was removed."
         await navigate(
             interaction,
-            InjuryPage(interaction.user.id, interaction.guild_id, self.selected),
-            f"🩹 Treated **{injury['name']}**. Your recovery advanced 24 hours. "
-            f"Gold remaining: **{balance}**."
+            InjuryPage(interaction.user.id, interaction.guild_id, self.selected, self.provider),
+            f"{outcome} You have **{balance} gold** left."
         )
 
     async def refresh(self, interaction):
-        await navigate(interaction, InjuryPage(interaction.user.id, interaction.guild_id))
+        await navigate(interaction, InjuryPage(
+            interaction.user.id, interaction.guild_id, self.selected, self.provider
+        ))
 
 
 class EquipmentPage(OwnedView):
@@ -1018,16 +1055,32 @@ class MenuCog(commands.Cog):
         view = InjuryPage(interaction.user.id, interaction.guild_id)
         await interaction.response.send_message(embed=view.make_embed(), view=view, ephemeral=True)
 
-    @app_commands.command(name="heal", description="Spend gold to accelerate recovery from an injury.")
-    async def heal(self, interaction: discord.Interaction, injury_id: str):
+    @app_commands.command(name="heal", description="Spend gold on tiered non-instant recovery treatment.")
+    @app_commands.choices(provider=[
+        app_commands.Choice(name="Faith Healer (12 gold)", value="faith_healer"),
+        app_commands.Choice(name="Shady Doctor (27 gold)", value="shady_doctor"),
+        app_commands.Choice(name="Private Doctor (55 gold)", value="private_doctor"),
+    ])
+    async def heal(self, interaction: discord.Interaction, injury_id: str,
+                   provider: str = "shady_doctor"):
         from services.injuries import heal
         try:
-            balance, injury = heal(interaction.guild_id, interaction.user.id, injury_id)
+            balance, result = heal(
+                interaction.guild_id, interaction.user.id, injury_id, provider=provider
+            )
         except ValueError as exc:
             return await interaction.response.send_message(f"❌ {exc}", ephemeral=True)
-        view = InjuryPage(interaction.user.id, interaction.guild_id)
+        view = InjuryPage(interaction.user.id, interaction.guild_id, provider=provider)
+        summary = (
+            f"✅ {result['provider']} reduced {result['name']} recovery "
+            f"by {result['hours_reduced']:.1f}h."
+            if result["success"]
+            else f"⚠️ {result['provider']} treatment failed."
+        )
+        if result["support_ready"]:
+            summary += " Temporary next-bout pain relief is available!"
         await interaction.response.send_message(
-            content=f"🩹 Treated **{injury['name']}**. 24h recovery advancement · {balance} gold remaining.",
+            content=f"{summary} Gold remaining: **{balance}**.",
             embed=view.make_embed(), view=view, ephemeral=True
         )
 
