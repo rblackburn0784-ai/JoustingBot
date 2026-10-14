@@ -124,6 +124,7 @@ class ProgressionTests(unittest.TestCase):
     def test_prestige_rank_progression(self):
         matches = {"matches": [fight(i) for i in range(5)]}
         self.assertEqual(p.prestige(7, 101, matches), (15, "Lancer"))
+        self.assertEqual(p.reputation(7, 101, matches), 10)
         self.assertEqual(p.prestige(9, 101, matches), (0, "Squire"))
 
 
