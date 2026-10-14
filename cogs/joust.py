@@ -17,7 +17,7 @@ from services.records import record_match
 from services.progression import loadout, equipped_standard
 from services.injuries import (
     apply_penalty, active as active_injuries, duration as injury_duration,
-    support_for_next_bout,
+    support_for_next_bout, risk_profile,
 )
 
 
@@ -312,6 +312,40 @@ def make_debug_embed(result: MatchResult) -> discord.Embed:
     return e
 
 
+def preview_risk(prepared: PreparedDuel) -> str:
+    """Approximate unhorsing injury risk before acceptance; no new RNG rolls."""
+    record = {
+        "arena_key": prepared.arena_key,
+        "a": {
+            "gear": {
+                "lance": prepared.fighter_a.lance_key,
+                "armour": prepared.fighter_a.armour_key,
+                "barding": prepared.fighter_a.barding_key,
+            },
+            "horse_breed": prepared.horse_a.breed,
+            "horse_stats": prepared.horse_a.stats,
+            "already_injured": bool(active_injuries(prepared.guild_id, prepared.challenger.id)),
+        },
+        "b": {
+            "gear": {
+                "lance": prepared.fighter_b.lance_key,
+                "armour": prepared.fighter_b.armour_key,
+                "barding": prepared.fighter_b.barding_key,
+            },
+            "horse_breed": prepared.horse_b.breed,
+            "horse_stats": prepared.horse_b.stats,
+            "already_injured": bool(active_injuries(prepared.guild_id, prepared.opponent.id)),
+        },
+    }
+    odds_a = risk_profile(record, "a", "b", "unhorsing")["chance"]
+    odds_b = risk_profile(record, "b", "a", "unhorsing")["chance"]
+    return (
+        f"**{prepared.knight_a.name}:** {odds_a}% if unhorsed\n"
+        f"**{prepared.knight_b.name}:** {odds_b}% if unhorsed\n"
+        "Illustrative risk *if an unhorsing happens*; other impacts use lower base odds."
+    )
+
+
 def make_challenge_embed(prepared: PreparedDuel) -> discord.Embed:
     arena = get_arena(prepared.arena_key)
     flavour = ARENA_FLAVOUR.get(prepared.arena_key, arena.description)
@@ -356,6 +390,7 @@ def make_challenge_embed(prepared: PreparedDuel) -> discord.Embed:
         ),
         inline=False,
     )
+    e.add_field(name="🩹 Injury Risk Preview", value=preview_risk(prepared), inline=False)
     seed_text = f"Seed `{prepared.seed}`" if prepared.seed is not None else "Random seed will be generated when accepted."
     e.add_field(
         name="Challenge Rules",
@@ -639,9 +674,15 @@ class JoustCog(commands.Cog):
                 descriptions = []
                 for event in events:
                     rider = prepared.knight_a.name if event["user_id"] == prepared.challenger.id else prepared.knight_b.name
+                    mods = event.get("risk_modifiers") or {}
+                    details = " ".join(
+                        f"{label.replace('_', ' ')} {value:+}%"
+                        for label, value in mods.items() if value
+                    )
                     descriptions.append(
                         f"**{rider}**: {event['name']} ({event.get('severity', 'moderate')}) "
-                        f"· −1 {event['stat']} · Injury risk {event.get('risk', '?')}%"
+                        f"· −1 {event['stat']} · {event.get('risk', '?')}% injury risk"
+                        + (f"\n_{details}_" if details else "")
                     )
                 result_embed.add_field(name="🩹 Injuries Sustained", value="\n".join(descriptions)[:1024], inline=False)
         result_embed.add_field(name="📜 Match ID", value=f"`{match_id}`", inline=False)
