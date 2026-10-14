@@ -12,7 +12,7 @@ from services import competition as c
 def match(mid, guild=12, arena="royal_lists", score_a=3, score_b=0,
           a_id=1, b_id=2, a_horse="h1", b_horse="h2", passes=None):
     return {
-        "id": mid, "guild_id": guild, "arena_key": arena,
+        "id": mid, "guild_id": guild, "arena_key": arena, "mode": "challenge",
         "a": {"user_id": a_id, "knight": "Arthur", "horse": "Thunder",
               "horse_id": a_horse, "score": score_a},
         "b": {"user_id": b_id, "knight": "Basil", "horse": "Biscuit",
@@ -22,6 +22,12 @@ def match(mid, guild=12, arena="royal_lists", score_a=3, score_b=0,
 
 
 class CompetitionTests(unittest.TestCase):
+    def test_instant_matches_do_not_rank(self):
+        instant = match("instant")
+        instant["mode"] = "instant"
+        self.assertEqual(c.ranked(12, "wins", {"matches": [instant]}), [])
+        self.assertEqual(c.title_progress(12, 1, {"matches": [instant]})["crowd_favourite"]["progress"], 0)
+
     def test_server_isolation_and_duplicate_match_ids(self):
         fixture = {"matches": [
             match("first"),
