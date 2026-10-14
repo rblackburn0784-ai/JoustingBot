@@ -9,6 +9,7 @@ from cogs.horse import Horse, load_horses
 from services.records import knight_record, horse_record, latest_matches
 from services.competition import equipped_title
 from services.progression import equipped_standard, prestige, reputation
+from services.injuries import active as active_injuries, duration as injury_duration, PENALTY_CAP
 
 def knight_stats_embed(member: discord.abc.User) -> discord.Embed:
     knight = get_knight(load_knights(), member.id)
@@ -21,6 +22,16 @@ def knight_stats_embed(member: discord.abc.User) -> discord.Embed:
         points, tier = prestige(guild.id, member.id)
         rep = reputation(guild.id, member.id)
         standard = equipped_standard(guild.id, member.id)
+        injuries = active_injuries(guild.id, member.id)
+        e.add_field(
+            name="🩹 Recovery",
+            value=(
+                "\n".join(f"{i['name']} — {injury_duration(i['remaining_seconds'])}"
+                          for i in injuries[:3]) +
+                f"\n(Maximum {PENALTY_CAP} total stat penalties)"
+            ) if injuries else "✅ Fully recovered",
+            inline=False,
+        )
         e.add_field(
             name="🪙 Guild Progression",
             value=f"**{tier}** · {points} prestige · {rep} reputation" + (f"\n🚩 {standard}" if standard else ""),
