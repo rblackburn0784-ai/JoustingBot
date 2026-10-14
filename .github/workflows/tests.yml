@@ -1,0 +1,42 @@
+name: JoustingBot tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install bot dependencies
+        run: python -m pip install "discord.py>=2.3,<3" python-dotenv
+      - name: Compile Python code
+        run: python -m compileall -q main.py cogs services tests
+      - name: Run competition regression tests
+        run: python -m unittest discover -s tests -v
+      - name: Check Discord cog and slash command registration
+        run: |
+          python - <<'PY'
+          import asyncio
+          import discord
+          from discord.ext import commands
+
+          async def check():
+              async with commands.Bot(command_prefix="!", intents=discord.Intents.default()) as bot:
+                  for module in (
+                      "cogs.menu", "cogs.knight", "cogs.horse",
+                      "cogs.equipment", "cogs.arena", "cogs.joust",
+                      "cogs.profile", "cogs.competition",
+                  ):
+                      await bot.load_extension(module)
+                  names = {command.name for command in bot.tree.get_commands()}
+                  assert {"menu", "profile", "titles", "title", "leaderboard", "knight", "horse", "joust"} <= names, names
+                  print("All cogs loaded; slash commands registered.")
+
+          asyncio.run(check())
+          PY
