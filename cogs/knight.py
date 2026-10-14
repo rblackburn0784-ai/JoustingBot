@@ -374,6 +374,11 @@ class KnightCog(commands.Cog):
             ephemeral=True,
         )
 
+    @knight_group.command(name="stats", description="View your knight career stats.")
+    async def career_stats(self, interaction: discord.Interaction):
+        from cogs.profile import knight_stats_embed
+        await interaction.response.send_message(embed=knight_stats_embed(interaction.user), ephemeral=True)
+
     @knight_group.command(name="view", description="View your knight.")
     async def view(self, interaction: discord.Interaction):
         db = load_knights()
