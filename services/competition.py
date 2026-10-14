@@ -37,12 +37,12 @@ CATEGORIES = {
 
 
 def guild_matches(guild_id: int, history: dict | None = None) -> list[dict]:
-    """Legacy v0.6 matches without guild_id are intentionally excluded."""
+    """Only accepted guild challenges count; instant tests and legacy results do not."""
     matches = (history if history is not None else load_history()).get("matches", [])
     seen: set[str] = set()
     selected: list[dict] = []
     for m in matches:
-        if not isinstance(m, dict) or m.get("guild_id") != guild_id:
+        if not isinstance(m, dict) or m.get("guild_id") != guild_id or m.get("mode") != "challenge":
             continue
         match_id = str(m.get("id", ""))
         if match_id and match_id in seen:
