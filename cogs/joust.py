@@ -14,9 +14,10 @@ from services.arenas import ARENAS, get_arena
 from services.combat import Fighter, MatchResult, PassLog, run_single_match
 from services.equipment import get_item
 from services.records import record_match
+from services.progression import loadout, equipped_standard
 
 
-VERSION_LABEL = "JoustingBot v0.7 — Leaderboards & Titles"
+VERSION_LABEL = "JoustingBot v0.8 — Equipment Progression"
 CHALLENGE_TIMEOUT_SECONDS = 120
 
 
@@ -184,6 +185,17 @@ def make_intro_embed(prepared: PreparedDuel) -> discord.Embed:
         ),
         inline=True,
     )
+
+    if prepared.guild_id is not None:
+        standard_a = equipped_standard(prepared.guild_id, prepared.challenger.id)
+        standard_b = equipped_standard(prepared.guild_id, prepared.opponent.id)
+        if standard_a or standard_b:
+            e.add_field(
+                name="🚩 Standards",
+                value=f"{prepared.knight_a.name}: **{standard_a or 'None'}**\n"
+                      f"{prepared.knight_b.name}: **{standard_b or 'None'}**",
+                inline=False,
+            )
 
     seed_text = f"Seed `{prepared.seed}`" if prepared.seed is not None else "Seed will be generated at match start."
     e.add_field(
@@ -520,6 +532,16 @@ class JoustCog(commands.Cog):
 
         horse_a = Horse.from_dict(horse_a_raw)
         horse_b = Horse.from_dict(horse_b_raw)
+
+        # v0.8: resolve per-server unlocked loadouts before simulation and presentation.
+        # Legacy starter equipment remains usable without migration.
+        for knight, horse, user_id in (
+            (knight_a, horse_a, challenger.id),
+            (knight_b, horse_b, opponent.id),
+        ):
+            knight.equipped_lance_key = loadout(guild_id, user_id, "lance", knight.equipped_lance_key)
+            knight.equipped_armour_key = loadout(guild_id, user_id, "armour", knight.equipped_armour_key)
+            horse.equipped_barding_key = loadout(guild_id, user_id, "barding", horse.equipped_barding_key)
 
         fighter_a = Fighter(
             user_id=challenger.id,
