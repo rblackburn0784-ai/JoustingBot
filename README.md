@@ -2,11 +2,51 @@
 
 A lightweight medieval jousting Discord game bot built with `discord.py`.
 
-**Current version:** `v0.8 — Equipment Progression & Unlocks`
+**Current version:** `v0.8.1 — Injuries & Recovery`
 
 Players create a knight, build and bind a horse, equip both rider and horse, choose an arena, and challenge other Discord users to cinematic jousts with accept/decline buttons.
 
 This version focuses on making matches feel more like a sport: richer pass categories, arena-specific lines, gear-specific lines, seed display, debug roll breakdowns, and tunable balance constants.
+
+---
+
+## v0.8.1 — Injuries & Recovery
+
+Knights can suffer **minor, temporary injuries** from serious impacts in **accepted** jousts. Injuries are part of the match history, are generated once per completed match, and have no permanent effects. Admin-only instant test duels do not cause injuries.
+
+### Possible injuries
+
+| Injury | Knight stat reduction | Natural healing |
+| --- | --- | --- |
+| Bruised Ribs | Endurance −1 | 24 real hours |
+| Wrenched Shoulder | Strength −1 | 36 real hours |
+| Jarred Wrist | Control −1 | 48 real hours |
+
+An unhorsing has a 28% chance of injuring the rider who was unhorsed; a saddle stagger has a 12% chance, and a heavy shield hit has a 6% chance. A match can inflict **at most one injury per rider**, using the most serious impact received. These are approximate chances before the deterministic seeded injury roll, not guarantees.
+
+**Fair-play restrictions:** Active injury debuffs are capped to **2 total stat points** across at most two different stats. No stat can drop below 1 from injury effects. Any additional injury is displayed but cannot increase that penalty; injuries are never fatal and do not change permanent allocated character stats. Recovery continues based on real-world time, even while the bot is offline.
+
+### Gold treatment
+
+- **30 gold** reduces one selected injury's remaining recovery time by **24 hours**.
+- A treatment may finish recovery immediately if under 24 hours remain.
+- The cost is paid from the same gold wallet used for purchasing equipment.
+- Treatment is only permitted for your own active injuries in that server.
+- Injuries heal naturally for free. Paying is optional, and confers no advantage beyond returning a hurt knight to their normal base stats.
+
+### Commands and UI
+
+- `/injuries` — private Injury Ward panel showing remaining healing time, effective penalties and gold balance.
+- `/heal injury_id:<id>` — pay for 24 hours of recovery.
+- `/menu` → **Injuries**, or `/menu` → **Profile** → **Injury Ward** — button-only recovery flow with a dropdown to select an injury and a **Treat Selected** button.
+- Your `/profile` and duel introduction show current injury status.
+- Match results announce any new injuries.
+
+### Persistence and compatibility
+
+New injury snapshots are saved **inside `storage/matches.json`**, alongside the completed match that caused them. Gold treatment payments are stored in **`storage/progression.json`**, so equipment purchases and treatments cannot spend the same gold. Both files are already included in the Admin backup and Git ignore rules.
+
+**Historical matches from v0.8 or earlier do not produce retroactive injuries.** Existing saves do not require migration. The injury roll is based on a match's unique ID, so viewing a result again never generates another injury.
 
 ---
 
