@@ -1,5 +1,28 @@
 # Changelog
 
+## v0.4 — Challenge Flow
+
+Controlled duel flow update for fair player-vs-player jousts.
+
+### Added
+
+- `/joust challenge opponent:<member> arena_key:<arena>`.
+- Public challenge embed with challenger, opponent, arena and timeout details.
+- Accept Challenge button for the challenged player.
+- Decline button for the challenged player or challenger.
+- 120-second challenge timeout.
+- Active challenge lock to prevent overlapping challenge spam.
+- Shared duel preparation logic used by both `/joust duel` and `/joust challenge`.
+- v0.4 footer label on joust embeds.
+
+### Notes
+
+- `/joust duel` still exists for instant/admin-style testing.
+- `/joust challenge` is now the preferred normal player flow.
+- Core combat maths were not changed in this update.
+
+---
+
 ## v0.3 — Match Presentation Update
 
 Presentation-layer update for single joust matches.
