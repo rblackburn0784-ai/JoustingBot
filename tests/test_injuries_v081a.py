@@ -162,6 +162,23 @@ class TreatmentTests(unittest.TestCase):
             self.assertIsNone(inj.support_for_next_bout(33, 8, history=history, now=now))
             self.assertIsNone(inj.support_for_next_bout(34, 8, history=history, now=now))
 
+    def test_injury_ward_has_provider_dropdown_home_and_treatment_button(self):
+        from cogs.menu import InjuryPage
+        import discord
+        wound = {
+            "id": "m:b", "name": "Bruised Ribs", "stat": "endurance",
+            "remaining_seconds": 32 * 3600, "severity": "moderate",
+        }
+        with patch.object(inj, "active", return_value=[wound]):
+            page = InjuryPage(8, 33)
+        selects = [c for c in page.children if isinstance(c, discord.ui.Select)]
+        labels = [c.label for c in page.children if isinstance(c, discord.ui.Button)]
+        self.assertEqual(len(selects), 2)
+        self.assertEqual(len(selects[1].options), 3)
+        self.assertIn("Treat Selected", labels)
+        self.assertIn("Main Menu", labels)
+        self.assertEqual({x.row for x in selects}, {0, 1})
+
     def test_support_expires_after_one_day_without_a_match(self):
         now, history = self.prepare()
         with tempfile.TemporaryDirectory() as td, \
