@@ -26,7 +26,7 @@ from services.competition import (
 from services.equipment import items_by_slot, get_item
 from services.records import load_history
 
-VERSION = "v0.8"
+VERSION = "v0.8.1"
 STYLE = discord.ButtonStyle
 
 
@@ -119,6 +119,7 @@ class MainMenuView(OwnedView):
             ("Leaderboards", "🏆", lambda it: navigate(it, LeaderboardPage(it.user.id, it.guild_id))),
             ("Titles", "🏅", lambda it: navigate(it, TitlePage(it.user.id, it.guild_id))),
             ("Progression", "🪙", lambda it: navigate(it, ProgressionPage(it.user.id, it.guild_id))),
+            ("Injuries", "🩹", lambda it: navigate(it, InjuryPage(it.user.id, it.guild_id))),
         ]
         for i, (label, icon, action) in enumerate(pages):
             self.button(label, action, row=i // 5, emoji=icon)
@@ -134,7 +135,7 @@ class MainMenuView(OwnedView):
                      "**Every section below opens usable controls.**\n"
                      "⚔️ Knight · 🐎 Horse · 🛡️ Equipment · 🏟️ Arenas\n"
                      "🎯 Challenge · 📜 Profile · 🏆 Leaderboards · 🏅 Titles\n"
-                     "🪙 Progression & Gold\n\n"
+                     "🪙 Progression & Gold · 🩹 Injuries & Recovery\n\n"
                      "Only authorised members see the ⚙️ Admin controls.")
 
 
@@ -146,6 +147,7 @@ class StartView(OwnedView):
         self.button("Choose Equipment", lambda it: navigate(it, EquipmentPage(it.user.id, it.guild_id)), row=1, emoji="🛡️")
         self.button("Challenge", lambda it: navigate(it, DuelPage(it.user.id)), row=1, emoji="🎯")
         self.button("Earn Gold", lambda it: navigate(it, ProgressionPage(it.user.id, it.guild_id)), row=2, emoji="🪙")
+        self.button("Recover", lambda it: navigate(it, InjuryPage(it.user.id, it.guild_id)), row=2, emoji="🩹")
         self.home()
 
     def make_embed(self):
@@ -364,6 +366,93 @@ class ConfirmHorseDelete(OwnedView):
         await navigate(interaction, StableView(interaction.user.id, guild_id=interaction.guild_id), "🗑️ Horse deleted.")
 
 
+
+class InjurySelect(discord.ui.Select):
+    def __init__(self, screen: "InjuryPage"):
+        self.screen = screen
+        choices = screen.current[:25]
+        super().__init__(
+            placeholder="Select an injury to treat",
+            row=0,
+            options=[
+                discord.SelectOption(
+                    label=f"{i['name']} ({i['stat']})"[:100],
+                    value=i["id"],
+                    description=f"Recovery: {screen.duration(i['remaining_seconds'])}"[:100],
+                    default=i["id"] == screen.selected,
+                ) for i in choices
+            ],
+        )
+
+    async def callback(self, interaction):
+        self.screen.selected = self.values[0]
+        await interaction.response.edit_message(embed=self.screen.make_embed(), view=self.screen)
+
+
+class InjuryPage(OwnedView):
+    """Fully private injury management, with owner-only payments and Home."""
+    def __init__(self, user_id: int, guild_id: int | None, selected: str | None = None):
+        super().__init__(user_id)
+        from services.injuries import active, duration
+        self.guild_id = guild_id
+        self.duration = duration
+        self.current = active(guild_id, user_id) if guild_id is not None else []
+        self.selected = selected if selected in {i["id"] for i in self.current} else (
+            self.current[0]["id"] if self.current else None
+        )
+        if self.current:
+            self.add_item(InjurySelect(self))
+        self.button("Treat Selected", self.treat, row=1, style=STYLE.primary,
+                    emoji="🩹", disabled=self.selected is None)
+        self.button("Refresh", self.refresh, row=1)
+        self.button("Career Profile", lambda it: navigate(it, ProfilePage(it.user.id)), row=2)
+        self.home()
+
+    def make_embed(self):
+        from services.injuries import HEAL_COST, HEAL_HOURS, PENALTY_CAP
+        from services.progression import wallet
+        if self.guild_id is None:
+            return embed("🩹 Injury Ward", "Open this section inside a Discord server.")
+        gold = wallet(self.guild_id, self.owner_id)
+        if not self.current:
+            return embed("🩹 Injury Ward",
+                         f"✅ You are fully recovered.\n\n🪙 **Gold:** {gold}\n"
+                         "Injuries can occur after significant impacts in accepted jousts.")
+        lines = []
+        for i in self.current[:12]:
+            marker = "➡️" if i["id"] == self.selected else "•"
+            lines.append(
+                f"{marker} **{i['name']}** — −1 {i['stat'].title()} · "
+                f"{self.duration(i['remaining_seconds'])} remaining"
+            )
+        return embed(
+            "🩹 Injury Ward — Recovery",
+            f"🪙 **Gold:** {gold}\n"
+            f"**Recovery treatment:** {HEAL_COST} gold = {HEAL_HOURS} hours faster recovery.\n"
+            f"**Maximum combat penalty:** {PENALTY_CAP} stat points total.\n"
+            "All injuries heal automatically with real time, even when the bot is offline.\n\n"
+            + "\n".join(lines)
+        )
+
+    async def treat(self, interaction):
+        if not self.selected:
+            return await interaction.response.send_message("✅ No injury needs treatment.", ephemeral=True)
+        from services.injuries import heal
+        try:
+            balance, injury = heal(interaction.guild_id, interaction.user.id, self.selected)
+        except ValueError as exc:
+            return await interaction.response.send_message(f"❌ {exc}", ephemeral=True)
+        await navigate(
+            interaction,
+            InjuryPage(interaction.user.id, interaction.guild_id, self.selected),
+            f"🩹 Treated **{injury['name']}**. Your recovery advanced 24 hours. "
+            f"Gold remaining: **{balance}**."
+        )
+
+    async def refresh(self, interaction):
+        await navigate(interaction, InjuryPage(interaction.user.id, interaction.guild_id))
+
+
 class EquipmentPage(OwnedView):
     def __init__(self, user_id: int, guild_id: int | None = None):
         super().__init__(user_id)
@@ -486,6 +575,8 @@ class ProgressionPage(OwnedView):
                     row=0, style=STYLE.primary, emoji="🛡️")
         self.button("View Standards", lambda it: navigate(it, StandardPage(it.user.id, it.guild_id)),
                     row=0, emoji="🚩")
+        self.button("Injury Ward", lambda it: navigate(it, InjuryPage(it.user.id, it.guild_id)),
+                    row=1, emoji="🩹")
         self.home()
 
     def make_embed(self):
@@ -920,6 +1011,24 @@ class MenuCog(commands.Cog):
     async def help_joust(self, interaction: discord.Interaction):
         view = MainMenuView(interaction.user.id, is_admin(interaction))
         await interaction.response.send_message(embed=view.make_embed(), view=view, ephemeral=True)
+
+    @app_commands.command(name="injuries", description="Inspect your injuries and purchase faster healing.")
+    async def injuries(self, interaction: discord.Interaction):
+        view = InjuryPage(interaction.user.id, interaction.guild_id)
+        await interaction.response.send_message(embed=view.make_embed(), view=view, ephemeral=True)
+
+    @app_commands.command(name="heal", description="Spend gold to accelerate recovery from an injury.")
+    async def heal(self, interaction: discord.Interaction, injury_id: str):
+        from services.injuries import heal
+        try:
+            balance, injury = heal(interaction.guild_id, interaction.user.id, injury_id)
+        except ValueError as exc:
+            return await interaction.response.send_message(f"❌ {exc}", ephemeral=True)
+        view = InjuryPage(interaction.user.id, interaction.guild_id)
+        await interaction.response.send_message(
+            content=f"🩹 Treated **{injury['name']}**. 24h recovery advancement · {balance} gold remaining.",
+            embed=view.make_embed(), view=view, ephemeral=True
+        )
 
     @app_commands.command(name="progress", description="Check your gold, prestige and equipment unlocks.")
     async def progress(self, interaction: discord.Interaction):
