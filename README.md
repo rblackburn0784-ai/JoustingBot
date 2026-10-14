@@ -2,11 +2,79 @@
 
 A lightweight medieval jousting Discord game bot built with `discord.py`.
 
-**Current version:** `v0.8.1 — Injuries & Recovery`
+**Current version:** `v0.8.1a — Contextual Injuries & Treatment`
 
 Players create a knight, build and bind a horse, equip both rider and horse, choose an arena, and challenge other Discord users to cinematic jousts with accept/decline buttons.
 
 This version focuses on making matches feel more like a sport: richer pass categories, arena-specific lines, gear-specific lines, seed display, debug roll breakdowns, and tunable balance constants.
+
+---
+
+## v0.8.1a — Contextual Injuries & Tiered Recovery
+
+Injury risk now depends on the **arena, impact, defender's armour and barding, attacking lance, mount breed, horse handling stats**, and whether the rider is already injured. All percentages are deliberately tuned **in-game balance values**, not real-world medical risk estimates.
+
+### Injury probability modifiers
+
+Each rider's most dangerous qualifying hit received per joust has a single injury roll. Base injury odds are:
+
+| Received event | Starting injury chance |
+| --- | ---: |
+| Unhorsing | 28% |
+| Saddle stagger | 12% |
+| Heavy shield hit | 6% |
+| Horse slip | 10% |
+
+Arena modifiers (percentage **points**):
+
+| Arena | Adjustment |
+| --- | ---: |
+| Royal Lists | −3 |
+| Festival Arena | −1 |
+| Wind-Swept Field | +2 |
+| Muddy Field | +5 |
+| War-Torn Battlefield | +6 |
+| Frozen Ground | +7 |
+
+Other modifications are added to the base risk: heavy/Oakbreaker lances raise injury risk; Tournament/Windrunner lances reduce it. Full Plate or a Reinforced Helm reduces the wearer's risk; Light Plate and a Duelist's Harness raise it. Barding affects footing and protection. Horse breed has a **small** adjustment: Destrier/Palfrey generally offer stability, while Charger/Courser are slightly riskier; unrecognised custom breeds are neutral. High courage and obedience slightly lower injury risk, while low values increase it. Riding while already injured adds **+3 points** of risk.
+
+**Final chance is clamped between 2% and 42%** for any qualifying impact, preventing extreme equipment combinations from making injuries either unavoidable or impossible. Injury-risk previews appear on challenge cards, and injury results list the final chance and applied modifiers.
+
+### Five injury types, variable recovery
+
+| Injury | Stat effect | Base recovery |
+| --- | --- | --- |
+| Bruised Ribs | Endurance −1 | 24 hours |
+| Wrenched Shoulder | Strength −1 | 36 hours |
+| Jarred Wrist | Control −1 | 48 hours |
+| Twisted Knee | Agility −1 | 32 hours |
+| Strained Back | Endurance −1 | 40 hours |
+
+Arena and impact type alter the *relative frequency* of each injury: muddy and frozen terrain favour knee problems; wind favours wrist/shoulder injuries; war-torn arenas favour shoulder/rib injuries; horse slips especially favour knees. Severity is rolled as Light (50%), Moderate (40%) or Serious (10%) and changes recovery duration to approximately 80%, 100% or 135% of the base, respectively. Every injury still affects its chosen stat by only **one point**.
+
+Fairness constraints are unchanged: at most **one new injury per rider per completed match**, no stat can fall below 1 due to injuries, and at most **two total effective penalty points** at once. There are no permanent injuries and no injuries from admin instant-test duels. Injuries heal naturally even when the bot is offline.
+
+### Three treatment providers
+
+| Provider | Gold cost | Maximum time reduction | Failure chance | Temporary aid chance on success |
+| --- | ---: | ---: | ---: | ---: |
+| Faith Healer | 12 | 8h | 16% | 12% |
+| Shady Doctor | 27 | 18h | 9% | 18% |
+| Private Doctor | 55 | 30h | 3% | 24% |
+
+A failed treatment **still costs gold** but reduces no recovery time. A successful one shortens natural recovery by *up to* its listed amount. **No treatment may reduce recovery below three hours**, so purchasing care does not instantly cure injuries. When fewer than three hours remain, treatment is unavailable; let natural healing finish. Previous successful treatments already paid for in v0.8.1 remain effective.
+
+A successful treatment also has a small independent chance to grant **physician's aid**: during the **next eligible accepted bout within 24 hours**, if the treated injury is still active, it negates **one** injury stat penalty for that bout. Aid is not consumed by posting, declining or timing out a challenge, is never used in admin instant tests, cannot stack into an extra bonus, and is recorded in the completed match history so it cannot be used again.
+
+### Commands and navigation
+
+Open \`/menu\` → **Injuries**, \`/menu\` → **Profile** → **Injury Ward**, or \`/injuries\`. The injury panel includes dropdowns for **which wound** to treat and **which provider** to use, plus treatment, refresh and Main Menu buttons.
+
+Command-line equivalent:
+
+\`/heal injury_id:<injury_id> provider:<faith_healer|shady_doctor|private_doctor>\`
+
+The provider argument is optional and defaults to Shady Doctor. Existing injuries, gold balances, gear and title records are kept; no data wipe or schema migration is required. New match records preserve horse breed and handling, the injury-risk breakdown and the consumption of any one-bout relief. Payment and recovery records remain in \`storage/progression.json\`; injury snapshots remain in \`storage/matches.json\`. Both are covered by the Admin backup feature.
 
 ---
 
