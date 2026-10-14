@@ -541,7 +541,7 @@ class JoustCog(commands.Cog):
         ):
             knight.equipped_lance_key = loadout(guild_id, user_id, "lance", knight.equipped_lance_key)
             knight.equipped_armour_key = loadout(guild_id, user_id, "armour", knight.equipped_armour_key)
-            horse.equipped_barding_key = loadout(guild_id, user_id, "barding", horse.equipped_barding_key)
+            horse.equipped_barding_key = loadout(guild_id, user_id, "barding", horse.equipped_barding_key, horse.horse_id)
 
         fighter_a = Fighter(
             user_id=challenger.id,
