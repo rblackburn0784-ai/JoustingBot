@@ -239,7 +239,7 @@ class HorsePage(OwnedView):
     def __init__(self, user_id: int):
         super().__init__(user_id)
         self.button("Create Horse", lambda it: it.response.send_modal(HorseModal()), emoji="➕")
-        self.button("Manage Stable", lambda it: navigate(it, StableView(it.user.id)), emoji="📋")
+        self.button("Manage Stable", lambda it: navigate(it, StableView(it.user.id, guild_id=it.guild_id)), emoji="📋")
         self.home()
 
     def make_embed(self):
@@ -267,8 +267,9 @@ class HorsePicker(discord.ui.Select):
 class StableView(OwnedView):
     PAGE_SIZE = 20
 
-    def __init__(self, user_id: int, page: int = 0):
+    def __init__(self, user_id: int, page: int = 0, guild_id: int | None = None):
         super().__init__(user_id)
+        self.guild_id = guild_id
         self.page = page
         self.raws = [r for r in load_horses().get("horses", {}).values() if r.get("owner_id") == user_id]
         self.raws.sort(key=lambda x: (x.get("name", "").lower(), x.get("horse_id", "")))
@@ -281,9 +282,9 @@ class StableView(OwnedView):
         self.button("Stats", self.stats, row=1, disabled=not choices)
         self.button("Bind", self.bind, row=1, style=STYLE.primary, disabled=not choices)
         self.button("Delete", self.delete, row=1, style=STYLE.danger, disabled=not choices)
-        self.button("◀", lambda it: navigate(it, StableView(it.user.id, self.page - 1)),
+        self.button("◀", lambda it: navigate(it, StableView(it.user.id, self.page - 1, it.guild_id)),
                     row=2, disabled=self.page == 0)
-        self.button("▶", lambda it: navigate(it, StableView(it.user.id, self.page + 1)),
+        self.button("▶", lambda it: navigate(it, StableView(it.user.id, self.page + 1, it.guild_id)),
                     row=2, disabled=(self.page + 1) * self.PAGE_SIZE >= len(self.raws))
         self.button("Back", lambda it: navigate(it, HorsePage(it.user.id)), row=2)
         self.home()
@@ -298,7 +299,7 @@ class StableView(OwnedView):
         h = self.horse()
         if h:
             from services.progression import loadout
-            current_barding = loadout(None, self.owner_id, "barding", h.equipped_barding_key)
+            current_barding = loadout(self.guild_id, self.owner_id, "barding", h.equipped_barding_key, h.horse_id)
             detail = f"**{h.name}** ({h.breed})\nBarding: {current_barding}\nID: `{h.horse_id}`"
         else:
             detail = "No horse on this page."
@@ -327,7 +328,7 @@ class StableView(OwnedView):
             return await interaction.response.send_message("❌ Create your knight first.", ephemeral=True)
         knight["bound_horse_id"] = h.horse_id
         save_knights(db)
-        await navigate(interaction, StableView(interaction.user.id, self.page), f"✅ {h.name} is now your mount.")
+        await navigate(interaction, StableView(interaction.user.id, self.page, interaction.guild_id), f"✅ {h.name} is now your mount.")
 
     async def delete(self, interaction):
         h = self.horse()
@@ -342,7 +343,7 @@ class ConfirmHorseDelete(OwnedView):
         super().__init__(user_id)
         self.horse_id = horse_id
         self.button("Confirm Delete", self.confirm, style=STYLE.danger)
-        self.button("Cancel", lambda it: navigate(it, StableView(it.user.id)))
+        self.button("Cancel", lambda it: navigate(it, StableView(it.user.id, guild_id=it.guild_id)))
         self.home()
 
     def make_embed(self):
@@ -360,7 +361,7 @@ class ConfirmHorseDelete(OwnedView):
         if knight and knight.get("bound_horse_id") == self.horse_id:
             knight["bound_horse_id"] = None
             save_knights(knights)
-        await navigate(interaction, StableView(interaction.user.id), "🗑️ Horse deleted.")
+        await navigate(interaction, StableView(interaction.user.id, guild_id=interaction.guild_id), "🗑️ Horse deleted.")
 
 
 class EquipmentPage(OwnedView):
