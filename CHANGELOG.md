@@ -1,5 +1,41 @@
 # Changelog
 
+## v0.5 — Match Engine Polish
+
+Combat readability and tuning update. This version makes jousts feel more like a sport while keeping the existing command flow.
+
+### Added
+
+- Better pass categories:
+  - `clean_miss`
+  - `shield_scrape`
+  - `lance_break`
+  - `heavy_shield_hit`
+  - `saddle_stagger`
+  - `unhorsing`
+  - `horse_refusal`
+  - `horse_slip`
+  - `double_clash`
+- More flavour text per result category.
+- Arena-specific pass lines.
+- Gear-specific pass lines.
+- Match seed generation and seed display in result embeds.
+- Optional `seed` parameter on joust commands for reproducible matches.
+- Optional `debug` parameter on joust commands.
+- Hidden admin/debug roll breakdown embed when `debug: True` is used by someone with Manage Server permission.
+- `services/balance.py` for tunable match constants.
+- Random arena support using `arena_key: random`.
+- Random Arena button on active challenges.
+- Expanded pre-match comparison in challenge embeds.
+
+### Notes
+
+- `/joust challenge` remains the preferred player flow.
+- `/joust duel` remains available for instant/admin-style testing.
+- Debug output is intentionally hidden/ephemeral and permission-gated.
+
+---
+
 ## v0.4 — Challenge Flow
 
 Controlled duel flow update for fair player-vs-player jousts.
@@ -15,11 +51,15 @@ Controlled duel flow update for fair player-vs-player jousts.
 - Shared duel preparation logic used by both `/joust duel` and `/joust challenge`.
 - v0.4 footer label on joust embeds.
 
+### Completed in v0.5
+
+- Random Arena button.
+- Expanded pre-match comparison before accept.
+
 ### Notes
 
 - `/joust duel` still exists for instant/admin-style testing.
 - `/joust challenge` is now the preferred normal player flow.
-- Core combat maths were not changed in this update.
 
 ---
 
