@@ -17,6 +17,14 @@ def knight_stats_embed(member: discord.abc.User) -> discord.Embed:
     guild = getattr(member, "guild", None)
     current_title = equipped_title(guild.id, member.id) if guild else None
     e.description = f"Rider: {member.mention}" + (f"\n🏅 **{current_title}**" if current_title else "")
+    if guild:
+        points, tier = prestige(guild.id, member.id)
+        standard = equipped_standard(guild.id, member.id)
+        e.add_field(
+            name="🪙 Guild Progression",
+            value=f"**{tier}** · {points} prestige" + (f"\n🚩 {standard}" if standard else ""),
+            inline=False,
+        )
     e.add_field(name="Record", value=f"🏆 {stats['wins']} W  ·  {stats['losses']} L  ·  {stats['draws']} D\nJousts: **{stats['jousts_completed']}**", inline=False)
     e.add_field(name="Highlights", value=f"Unhorsings caused: **{stats['unhorsings_caused']}**\nTimes unhorsed: **{stats['times_unhorsed']}**\nLance breaks: **{stats['lance_breaks']}**", inline=False)
     return e
