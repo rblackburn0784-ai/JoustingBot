@@ -15,10 +15,13 @@ from services.combat import Fighter, MatchResult, PassLog, run_single_match
 from services.equipment import get_item
 from services.records import record_match
 from services.progression import loadout, equipped_standard
-from services.injuries import apply_penalty, active as active_injuries, duration as injury_duration
+from services.injuries import (
+    apply_penalty, active as active_injuries, duration as injury_duration,
+    support_for_next_bout,
+)
 
 
-VERSION_LABEL = "JoustingBot v0.8.1 — Injuries & Recovery"
+VERSION_LABEL = "JoustingBot v0.8.1a — Injury Risk & Treatment"
 CHALLENGE_TIMEOUT_SECONDS = 120
 
 
@@ -101,6 +104,10 @@ class PreparedDuel:
     debug_requested: bool = False
     guild_id: Optional[int] = None
     mode: str = "instant"
+    support_token_a: Optional[str] = None
+    support_token_b: Optional[str] = None
+    had_injury_a: bool = False
+    had_injury_b: bool = False
 
 
 def equipment_name(key: Optional[str]) -> str:
@@ -599,6 +606,23 @@ class JoustCog(commands.Cog):
         )
 
     async def send_match(self, sender, prepared: PreparedDuel) -> MatchResult:
+        # Re-check at acceptance, not at challenge creation; time-based healing
+        # and last-minute treatment might have changed the knight's condition.
+        if prepared.guild_id is not None:
+            for side, user_id, fighter, knight in (
+                ("a", prepared.challenger.id, prepared.fighter_a, prepared.knight_a),
+                ("b", prepared.opponent.id, prepared.fighter_b, prepared.knight_b),
+            ):
+                injured = bool(active_injuries(prepared.guild_id, user_id))
+                assistance = (support_for_next_bout(prepared.guild_id, user_id)
+                              if prepared.mode == "challenge" else None)
+                setattr(prepared, "had_injury_" + side, injured)
+                setattr(prepared, "support_token_" + side,
+                        assistance["id"] if assistance is not None else None)
+                fighter.knight_stats = apply_penalty(
+                    knight.stats, prepared.guild_id, user_id,
+                    relief=bool(assistance),
+                )
         intro_embed = make_intro_embed(prepared)
         await sender.send(embed=intro_embed)
 
@@ -615,9 +639,23 @@ class JoustCog(commands.Cog):
                 descriptions = []
                 for event in events:
                     rider = prepared.knight_a.name if event["user_id"] == prepared.challenger.id else prepared.knight_b.name
-                    descriptions.append(f"**{rider}**: {event['name']} (−1 {event['stat']}, natural healing)")
+                    descriptions.append(
+                        f"**{rider}**: {event['name']} ({event.get('severity', 'moderate')}) "
+                        f"· −1 {event['stat']} · Injury risk {event.get('risk', '?')}%"
+                    )
                 result_embed.add_field(name="🩹 Injuries Sustained", value="\n".join(descriptions)[:1024], inline=False)
         result_embed.add_field(name="📜 Match ID", value=f"`{match_id}`", inline=False)
+        helped = []
+        if prepared.support_token_a:
+            helped.append(prepared.knight_a.name)
+        if prepared.support_token_b:
+            helped.append(prepared.knight_b.name)
+        if helped:
+            result_embed.add_field(
+                name="🩹 Physician's Aid",
+                value=", ".join(helped) + " received one-bout pain relief (one injury penalty eased).",
+                inline=False,
+            )
         await sender.send(embed=result_embed, view=ChallengeHomeView())
         return result
 
