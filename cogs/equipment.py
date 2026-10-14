@@ -58,12 +58,14 @@ class EquipmentCog(commands.Cog):
         knight = load_knights().get("knights", {}).get(str(interaction.user.id))
         if not knight:
             return await send_with_home(interaction, "❌ Create a knight first.")
+        horse_id = None
         if slot == "barding":
+            horse_id = knight.get("bound_horse_id")
             horse = load_horses().get("horses", {}).get(knight.get("bound_horse_id"))
             if not horse or int(horse.get("owner_id", -1)) != interaction.user.id:
                 return await send_with_home(interaction, "❌ Bind a horse you own first.")
         try:
-            set_loadout(interaction.guild_id, interaction.user.id, slot, item_key)
+            set_loadout(interaction.guild_id, interaction.user.id, slot, item_key, horse_id=horse_id)
         except ValueError as exc:
             return await send_with_home(interaction, f"🔒 {exc}")
         return await send_with_home(interaction, f"✅ Equipped **{item.name}** in this server.")
