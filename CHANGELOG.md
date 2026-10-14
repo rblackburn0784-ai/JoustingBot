@@ -3,7 +3,7 @@
 ## v0.8 — Equipment Progression & Unlocks
 
 - Added server-specific gold earned from accepted challenge results only: +12 per match, +8 per win, +4 per draw.
-- Added prestige tiers based on completed matches and wins; prestige is cosmetic and cannot be spent.
+- Added prestige tiers based on completed matches and wins, plus feat-driven reputation (wins, unhorsings and lance breaks); neither metric can be spent or influence combat.
 - Added six unlockable equipment sidegrades with trade-offs and a milestone + gold purchase requirement.
 - Preserved twelve existing pieces of starter equipment as free choices; original JSON data continues working.
 - Added permanent per-server purchases and per-guild knight loadouts; barding belongs to an individual horse.
