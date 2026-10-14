@@ -853,13 +853,13 @@ class AdminPage(OwnedView):
     def make_embed(self):
         return embed("⚙️ Admin Control Room",
                      "**Restricted: Manage Server permission required.**\n"
-                     "Inspect storage, view guild totals, back up local JSON data, "
+                     "Inspect storage, view guild totals, back up local JSON data (including progression), "
                      "or run an instant unranked test match.")
 
     async def health(self, interaction):
         from services.storage import load_json
         checks = []
-        for path in ("storage/knights.json", "storage/horses.json", "storage/matches.json", "storage/titles.json"):
+        for path in ("storage/knights.json", "storage/horses.json", "storage/matches.json", "storage/titles.json", "storage/progression.json"):
             file = Path(path)
             if not file.exists():
                 checks.append(f"⚪ {file.name}: not yet created")
@@ -891,7 +891,7 @@ class AdminPage(OwnedView):
         try:
             dest.mkdir(parents=True, exist_ok=False)
             copied = []
-            for name in ("knights.json", "horses.json", "matches.json", "titles.json"):
+            for name in ("knights.json", "horses.json", "matches.json", "titles.json", "progression.json"):
                 src = Path("storage") / name
                 if src.is_file():
                     shutil.copy2(src, dest / name)
