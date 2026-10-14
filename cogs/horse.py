@@ -236,10 +236,11 @@ class CreateHorseButton(discord.ui.Button):
         horses_db["horses"][horse.horse_id] = horse.to_dict()
         save_horses(horses_db)
 
+        from cogs.menu import HomeOnlyView
         await interaction.response.edit_message(
             content="✅ Horse created.",
             embed=horse_embed(horse, interaction.user),
-            view=None,
+            view=HomeOnlyView(interaction.user.id),
         )
 
 
@@ -283,6 +284,12 @@ class HorseStatBuilderView(discord.ui.View):
         self.add_item(HorseValueSelect(self))
         self.add_item(CreateHorseButton(self))
         self.add_item(ResetHorseStatsButton(self))
+        from cogs.menu import Action, MainMenuView, navigate, is_admin
+        self.add_item(Action(
+            "Main Menu",
+            lambda it: navigate(it, MainMenuView(it.user.id, is_admin(it))),
+            row=4, style=discord.ButtonStyle.success, emoji="🏰",
+        ))
 
     def total_points(self) -> int:
         return sum(self.stats.values())
