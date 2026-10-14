@@ -7,12 +7,15 @@ from discord.ext import commands
 from cogs.knight import get_knight, load_knights
 from cogs.horse import Horse, load_horses
 from services.records import knight_record, horse_record, latest_matches
+from services.competition import equipped_title
 
 def knight_stats_embed(member: discord.abc.User) -> discord.Embed:
     knight = get_knight(load_knights(), member.id)
     stats = knight_record(member.id)
     e = discord.Embed(title=f"⚔️ {knight.name if knight else member.display_name} — Career")
-    e.description = f"Rider: {member.mention}"
+    guild = getattr(member, "guild", None)
+    current_title = equipped_title(guild.id, member.id) if guild else None
+    e.description = f"Rider: {member.mention}" + (f"\n🏅 **{current_title}**" if current_title else "")
     e.add_field(name="Record", value=f"🏆 {stats['wins']} W  ·  {stats['losses']} L  ·  {stats['draws']} D\nJousts: **{stats['jousts_completed']}**", inline=False)
     e.add_field(name="Highlights", value=f"Unhorsings caused: **{stats['unhorsings_caused']}**\nTimes unhorsed: **{stats['times_unhorsed']}**\nLance breaks: **{stats['lance_breaks']}**", inline=False)
     return e
