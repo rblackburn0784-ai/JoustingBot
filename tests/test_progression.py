@@ -57,6 +57,7 @@ class ProgressionTests(unittest.TestCase):
         b["passes"][0]["category"] = "unhorsing"
         b["passes"][0]["points_a"] = 0
         b["passes"][0]["points_b"] = 3
+        b["a"]["score"], b["b"]["score"] = 0, 3
         del c["a"]["gear"]
         values = p.progress(7, 101, {"matches": [a,b,c]})
         self.assertEqual(values["frozen_survivals"], 2)
