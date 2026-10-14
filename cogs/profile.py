@@ -8,6 +8,7 @@ from cogs.knight import get_knight, load_knights
 from cogs.horse import Horse, load_horses
 from services.records import knight_record, horse_record, latest_matches
 from services.competition import equipped_title
+from services.progression import equipped_standard, prestige
 
 def knight_stats_embed(member: discord.abc.User) -> discord.Embed:
     knight = get_knight(load_knights(), member.id)
