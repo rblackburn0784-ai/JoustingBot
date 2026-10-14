@@ -419,6 +419,12 @@ class HorseCog(commands.Cog):
                 ephemeral=True,
             )
 
+        from services.progression import loadout
+        knight = load_knights().get("knights", {}).get(str(interaction.user.id))
+        if knight and knight.get("bound_horse_id") == horse.horse_id:
+            horse.equipped_barding_key = loadout(
+                interaction.guild_id, interaction.user.id, "barding", horse.equipped_barding_key
+            )
         await interaction.response.send_message(
             embed=horse_embed(horse, interaction.user),
             ephemeral=True,
