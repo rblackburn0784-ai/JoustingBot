@@ -30,6 +30,7 @@ def record_match(prepared: Any, result: Any) -> str:
         "id": match_id,
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "guild_id": getattr(prepared, "guild_id", None),
+        "mode": getattr(prepared, "mode", "instant"),
         "arena_key": prepared.arena_key, "arena_name": result.arena_name,
         "seed": result.seed,
         "a": {"user_id": prepared.fighter_a.user_id, "knight": prepared.knight_a.name,
