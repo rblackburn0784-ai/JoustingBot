@@ -26,7 +26,7 @@ Only **completed, accepted** `/joust challenge` matches in the current server ea
 
 A win therefore awards **20 gold**, a draw **16 gold** and a loss **12 gold**. The gold wallet is derived from the completed-match journal, less previous purchases in `storage/progression.json`, so simply restarting the bot does not duplicate rewards.
 
-Prestige is **1 per completed challenge plus 2 per win**, and determines a display tier (Squire, Lancer, Knight Errant, Grand Champion, Legend of the Lists). Prestige is not spent, and does not affect combat strength.
+Prestige is **1 per completed challenge plus 2 per win**, and determines a display tier (Squire, Lancer, Knight Errant, Grand Champion, Legend of the Lists). **Reputation** is another non-spendable metric: +1 for each competitive win, +2 for each unhorsing caused and +1 per lance break. Neither prestige nor reputation changes combat strength.
 
 ### Unlockable sidegrade equipment
 
