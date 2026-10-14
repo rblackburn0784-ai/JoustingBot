@@ -84,6 +84,16 @@ async def navigate(interaction: discord.Interaction, view: "OwnedView", message:
     await interaction.response.edit_message(content=message, embed=view.make_embed(), view=view)
 
 
+class HomeOnlyView(OwnedView):
+    """Single-button navigation for modal-generated creation screens."""
+    def __init__(self, user_id: int):
+        super().__init__(user_id)
+        self.home()
+
+    def make_embed(self):
+        return embed("🏰 Main Menu", "Press Main Menu to return to the hub.")
+
+
 class MainMenuView(OwnedView):
     def __init__(self, user_id: int, allow_admin: bool = False):
         super().__init__(user_id)
@@ -150,7 +160,7 @@ class KnightModal(discord.ui.Modal, title="Create Your Knight"):
 class ConfirmKnightDelete(OwnedView):
     def __init__(self, user_id: int):
         super().__init__(user_id)
-        self.button("Confirm Delete", self.confirm, style=STYLE.danger, emoji="trash", row=0)
+        self.button("Confirm Delete", self.confirm, style=STYLE.danger, emoji="🗑️", row=0)
         self.button("Cancel", lambda it: navigate(it, KnightPage(it.user.id)), row=0)
         self.home()
 
@@ -168,9 +178,9 @@ class ConfirmKnightDelete(OwnedView):
 class KnightPage(OwnedView):
     def __init__(self, user_id: int):
         super().__init__(user_id)
-        self.button("Create", self.create, emoji="plus")
-        self.button("View Knight", self.view, emoji="shield")
-        self.button("Career Stats", self.stats, emoji="chart-bar")
+        self.button("Create", self.create, emoji="➕")
+        self.button("View Knight", self.view, emoji="🛡️")
+        self.button("Career Stats", self.stats, emoji="📊")
         self.button("Delete", lambda it: navigate(it, ConfirmKnightDelete(it.user.id)), style=STYLE.danger)
         self.home()
 
@@ -208,8 +218,8 @@ class HorseModal(discord.ui.Modal, title="Create Your Horse"):
 class HorsePage(OwnedView):
     def __init__(self, user_id: int):
         super().__init__(user_id)
-        self.button("Create Horse", lambda it: it.response.send_modal(HorseModal()), emoji="plus")
-        self.button("Manage Stable", lambda it: navigate(it, StableView(it.user.id)), emoji="list")
+        self.button("Create Horse", lambda it: it.response.send_modal(HorseModal()), emoji="➕")
+        self.button("Manage Stable", lambda it: navigate(it, StableView(it.user.id)), emoji="📋")
         self.home()
 
     def make_embed(self):
@@ -266,7 +276,7 @@ class StableView(OwnedView):
 
     def make_embed(self):
         h = self.horse()
-        detail = (f"**{h.name}** ({h.breed})\nBarding: {h.equipped_barding_key}\nID: \`{h.horse_id}\`"
+        detail = (f"**{h.name}** ({h.breed})\nBarding: {h.equipped_barding_key}\nID: `{h.horse_id}`"
                   if h else "No horse on this page.")
         return embed("🐎 Stable Management", f"{detail}\n\nPage {self.page + 1} of "
                      f"{max(1, (len(self.raws) + self.PAGE_SIZE - 1) // self.PAGE_SIZE)}")
@@ -681,9 +691,9 @@ class TitlePage(OwnedView):
 class AdminPage(OwnedView):
     def __init__(self, user_id: int):
         super().__init__(user_id, admin=True)
-        self.button("System Health", self.health, row=0, emoji="heart-pulse")
-        self.button("Server Summary", self.summary, row=0, emoji="chart-bar")
-        self.button("Backup Data", self.backup, row=1, style=STYLE.primary, emoji="save")
+        self.button("System Health", self.health, row=0, emoji="💚")
+        self.button("Server Summary", self.summary, row=0, emoji="📊")
+        self.button("Backup Data", self.backup, row=1, style=STYLE.primary, emoji="💾")
         self.button("Instant Test Duel", lambda it: navigate(it, DuelPage(it.user.id, instant=True)), row=1)
         self.home()
 
@@ -737,7 +747,7 @@ class AdminPage(OwnedView):
             return await interaction.response.send_message(
                 f"❌ Backup could not be created: {type(exc).__name__}.", ephemeral=True)
         await interaction.response.edit_message(
-            embed=embed("💾 Backup Created", f"Path: \`{dest}\`\nFiles: {', '.join(copied) or 'No data files exist yet.'}\n"
+            embed=embed("💾 Backup Created", f"Path: `{dest}`\nFiles: {', '.join(copied) or 'No data files exist yet.'}\n"
                         "Keep this directory private and backed up off-host too."),
             view=self,
         )
