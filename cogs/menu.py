@@ -17,7 +17,9 @@ def main_menu_embed() -> discord.Embed:
             "4. `/equip list`\n"
             "5. `/arena list`\n"
             "6. `/joust challenge`\n"
-            "7. `/profile`\n"\n            "8. `/leaderboard wins`\n"\n            "9. `/titles`"
+            "7. `/profile`\n"
+            "8. `/leaderboard wins`\n"
+            "9. `/titles`"
         ),
     )
     e.add_field(
