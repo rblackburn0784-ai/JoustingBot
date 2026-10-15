@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.9.2 — Cinematic Matchday Broadcast
+
+- Added a separate, deterministic broadcast planner that reads saved combat results without ever rerolling RNG or awarding duplicate match rewards.
+- Added two heraldic entrance announcements and generated 1200x675 PNG introduction and final scoreboard graphics via Pillow. Both accept optional, user-supplied arena/background PNGs.
+- Added the staged Approach → Charge → Impact → Aftermath sequence for each completed pass, incorporating arena ambience, tactics, fatigue, special moves, the recorded impact and marshal scoring.
+- Implemented one continuously edited Discord live-screen message (not a new message or match for each phase) and a separate accessible final scoreboard with lance breaks, unhorsings, heavy hits, winner/tie, injury report and match ID.
+- Added assets/broadcast/manifest.json with optional HTTPS GIF/PNG URLs for all stages, impact-specific categories and arena-specific artwork.
+- Added environment configuration for broadcast enabling, adjustable stage delay and reduced-motion mode.
+- Persist match history *before* presentation. Broadcast/image failures do not re-simulate matches, produce extra gold or duplicate injuries; the final result is still attempted.
+- Added entrance/final media fallbacks and public Main Menu navigation on announcement, live stage and result cards.
+- Added unit tests for no duplicate passes, score integrity, no result spoilers, media URL hygiene, PNG dimensions, one-message stage editing, reduced-motion mode and playback failure isolation.
+- Updated README, dependencies and /version to v0.9.2.
+
+---
+
+
 ## v0.9.1 — Combat Tactics & Decisions
 
 - Added private challenge-phase choices for both riders: Cautious/Balanced/Aggressive styles, Shield/Lance/Rider targets and an optional manoeuvre.
