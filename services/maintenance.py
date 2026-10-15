@@ -98,6 +98,8 @@ def inspect() -> dict:
             for gid, group in obj.get("guilds", {}).items():
                 if not isinstance(group, dict):
                     problems.append(f"tournaments.json: guild {str(gid)[:24]} is not an object.")
+                elif group.get("active") and not isinstance(group["active"], dict):
+                    problems.append(f"tournaments.json: guild {str(gid)[:24]} active event is malformed.")
                 elif group.get("active") and group["active"].get("status") not in ("registration", "running"):
                     warnings.append(f"tournaments.json: guild {str(gid)[:24]} has an unusual active status; review manually.")
     return {"files": files, "errors": problems, "warnings": warnings, "healthy": not problems}
@@ -186,7 +188,7 @@ def create_backup() -> str:
             copied[filename] = _hash(contents)
         manifest = {"schema": 1, "created_at": _now(), "files": copied}
         (target / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
-        verify_backup(name)
+        verify_backup(name, allow_empty=True)
     except Exception:
         shutil.rmtree(target, ignore_errors=True)
         raise
@@ -201,7 +203,7 @@ def backup_names(limit: int = 20) -> list[str]:
     return sorted(names, reverse=True)[:limit]
 
 
-def verify_backup(name: str) -> dict[str, bytes]:
+def verify_backup(name: str, *, allow_empty: bool = False) -> dict[str, bytes]:
     if not BACKUP_RE.fullmatch(name):
         raise MaintenanceError("Invalid backup identifier.")
     folder = BACKUP_DIR / name
@@ -212,7 +214,7 @@ def verify_backup(name: str) -> dict[str, bytes]:
         filenames = manifest["files"]
         if manifest.get("schema") != 1 or not isinstance(filenames, dict):
             raise ValueError("invalid manifest")
-        if not filenames:
+        if not filenames and not allow_empty:
             raise ValueError("empty backup")
         contents = {}
         for filename, digest in filenames.items():
@@ -241,7 +243,19 @@ def restore_backup(name: str) -> str:
     perform while no matches/other writes are active on this bot instance.
     """
     contents = verify_backup(name)
-    rollback = create_backup()
+    try:
+        rollback = create_backup()
+    except MaintenanceError:
+        # A corrupt current JSON file is the primary reason to need restore.
+        # Preserve its raw bytes for forensic recovery, never rewrite it as valid.
+        name = "quarantine-" + datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ") + "-" + uuid.uuid4().hex[:8]
+        directory = BACKUP_DIR / name
+        directory.mkdir(parents=True, exist_ok=False)
+        for filename in SCHEMAS:
+            source = DATA_DIR / filename
+            if source.is_file():
+                shutil.copy2(source, directory / filename)
+        rollback = name
     for filename, raw in contents.items():
         payload = json.loads(raw.decode("utf-8"))
         save_json(str(DATA_DIR / filename), payload)
