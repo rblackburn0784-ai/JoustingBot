@@ -23,7 +23,7 @@ from services.injuries import (
 )
 
 
-VERSION_LABEL = "JoustingBot v0.9.1 — Combat Tactics"
+VERSION_LABEL = "JoustingBot v0.9.2 — Cinematic Matchday Broadcast"
 CHALLENGE_TIMEOUT_SECONDS = 240
 
 
@@ -739,9 +739,12 @@ class JoustCog(commands.Cog):
                     knight.stats, prepared.guild_id, user_id,
                     relief=bool(assistance),
                 )
+        # Render the pre-match state before the journal is updated, so a fresh
+        # injury sustained in this bout isn't mistakenly shown at the entrance.
         intro_embed = make_intro_embed(prepared)
-        await sender.send(embed=intro_embed)
 
+        # Authoritative combat and history happen EXACTLY ONCE. Presentation
+        # is a replay of this result: Discord edits never trigger combat again.
         result = run_single_match(prepared.fighter_a, prepared.fighter_b, prepared.arena_key,
                                   seed=prepared.seed, tactics_a=prepared.tactics_a,
                                   tactics_b=prepared.tactics_b)
@@ -780,7 +783,29 @@ class JoustCog(commands.Cog):
                 value=", ".join(helped) + " received one-bout pain relief (one injury penalty eased).",
                 inline=False,
             )
-        await sender.send(embed=result_embed, view=ChallengeHomeView())
+        # Broadcast is non-authoritative: a Discord/media failure cannot
+        # duplicate the match or erase its completed, saved result.
+        import logging
+        from cogs import broadcast
+        display = logging.getLogger(__name__)
+        if broadcast.enabled():
+            try:
+                await broadcast.send_intro(sender, prepared, intro_embed)
+                await broadcast.play_passes(
+                    sender, result, arena_key=prepared.arena_key,
+                    home_view=ChallengeHomeView(),
+                )
+            except Exception:
+                display.exception("Cinematic stages failed for recorded match %s", match_id)
+        else:
+            try:
+                await sender.send(embed=intro_embed)
+            except Exception:
+                display.exception("Broadcast-off introduction failed for match %s", match_id)
+
+        await broadcast.send_final(
+            sender, result_embed, result, prepared, home_view=ChallengeHomeView()
+        )
         return result
 
     @joust_group.command(name="duel", description="Run a cinematic single joust match immediately.")
