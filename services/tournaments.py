@@ -10,6 +10,7 @@ import uuid
 from datetime import datetime, timezone
 
 from services.storage import load_json, save_json
+from services.arenas import ARENAS
 
 PATH = "storage/tournaments.json"
 ALLOWED_SIZES = (4, 8)
@@ -82,11 +83,11 @@ def join(guild_id: int, user_id: int) -> dict:
     return item
 
 
-def _match(tournament_id: str, round_index: int, match_index: int, a=None, b=None, seed=0) -> dict:
+def _match(tournament_id: str, round_index: int, match_index: int, a=None, b=None, seed=0, arena_key="royal_lists") -> dict:
     return {
         "id": f"t-{tournament_id}-r{round_index + 1}-m{match_index + 1}",
         "a": a, "b": b, "status": "pending",
-        "seed": seed, "winner": None, "record_id": None,
+        "seed": seed, "arena_key": arena_key, "winner": None, "record_id": None,
         "tiebreak": None,
     }
 
@@ -110,7 +111,7 @@ def start(guild_id: int) -> dict:
             _match(item["id"], ridx, i,
                    players[i * 2] if ridx == 0 else None,
                    players[i * 2 + 1] if ridx == 0 else None,
-                   rng.randrange(1, 2**31))
+                   rng.randrange(1, 2**31), rng.choice(tuple(ARENAS)))
             for i in range(match_count)
         ]
         rounds.append(matches)
