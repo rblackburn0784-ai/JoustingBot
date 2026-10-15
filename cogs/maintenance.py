@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from typing import Literal
 
 import discord
 from discord import app_commands
@@ -109,6 +110,7 @@ class MaintenancePage(OwnedView):
         self.button("Restore Selected", self.restore, row=2, emoji="♻️",
                     disabled=self.selected is None, style=discord.ButtonStyle.danger)
         self.button("Admin Dashboard", self.back, row=2)
+        self.button("Reset User", self.reset_user, row=3, style=discord.ButtonStyle.danger)
         self.home()
 
     def make_embed(self):
@@ -156,8 +158,132 @@ class MaintenancePage(OwnedView):
             return await interaction.response.send_message(f"❌ Backup failed verification: {error}", ephemeral=True)
         await navigate(interaction, ConfirmPage(interaction.user.id, "restore", self.selected))
 
+    async def reset_user(self, interaction):
+        await navigate(interaction, ResetUserPage(interaction.user.id, interaction.guild_id))
+
     async def back(self, interaction):
         await navigate(interaction, AdminPage(interaction.user.id))
+
+
+
+class ResetConfirmation(discord.ui.Modal, title="Confirm Server User Reset"):
+    confirmation = discord.ui.TextInput(
+        label="Type RESET followed by the target ID",
+        placeholder="RESET 123456789012345678", max_length=40,
+    )
+
+    def __init__(self, guild_id, user_id, actor_id, scope):
+        super().__init__()
+        self.guild_id, self.user_id, self.actor_id, self.scope = guild_id, user_id, actor_id, scope
+
+    async def on_submit(self, interaction):
+        if interaction.user.id != self.actor_id or interaction.guild_id != self.guild_id or not is_admin(interaction):
+            return await interaction.response.send_message("Access denied.", ephemeral=True)
+        if str(self.confirmation).strip() != f"RESET {self.user_id}":
+            return await interaction.response.send_message("Confirmation mismatch. Nothing changed.", ephemeral=True)
+        cog = interaction.client.get_cog("MaintenanceCog")
+        if cog is None:
+            return await interaction.response.send_message("Maintenance unavailable.", ephemeral=True)
+        async with cog.lock:
+            if not idle(interaction.client):
+                return await interaction.response.send_message("Matches are active. Reset blocked.", ephemeral=True)
+            try:
+                report = store.reset_user(self.guild_id, self.user_id, self.scope, self.actor_id)
+            except (store.MaintenanceError, ValueError, OSError) as exc:
+                LOG.exception("Reset refused for player %s", self.user_id)
+                return await interaction.response.send_message(
+                    f"Reset refused: {str(exc)[:320]}", ephemeral=True)
+        view = MaintenancePage(interaction.user.id)
+        await interaction.response.send_message(
+            content=f"Reset completed for <@{self.user_id}> ({self.scope}). "
+                    f"Verified safety backup: {report['backup']}. Match records and spending preserved.",
+            embed=view.make_embed(), view=view, ephemeral=True)
+
+
+class ConfirmUserResetPage(OwnedView):
+    def __init__(self, actor_id, guild_id, user_id, scope):
+        super().__init__(actor_id, admin=True)
+        self.guild_id, self.user_id, self.scope = guild_id, user_id, scope
+        self.button("Confirm Reset", self.confirm, row=0, style=discord.ButtonStyle.danger)
+        self.button("Cancel", lambda it: navigate(it, MaintenancePage(it.user.id)), row=0)
+        self.home()
+
+    def make_embed(self):
+        plan = store.reset_user_plan(self.guild_id, self.user_id, self.scope)
+        actions = "\n".join("- " + item for item in plan["changes"]) or "No settings currently selected."
+        return embed("Review Server User Reset",
+                     f"Target: <@{self.user_id}>\nServer: {self.guild_id}\nScope: {self.scope}\n\n"
+                     f"Changes:\n{actions}\n\nPreserved: {', '.join(plan['preserved'])}.\n\n"
+                     "A verified backup is created first. Press Confirm Reset, then type "
+                     "RESET followed by the target numeric ID.")
+
+    async def confirm(self, interaction):
+        if not is_admin(interaction) or interaction.guild_id != self.guild_id:
+            return await interaction.response.send_message("Access denied.", ephemeral=True)
+        await interaction.response.send_modal(
+            ResetConfirmation(self.guild_id, self.user_id, interaction.user.id, self.scope))
+
+
+class ResetMemberSelect(discord.ui.UserSelect):
+    def __init__(self, page):
+        self.page = page
+        super().__init__(placeholder="Choose member", row=0)
+
+    async def callback(self, interaction):
+        self.page.target_id = self.values[0].id
+        await interaction.response.edit_message(embed=self.page.make_embed(), view=self.page)
+
+
+class ResetScopeSelect(discord.ui.Select):
+    def __init__(self, page):
+        self.page = page
+        super().__init__(row=1, placeholder="Reset scope", options=[
+            discord.SelectOption(label="Settings", value="settings", default=True,
+                                 description="Remove equipped selections but keep purchases"),
+            discord.SelectOption(label="Inventory", value="inventory",
+                                 description="Also retire gear purchases, with no refund"),
+        ])
+
+    async def callback(self, interaction):
+        self.page.scope = self.values[0]
+        await interaction.response.edit_message(embed=self.page.make_embed(), view=self.page)
+
+
+class ResetUserPage(OwnedView):
+    def __init__(self, actor_id, guild_id):
+        super().__init__(actor_id, admin=True)
+        self.guild_id, self.target_id, self.scope = guild_id, None, "settings"
+        self.add_item(ResetMemberSelect(self))
+        self.add_item(ResetScopeSelect(self))
+        self.button("Review Reset", self.review, row=2, style=discord.ButtonStyle.danger)
+        self.button("Back", lambda it: navigate(it, MaintenancePage(it.user.id)), row=3)
+        self.home()
+
+    def make_embed(self):
+        mention = f"<@{self.target_id}>" if self.target_id else "None"
+        return embed("Server User Reset",
+                     f"Member: {mention}\nScope: {self.scope}\n\n"
+                     "Settings clears selected loadout, standard and title.\n"
+                     "Inventory also removes unlocked-item ownership without refund.\n"
+                     "Historical matches, gold already spent, injuries, tournaments, "
+                     "shared characters and other servers are preserved.")
+
+    async def review(self, interaction):
+        if not is_admin(interaction) or interaction.guild_id != self.guild_id:
+            return await interaction.response.send_message("Access denied.", ephemeral=True)
+        if not self.target_id or interaction.guild is None:
+            return await interaction.response.send_message("Select a member first.", ephemeral=True)
+        if interaction.guild.get_member(self.target_id) is None:
+            try:
+                await interaction.guild.fetch_member(self.target_id)
+            except discord.HTTPException:
+                return await interaction.response.send_message("Target is not a member.", ephemeral=True)
+        try:
+            view = ConfirmUserResetPage(interaction.user.id, self.guild_id, self.target_id, self.scope)
+            summary = view.make_embed()
+        except store.MaintenanceError as exc:
+            return await interaction.response.send_message(f"Reset blocked: {exc}", ephemeral=True)
+        await interaction.response.edit_message(embed=summary, view=view)
 
 
 class MaintenanceCog(commands.Cog):
