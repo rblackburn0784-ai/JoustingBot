@@ -36,6 +36,19 @@ def save_json(path: str, data: Dict[str, Any]) -> None:
             file.flush()
             os.fsync(file.fileno())
         os.replace(temporary, path)
+        # POSIX: fsync the parent directory so the renamed file entry is
+        # durable across sudden machine power loss. On platforms where
+        # directories cannot be opened as file descriptors, atomic replace
+        # remains the fallback.
+        try:
+            if hasattr(os, "O_DIRECTORY"):
+                directory_fd = os.open(directory, os.O_RDONLY | os.O_DIRECTORY)
+                try:
+                    os.fsync(directory_fd)
+                finally:
+                    os.close(directory_fd)
+        except OSError:
+            pass
     finally:
         if os.path.exists(temporary):
             os.unlink(temporary)
