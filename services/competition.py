@@ -5,6 +5,7 @@ from collections import defaultdict
 from typing import Any
 
 from services.records import load_history
+from services.tournament_awards import TOURNAMENT_TITLES, tournament_stats
 from services.storage import load_json, save_json
 
 TITLES_PATH = "storage/titles.json"
@@ -35,6 +36,8 @@ TITLE_RULES = {
     "honour_bound": ("Honour Bound", "Fight 3 drawn jousts.", "draws", 3),
     "steady_in_the_saddle": ("Steady in the Saddle", "Complete 10 jousts without horse slips or refusals.", "clean_jousts", 10),
 }
+
+TITLE_RULES.update(TOURNAMENT_TITLES)
 
 CATEGORIES = {
     "wins": "Most Wins",
@@ -232,7 +235,8 @@ def ranked(guild_id: int, category: str, history: dict | None = None) -> list[di
     return rows[:TOP_COUNT]
 
 
-def title_progress(guild_id: int, user_id: int, history: dict | None = None) -> dict[str, dict]:
+def title_progress(guild_id: int, user_id: int, history: dict | None = None,
+                   tournament_data: dict | None = None) -> dict[str, dict]:
     knights, _ = aggregate(guild_id, history)
     s = knights.get(user_id, _knight())
     fields = {
@@ -244,6 +248,7 @@ def title_progress(guild_id: int, user_id: int, history: dict | None = None) -> 
         "festival_wins": s["festival_wins"], "war_wins": s["war_wins"],
         "clean_jousts": s["clean_jousts"],
     }
+    fields.update(tournament_stats(guild_id, user_id, tournament_data, history))
     return {key: {"name": name, "description": desc, "progress": fields[field],
                   "required": target, "earned": fields[field] >= target}
             for key, (name, desc, field, target) in TITLE_RULES.items()}
