@@ -12,13 +12,13 @@ from services.competition import TITLE_RULES, title_progress
 
 
 class UIReleaseTests(unittest.TestCase):
-    def test_all_eighteen_titles_exist(self):
-        self.assertEqual(len(TITLE_RULES), 18)
-        self.assertEqual(len(set(TITLE_RULES)), 18)
+    def test_original_eighteen_titles_preserved_and_twelve_tournament_added(self):
+        self.assertEqual(len(TITLE_RULES), 30)
+        self.assertEqual(len(set(TITLE_RULES)), 30)
         for key, (display, description, field, threshold) in TITLE_RULES.items():
             self.assertTrue(key and display and description and field)
             self.assertGreater(threshold, 0)
-        self.assertEqual(len(title_progress(1, 123, {"matches": []})), 18)
+        self.assertEqual(len(title_progress(1, 123, {"matches": []})), 30)
 
     def test_all_twelve_new_titles_are_unlockable(self):
         old_keys = {
@@ -57,11 +57,11 @@ class UIReleaseTests(unittest.TestCase):
                 "passes": [],
             })
         progress = title_progress(99, 5, {"matches": matches})
-        self.assertEqual(
-            set(progress) - old_keys,
-            {k for k in TITLE_RULES if k not in old_keys},
-        )
-        self.assertTrue(all(progress[k]["earned"] for k in progress if k not in old_keys))
+        from services.tournament_awards import TOURNAMENT_TITLES
+        career_keys = [key for key in TITLE_RULES if key not in TOURNAMENT_TITLES]
+        self.assertEqual(len(career_keys), 18)
+        self.assertTrue(all(progress[k]["earned"] for k in career_keys if k not in old_keys))
+        self.assertTrue(all(not progress[k]["earned"] for k in TOURNAMENT_TITLES))
 
     def test_main_menu_admin_visibility(self):
         public = menu.MainMenuView(123, False)
@@ -107,7 +107,7 @@ class UIReleaseTests(unittest.TestCase):
         self.assertEqual(view.page, 2)
         selects = [c for c in view.children if isinstance(c, discord.ui.Select)]
         self.assertEqual(len(selects), 1)
-        self.assertEqual(len(selects[0].options), 18)
+        self.assertEqual(len(selects[0].options), 6)
 
 
 class PermissionTests(unittest.IsolatedAsyncioTestCase):
