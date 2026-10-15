@@ -86,7 +86,7 @@ def effects(plan: TacticPlan, *, pass_no: int, fatigue: int, horse_stats: dict[s
         eligible = pass_no == 3 and (score_for < score_against or fatigue >= 3)
     if plan.manoeuvre != "none" and eligible:
         move = plan.manoeuvre
-        _, ma, mc, mr, mi, _ = MOVES[move]
+        _, ma, mc, mr, mi, _cooldown, _description = MOVES[move]
         align += ma
         charge += mc
         risk += mi
