@@ -368,9 +368,11 @@ class MaintenanceCog(commands.Cog):
     async def version(self, interaction: discord.Interaction):
         view = MainMenuView(interaction.user.id, is_admin(interaction))
         await interaction.response.send_message(
-            embed=embed("⚙️ JoustingBot v0.9.0a",
-                        "Stability & Admin Tools\n"
+            embed=embed("⚙️ JoustingBot v0.9.1",
+                        "Combat Tactics & Decisions\n"
                         "✅ Atomic JSON saves · verified local backups · safe repairs\n"
+                        "✅ Private tactics for each rider: style, target, manoeuvre\n"
+                        "✅ Fatigue, temperament and injury trade-offs · seeded replay\n"
                         "✅ Challenge cooldowns and locks · error cleanup\n"
                         "✅ Admin-only restore with confirmation\n\n"
                         "Use /admin health, /admin backup, /admin repair and /admin reset_user."),
