@@ -14,7 +14,7 @@ from services.arenas import ARENAS
 
 PATH = "storage/tournaments.json"
 ALLOWED_SIZES = (4, 8)
-HISTORY_LIMIT = 20
+HISTORY_LIMIT = 20  # recent() display cap; full completed history remains stored
 
 
 class TournamentError(ValueError):
@@ -177,7 +177,6 @@ def complete_match(guild_id: int, tournament_id: str, match_id: str,
         item["status"] = "completed"
         item["completed_at"] = timestamp()
         bucket.setdefault("history", []).append(item)
-        bucket["history"] = bucket["history"][-HISTORY_LIMIT:]
         bucket["active"] = None
     else:
         downstream = item["rounds"][ridx + 1][midx // 2]
