@@ -152,3 +152,15 @@ def statistics(result: Any) -> dict[str, dict[str, int]]:
             elif p.category in {"horse_refusal", "horse_slip"}:
                 stats[other]["penalties"] += 1
     return stats
+
+
+
+def entrance_commentary(prepared: Any) -> str:
+    """Pre-match narrative with no simulated result or hidden mechanics."""
+    return (
+        f"🎺 **West gate:** {prepared.knight_a.name} rides in on {prepared.horse_a.name}. "
+        f"The first banners rise in salute.\n"
+        f"🎺 **East gate:** {prepared.knight_b.name} follows on {prepared.horse_b.name}, "
+        f"turning towards the opposite rail.\n"
+        "The marshals signal the lists are ready. No champion has yet been decided."
+    )
