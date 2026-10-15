@@ -119,6 +119,21 @@ async def open_tournaments(interaction: discord.Interaction):
         interaction.user.id, interaction.guild_id, is_admin(interaction)))
 
 
+class VersionPage(OwnedView):
+    def __init__(self, user_id: int):
+        super().__init__(user_id)
+        self.home()
+
+    def make_embed(self):
+        return embed(
+            "⚙️ JoustingBot v0.9.0",
+            "**Stability & Admin Tools**\n"
+            "Reliable atomic saves, checksum-verified local backups, safe repair previews, "
+            "confirmed restores, challenge locks and cooldowns, and clearer errors.\n\n"
+            "The admin Maintenance Tools panel is visible only to Manage Server users."
+        )
+
+
 class MainMenuView(OwnedView):
     def __init__(self, user_id: int, allow_admin: bool = False):
         super().__init__(user_id)
@@ -135,6 +150,7 @@ class MainMenuView(OwnedView):
             ("Progression", "🪙", lambda it: navigate(it, ProgressionPage(it.user.id, it.guild_id))),
             ("Injuries", "🩹", lambda it: navigate(it, InjuryPage(it.user.id, it.guild_id))),
             ("Tournaments", "🏆", open_tournaments),
+            ("Version", "ℹ️", lambda it: navigate(it, VersionPage(it.user.id))),
         ]
         for i, (label, icon, action) in enumerate(pages):
             self.button(label, action, row=i // 5, emoji=icon)
