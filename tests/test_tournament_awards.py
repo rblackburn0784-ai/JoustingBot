@@ -161,10 +161,10 @@ class AwardsFixture(unittest.TestCase):
         selects = [c for c in page.children if isinstance(c, discord.ui.Select)]
         self.assertEqual(len(selects), 1)
         self.assertEqual(len(selects[0].options), 6)
-        self.assertIn("Main Menu", [c.label for c in page.children])
+        self.assertIn("Main Menu", [getattr(c, "label", None) for c in page.children])
         cabinet = TournamentCabinet(101, 80)
-        self.assertIn("Tournament Menu", [c.label for c in cabinet.children])
-        self.assertIn("Main Menu", [c.label for c in cabinet.children])
+        self.assertIn("Tournament Menu", [getattr(c, "label", None) for c in cabinet.children])
+        self.assertIn("Main Menu", [getattr(c, "label", None) for c in cabinet.children])
         self.assertIn("Trophy Cabinet", [c.label for c in TournamentPanel().children])
         self.assertIn("Trophy Cabinet", [c.label for c in TournamentHub(101, 80).children])
         self.assertGreater(len(cabinet.make_embed().fields), 0)
