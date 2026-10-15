@@ -576,6 +576,9 @@ class ChallengeView(discord.ui.View):
         if len(keys) > 1 and self.prepared.arena_key in keys:
             keys.remove(self.prepared.arena_key)
 
+        if self.prepared.tactics_ready:
+            return await interaction.response.send_message(
+                "❌ Arena is locked once either rider has selected their tactics.", ephemeral=True)
         self.prepared.arena_key = random.choice(keys)
         await interaction.response.edit_message(embed=make_challenge_embed(self.prepared), view=self)
 
