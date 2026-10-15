@@ -34,6 +34,16 @@ class JoustBot(commands.Bot):
             await self.load_extension(module)
         await self.tree.sync()
         LOG.info("Slash commands synced.")
+        # Diagnoses missing/malformed saves without silently overwriting them.
+        try:
+            from services.maintenance import inspect
+            report = inspect()
+            for issue in report["errors"]:
+                LOG.error("Storage validation: %s", issue)
+            for issue in report["warnings"]:
+                LOG.warning("Storage attention: %s", issue)
+        except Exception:
+            LOG.exception("Startup storage diagnostic failed; review /admin health.")
 
     async def on_app_command_error(self, interaction: discord.Interaction,
                                    error: app_commands.AppCommandError) -> None:
