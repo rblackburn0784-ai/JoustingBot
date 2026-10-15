@@ -179,6 +179,37 @@ class TreatmentTests(unittest.TestCase):
         self.assertIn("Main Menu", labels)
         self.assertEqual({x.row for x in selects}, {0, 1})
 
+    def test_multiple_treatments_do_not_stack_support_across_jousts(self):
+        now, history = self.prepare(wound_hours=72)
+        with tempfile.TemporaryDirectory() as td, \
+             patch.object(prog, "PATH", str(Path(td) / "progression.json")), \
+             patch.object(inj, "load_history", return_value=history), \
+             patch.object(prog, "load_history", return_value=history), \
+             patch.object(inj, "_treatment_roll", side_effect=lambda token, salt:
+                          99 if salt == "success" else 0):
+            first_balance, first = inj.heal(
+                33, 8, "win0:b", now=now, provider="faith_healer"
+            )
+            second_balance, second = inj.heal(
+                33, 8, "win0:b", now=now, provider="faith_healer"
+            )
+            self.assertTrue(first["support_ready"])
+            self.assertTrue(second["support_ready"])
+            self.assertEqual(first_balance - second_balance, 12)
+            self.assertIsNotNone(inj.support_for_next_bout(33, 8, history=history, now=now))
+            # Declined challenges, or other guilds' matches, do not consume aid.
+            history["matches"].append({
+                **match("declined", now=now + timedelta(minutes=1)),
+                "mode": "declined"
+            })
+            self.assertIsNotNone(inj.support_for_next_bout(
+                33, 8, history=history, now=now + timedelta(minutes=2)))
+            # Once a new accepted joust has completed, *all* earlier treatment
+            # boosts expire, including older tokens that were not selected.
+            history["matches"].append(match("next_joust", now=now + timedelta(minutes=3)))
+            self.assertIsNone(inj.support_for_next_bout(
+                33, 8, history=history, now=now + timedelta(minutes=4)))
+
     def test_support_expires_after_one_day_without_a_match(self):
         now, history = self.prepare()
         with tempfile.TemporaryDirectory() as td, \
