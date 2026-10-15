@@ -2,11 +2,58 @@
 
 A lightweight medieval jousting Discord game bot built with `discord.py`.
 
-**Current version:** `v0.9.1 — Combat Tactics & Decisions`
+**Current version:** `v0.9.2 — Cinematic Matchday Broadcast`
 
 Players create a knight, build and bind a horse, equip both rider and horse, choose an arena, and challenge other Discord users to cinematic jousts with accept/decline buttons.
 
-This version adds private pre-match tactical decisions to the existing server-safe, seedable jousting game. Knight/horse ownership, saved history, tournaments, progression, injuries and all admin safeguards remain intact.
+This version adds cinematic stage-by-stage Discord commentary and generated entrance/final scoreboard PNGs. All v0.9.1 tactics, seeded combat, history, tournaments, progression, injuries and admin safeguards remain intact.
+
+---
+
+## v0.9.2 — Cinematic Matchday Broadcast
+
+Each joust now has a staged replay of one authoritative saved combat result. Scoring, RNG, reward calculations and injury events are unchanged.
+
+### Presentation sequence
+
+1. **Entrances** — automatically generated 1200×675 PNG, each knight and mount introduced by the herald, arena backdrop, and both tactical plans.
+2. **Approach** — arena atmosphere and riding styles; no premature outcome announcement.
+3. **Charge** — chosen lance targets, current fatigue and activated special manoeuvres.
+4. **Impact** — the recorded result, including misses, heavy hits, splintered lances and unhorsings, with optional outcome-specific GIF.
+5. **Aftermath** — the marshal awards points and updates the running score.
+6. Repeat stages 2–5 once for every actual pass. The match can conclude before the maximum of five passes.
+7. **Final** — generated 1200×675 scoreboard PNG with both riders, points, winner/tie, lance breaks, unhorsings, heavy hits and seed, plus full accessible text, match ID and injury report.
+
+Only ONE editable Discord message is used for the entire pass-by-pass presentation. The intro and final result are separate messages. All frames come from the already-completed seeded match; no frame ever re-simulates combat. If a media upload or stage edit fails, the recorded result is preserved and the final card is still attempted.
+
+### Media placeholders
+
+You do not have to add artwork. Pillow renders an attractive fallback card and scoreboard.
+
+For additional backgrounds and highlights, see **[assets/broadcast/README.md](assets/broadcast/README.md)** and **[assets/broadcast/manifest.json](assets/broadcast/manifest.json)**.
+
+- Copy your custom 16:9 backgrounds into the broadcast assets directory as intro.png, final.png, or arena_royal_lists.png, arena_muddy_field.png, arena_frozen_ground.png, etc.
+- The bot overlays dynamic names, heraldry, tactics, scores and statistics itself. Leave text off the background art.
+- Fill direct HTTPS URLs in the media manifest for approach, charge, impact, aftermath, impact_unhorsing, impact_lance_break, impact_horse_slip and other relevant events.
+- Unfilled asset slots are ignored. URL validation prevents accidentally displaying local paths or insecure links. No GIFs are required to run the game.
+
+### Configuration
+
+Add these to your .env or host environment:
+
+~~~dotenv
+JOUST_BROADCAST_ENABLED=true
+JOUST_BROADCAST_STAGE_DELAY=0.85
+JOUST_BROADCAST_REDUCED_MOTION=false
+~~~
+
+- The stage delay is clamped from 0.35–2.5 seconds. Discord rate limits may impose extra delay.
+- Reduced-motion mode displays one static final pass summary and no stage edits.
+- Disabling the broadcast preserves the original quick intro/final result flow (with a generated final scoreboard).
+
+The source is divided into services/broadcast.py (pure playback planner), services/broadcast_art.py (PNG renderer), and cogs/broadcast.py (Discord delivery). The playback module does not write storage, create awards or run combat.
+
+The tests verify unique frames, scoring integrity, stage order, no spoilers before impact, renderer image dimensions, HTTPS media fallbacks, reduced motion and that a broken broadcast cannot re-run or re-award a match.
 
 ---
 
