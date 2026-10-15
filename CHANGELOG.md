@@ -2,6 +2,8 @@
 
 ## v0.9.0 — Stability & Admin Tools
 
+- Hardened v0.8.1a physician support so multiple treatment bonuses cannot be banked for several later jousts; only the first completed accepted match after treatment can use one. Added regression coverage.
+
 - Added /version and restricted /maintenance command, linked from the admin dashboard.
 - Added SHA256-manifested local JSON backups, verification before restore, strictly validated snapshot names and safety backups before applying changes.
 - Implemented an owner/admin-confirmation UI for safe repairs and snapshot restore, with checks to block maintenance while current-process matches are running.
