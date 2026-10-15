@@ -13,6 +13,10 @@ from cogs.horse import load_horses
 from cogs.menu import MainMenuView, is_admin, OwnedView, navigate
 from services import tournaments as engine
 from services.records import load_history
+from services.tournament_awards import (
+    achievement_progress, tournament_stats, TOURNAMENT_TITLES,
+)
+from services.competition import title_progress
 
 
 def at(uid):
@@ -100,6 +104,74 @@ class HomeView(OwnedView):
         return discord.Embed(title="Return to the Main Menu")
 
 
+class TournamentCabinet(OwnedView):
+    """Player-locked tournament trophies, milestones and titles."""
+    def __init__(self, viewer_id: int, guild_id: int | None,
+                 target_id: int | None = None, tab: str = "achievements"):
+        super().__init__(viewer_id)
+        self.gid = guild_id
+        self.target_id = target_id or viewer_id
+        self.tab = tab
+        for label, emoji, mode in (
+            ("Achievements", "🎖️", "achievements"),
+            ("Tournament Titles", "🏅", "titles"),
+            ("Career Medals", "🏆", "records"),
+        ):
+            self.button(label, lambda it, which=mode: navigate(
+                it, TournamentCabinet(it.user.id, it.guild_id, self.target_id, which)),
+                row=0, emoji=emoji)
+        self.button("Equip Title", self.equip, row=1, emoji="⚔️")
+        self.button("Tournament Menu", self.back, row=1)
+        self.home()
+
+    def make_embed(self):
+        e = discord.Embed(title="🏆 Tournament Trophy Cabinet", colour=discord.Colour.gold())
+        if self.gid is None:
+            e.description = "Open the Trophy Cabinet in a Discord server."
+            return e
+        e.description = f"Rider: {at(self.target_id)} · Verified server tournament results."
+        if self.tab == "records":
+            stats = tournament_stats(self.gid, self.target_id)
+            e.add_field(name="🏆 Tournament Medals",
+                        value=f"Gold championships: **{stats['championships']}**\n"
+                              f"Silver finishes: **{stats['runners_up']}**\n"
+                              f"Eight-rider crowns: **{stats['eight_crowns']}**",
+                        inline=False)
+            e.add_field(name="⚔️ Tournament Career",
+                        value=f"Events entered: **{stats['entries']}**\n"
+                              f"Jousts: **{stats['matches']}** · Advances: **{stats['advances']}**\n"
+                              f"Finals: **{stats['finals']}** · Marshal advances: **{stats['marshal_advances']}**\n"
+                              f"Unhorsings: **{stats['unhorsings']}** · Lance breaks: **{stats['lance_breaks']}**",
+                        inline=False)
+            return e
+        if self.tab == "titles":
+            progress = {key: val for key, val in title_progress(self.gid, self.target_id).items()
+                        if key in TOURNAMENT_TITLES}
+        else:
+            progress = achievement_progress(self.gid, self.target_id)
+        unlocked = sum(val["earned"] for val in progress.values())
+        lines = [
+            f"{'✅' if p['earned'] else '🔒'} **{p['name']}** ({p['progress']}/{p['required']})\n"
+            f"    {p['description']}" for p in progress.values()
+        ]
+        e.description += f"\n**Unlocked: {unlocked}/{len(progress)}**"
+        e.add_field(name="🏅 Tournament Titles" if self.tab == "titles" else "🎖️ Achievements",
+                    value="\n\n".join(lines)[:1024], inline=False)
+        e.set_footer(text="Titles can be equipped. Achievements are permanent recognition.")
+        return e
+
+    async def equip(self, interaction):
+        from cogs.menu import TitlePage
+        titles = list(title_progress(interaction.guild_id, interaction.user.id))
+        start = next((i for i, key in enumerate(titles) if key in TOURNAMENT_TITLES), 0)
+        await navigate(interaction, TitlePage(interaction.user.id, interaction.guild_id,
+                                               start // TitlePage.PER_PAGE))
+
+    async def back(self, interaction):
+        await navigate(interaction, TournamentHub(interaction.user.id,
+                                                   interaction.guild_id, is_admin(interaction)))
+
+
 class TournamentPanel(discord.ui.View):
     """Registered persistent public buttons; permissions checked by the cog."""
     def __init__(self):
@@ -127,6 +199,12 @@ class TournamentPanel(discord.ui.View):
             return await interaction.response.send_message("Server only.", ephemeral=True)
         await interaction.response.send_message(embed=history_embed(interaction.guild_id),
                                                 view=HomeView(interaction.user.id), ephemeral=True)
+
+    @discord.ui.button(label="Trophy Cabinet", emoji="🎖️", style=discord.ButtonStyle.secondary,
+                       custom_id="tournament:cabinet", row=1)
+    async def cabinet(self, interaction, button):
+        view = TournamentCabinet(interaction.user.id, interaction.guild_id)
+        await interaction.response.send_message(embed=view.make_embed(), view=view, ephemeral=True)
 
     @discord.ui.button(label="Refresh", emoji="🔄", style=discord.ButtonStyle.secondary,
                        custom_id="tournament:refresh", row=1)
@@ -161,6 +239,7 @@ class TournamentHub(OwnedView):
         self.button("Refresh", self.refresh, row=0, emoji="🔄")
         self.button("Join", self.join, row=0, emoji="🛡️")
         self.button("History", self.history, row=0, emoji="📜")
+        self.button("Trophy Cabinet", self.cabinet, row=2, emoji="🎖️")
         if admin:
             self.button("Create", self.create, row=1, style=discord.ButtonStyle.primary)
             self.button("Start", self.start, row=1)
@@ -178,6 +257,8 @@ class TournamentHub(OwnedView):
         await it.client.get_cog("TournamentCog").do_join(it)
     async def history(self, it):
         await it.response.edit_message(embed=history_embed(it.guild_id), view=self)
+    async def cabinet(self, it):
+        await navigate(it, TournamentCabinet(it.user.id, it.guild_id))
     async def create(self, it):
         if not is_admin(it):
             return await it.response.send_message("Admin only.", ephemeral=True)
@@ -361,6 +442,20 @@ class TournamentCog(commands.Cog):
     @app_commands.default_permissions(manage_guild=True)
     async def next(self, interaction: discord.Interaction):
         await self.do_next(interaction)
+
+    @group.command(name="achievements", description="Browse tournament achievements and titles.")
+    @app_commands.guild_only()
+    async def achievements(self, interaction: discord.Interaction, player: discord.Member | None = None):
+        view = TournamentCabinet(interaction.user.id, interaction.guild_id,
+                                 player.id if player else interaction.user.id)
+        await interaction.response.send_message(embed=view.make_embed(), view=view, ephemeral=True)
+
+    @group.command(name="cabinet", description="View tournament medals and lifetime progress.")
+    @app_commands.guild_only()
+    async def cabinet(self, interaction: discord.Interaction):
+        view = TournamentCabinet(interaction.user.id, interaction.guild_id,
+                                 tab="records")
+        await interaction.response.send_message(embed=view.make_embed(), view=view, ephemeral=True)
 
     @group.command(name="history", description="Show recent tournament champions.")
     @app_commands.guild_only()
