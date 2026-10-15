@@ -245,8 +245,8 @@ def active(guild_id: int | None, user_id: int, history=None, data=None, now=None
 def support_for_next_bout(guild_id: int | None, user_id: int, history=None, data=None, now=None) -> dict | None:
     """One use only, during the next eligible accepted bout within 24 hours.
 
-    A recorded match's support_token consumes the benefit. No state mutation
-    occurs on challenge issuance, decline, timeout or admin instant duels.
+    Any completed accepted joust after treatment consumes the opportunity.
+    Declines, timeouts and admin instant test duels do not consume it.
     """
     if guild_id is None:
         return None
@@ -259,9 +259,25 @@ def support_for_next_bout(guild_id: int | None, user_id: int, history=None, data
     if not active(guild_id, user_id, history, data, now):
         return None
     player = data.get("guilds", {}).get(str(guild_id), {}).get(str(user_id), {})
-    used = {side.get("support_token") for m in history.get("matches", [])
-            if m.get("guild_id") == guild_id and m.get("mode") == "challenge"
-            for side in (m.get("a", {}), m.get("b", {})) if side.get("user_id") == user_id}
+    # Any completed competitive match after treatment consumes that support opportunity.
+    # Several treatments before the same match do not create several future boosts.
+    completed = []
+    used = set()
+    for match in history.get("matches", []):
+        if not isinstance(match, dict) or match.get("guild_id") != guild_id or match.get("mode") != "challenge":
+            continue
+        sides = [match.get(side, {}) for side in ("a", "b")]
+        if not any(isinstance(side, dict) and side.get("user_id") == user_id for side in sides):
+            continue
+        try:
+            completed_at = utc(match["timestamp"])
+        except (KeyError, TypeError, ValueError):
+            completed_at = None
+        if completed_at is not None and completed_at <= now:
+            completed.append(completed_at)
+        used.update(side.get("support_token") for side in sides if isinstance(side, dict)
+                    and side.get("user_id") == user_id and side.get("support_token"))
+    recovering_ids = {w["id"] for w in active(guild_id, user_id, history, data, now)}
     choices = []
     for injury_id, entry in player.get("healing", {}).items():
         for payment in entry.get("treatments", []):
@@ -272,7 +288,9 @@ def support_for_next_bout(guild_id: int | None, user_id: int, history=None, data
                 time = utc(payment["at"])
                 if token in used or time > now or now - time > timedelta(hours=SUPPORT_WINDOW_HOURS):
                     continue
-                if not any(x["id"] == injury_id for x in active(guild_id, user_id, history, data, now)):
+                if injury_id not in recovering_ids:
+                    continue
+                if any(time < completed_at <= now for completed_at in completed):
                     continue
                 choices.append(payment)
             except (KeyError, TypeError, ValueError):
