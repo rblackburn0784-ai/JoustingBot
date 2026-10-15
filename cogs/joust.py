@@ -815,7 +815,7 @@ class JoustCog(commands.Cog):
                 display.exception("Cinematic stages failed for recorded match %s", match_id)
         else:
             try:
-                await sender.send(embed=intro_embed)
+                await sender.send(embed=intro_embed, view=ChallengeHomeView())
             except Exception:
                 display.exception("Broadcast-off introduction failed for match %s", match_id)
 
