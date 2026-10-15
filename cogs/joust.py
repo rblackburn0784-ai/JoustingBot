@@ -284,11 +284,14 @@ def make_result_embed(result: MatchResult, arena_key: str) -> discord.Embed:
 
         pass_lines.append(line)
 
-    e.add_field(
-        name="📜 Pass-by-Pass Chronicle",
-        value="\n\n".join(pass_lines)[:1024],
-        inline=False,
-    )
+    # One embed field per pass avoids Discord silently truncating later tactical
+    # decisions after the first 1024 characters of a combined chronicle.
+    for pass_no, line in enumerate(pass_lines, 1):
+        e.add_field(
+            name=f"📜 Pass {pass_no} — Chronicle",
+            value=line[:1024] or "No pass details.",
+            inline=False,
+        )
 
     e.add_field(
         name="🧠 Tactical Plans",
