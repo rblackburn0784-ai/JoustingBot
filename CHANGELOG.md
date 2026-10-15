@@ -1,5 +1,20 @@
 # Changelog
 
+## v0.9.1 — Combat Tactics & Decisions
+
+- Added private challenge-phase choices for both riders: Cautious/Balanced/Aggressive styles, Shield/Lance/Rider targets and an optional manoeuvre.
+- Both players must explicitly lock their choices before a public /joust challenge can be accepted; tactics are private until the cinematic match introduction. Timeout extended to 240 seconds.
+- Added Precision Strike, Reckless Charge, Shield Brace, Feigned Miss and conditional Last Stand, with two-pass cooldowns.
+- Added per-pass fatigue and mount-handling modifiers. Aggressive riding creates more charge but worse alignment, nervous horse behaviour and higher injury risk.
+- Integrated style, target, fatigue and activated manoeuvres into existing seeded combat, risk profiles and the match JSON journal. No character-save migration needed.
+- Prevented arena rerolls once either rider has locked a tactical plan.
+- Expanded result embeds to one per-pass chronicle field so tactical decisions are not lost to the original 1,024-character combined recap truncation.
+- Kept neutral Balanced/Shield/No Manoeuvre defaults for admin instant duels and automated tournament rounds.
+- Added simulation-based balance checks comparing equal-stat tactical builds, deterministic replay tests, manoeuvre cooldown/fatigue tests, injury-risk tests, and Discord private selection/ready-state tests.
+
+---
+
+
 ## v0.9.0a — Stability, Admin Tools & Cleanup
 
 - Added protected /admin group: /admin panel, /admin health, /admin backup, /admin repair and /admin reset_user; kept /maintenance and /version for compatibility.
