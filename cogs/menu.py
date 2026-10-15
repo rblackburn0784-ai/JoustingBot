@@ -26,7 +26,7 @@ from services.competition import (
 from services.equipment import items_by_slot, get_item
 from services.records import load_history
 
-VERSION = "v0.8.1a"
+VERSION = "v0.8.5"
 STYLE = discord.ButtonStyle
 
 
@@ -105,6 +105,13 @@ class PublicHomeView(discord.ui.View):
         await interaction.response.send_message(embed=view.make_embed(), view=view, ephemeral=True)
 
 
+
+async def open_tournaments(interaction: discord.Interaction):
+    from cogs.tournament import TournamentHub
+    await navigate(interaction, TournamentHub(
+        interaction.user.id, interaction.guild_id, is_admin(interaction)))
+
+
 class MainMenuView(OwnedView):
     def __init__(self, user_id: int, allow_admin: bool = False):
         super().__init__(user_id)
@@ -120,6 +127,7 @@ class MainMenuView(OwnedView):
             ("Titles", "🏅", lambda it: navigate(it, TitlePage(it.user.id, it.guild_id))),
             ("Progression", "🪙", lambda it: navigate(it, ProgressionPage(it.user.id, it.guild_id))),
             ("Injuries", "🩹", lambda it: navigate(it, InjuryPage(it.user.id, it.guild_id))),
+            ("Tournaments", "🏆", open_tournaments),
         ]
         for i, (label, icon, action) in enumerate(pages):
             self.button(label, action, row=i // 5, emoji=icon)
@@ -978,6 +986,7 @@ class AdminPage(OwnedView):
         self.button("Server Summary", self.summary, row=0, emoji="📊")
         self.button("Backup Data", self.backup, row=1, style=STYLE.primary, emoji="💾")
         self.button("Instant Test Duel", lambda it: navigate(it, DuelPage(it.user.id, instant=True)), row=1)
+        self.button("Tournament Director", open_tournaments, row=2, emoji="🏆")
         self.home()
 
     def make_embed(self):
@@ -989,7 +998,7 @@ class AdminPage(OwnedView):
     async def health(self, interaction):
         from services.storage import load_json
         checks = []
-        for path in ("storage/knights.json", "storage/horses.json", "storage/matches.json", "storage/titles.json", "storage/progression.json"):
+        for path in ("storage/knights.json", "storage/horses.json", "storage/matches.json", "storage/titles.json", "storage/progression.json", "storage/tournaments.json"):
             file = Path(path)
             if not file.exists():
                 checks.append(f"⚪ {file.name}: not yet created")
@@ -1021,7 +1030,7 @@ class AdminPage(OwnedView):
         try:
             dest.mkdir(parents=True, exist_ok=False)
             copied = []
-            for name in ("knights.json", "horses.json", "matches.json", "titles.json", "progression.json"):
+            for name in ("knights.json", "horses.json", "matches.json", "titles.json", "progression.json", "tournaments.json"):
                 src = Path("storage") / name
                 if src.is_file():
                     shutil.copy2(src, dest / name)
