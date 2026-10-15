@@ -8,6 +8,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from services.balance import PASSES_PER_MATCH
+
 STAGES = ("approach", "charge", "impact", "aftermath")
 PHASE_ICONS = {"approach": "🏇", "charge": "💨", "impact": "💥", "aftermath": "🏁"}
 PHASE_COLORS = {
@@ -59,7 +61,8 @@ def make_frames(result: Any, *, arena_key: str) -> list[BroadcastFrame]:
     unique = set()
     frames: list[BroadcastFrame] = []
     a_score = b_score = 0
-    total = len({int(p.pass_no) for p in passes})
+    # Never reveal a shortened match before its outcome.
+    total = PASSES_PER_MATCH
     for p in passes:
         no = int(p.pass_no)
         if no in unique:
@@ -72,10 +75,18 @@ def make_frames(result: Any, *, arena_key: str) -> list[BroadcastFrame]:
         b_target = str(tb.get("target", "shield")).title()
         a_move, b_move = ta.get("move", "none"), tb.get("move", "none")
         a_fatigue, b_fatigue = int(ta.get("fatigue", 0)), int(tb.get("fatigue", 0))
+        setting = {
+            "royal_lists": "Banners rise above the pristine tournament rail.",
+            "muddy_field": "Wet clods fly beneath the pounding hooves.",
+            "frozen_ground": "Iron shoes ring against frozen earth.",
+            "wind_swept": "A crosswind snaps at the lowered lances.",
+            "festival_arena": "The festival drums shake the wooden stands.",
+            "war_torn": "Dust swirls over the battered battlefield.",
+        }.get(arena_key, "The crowd rises as the knights prepare.")
         approach = (
-            f"{result.fighter_a} takes the rail in {a_style.lower()} fashion. "
-            f"{result.fighter_b} answers with a {b_style.lower()} approach. "
-            f"Hooves find their rhythm; neither knight knows how this pass will end."
+            f"{setting} {result.fighter_a} takes a {a_style.lower()} pace; "
+            f"{result.fighter_b} a {b_style.lower()} line. "
+            f"The marshals prepare pass {no}."
         )
         charge = (
             f"{result.fighter_a} lowers the lance towards the {a_target.lower()}; "
@@ -92,6 +103,9 @@ def make_frames(result: Any, *, arena_key: str) -> list[BroadcastFrame]:
         impact = str(getattr(p, "result", "") or "Impact at the rail.") + ". " + IMPACT_LINES.get(
             p.category, "The marshals judge a hard-fought pass."
         )
+        gear = str(getattr(p, "gear_line", "") or "")
+        if gear and gear != "Gear, nerve and footing all play their part in the pass.":
+            impact += " " + gear
         a_score += int(p.points_a)
         b_score += int(p.points_b)
         commentary = (
