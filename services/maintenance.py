@@ -283,8 +283,12 @@ def reset_user_plan(guild_id: int, user_id: int, scope: str = "settings") -> dic
     # Fail closed on malformed JSON: admins should repair/restore first.
     progression = _read("progression.json") or {"guilds": {}}
     titles = _read("titles.json") or {"guilds": {}}
-    pdata = progression.get("guilds", {}).get(str(guild_id), {}).get(str(user_id), {})
-    current = titles.get("guilds", {}).get(str(guild_id), {}).get(str(user_id))
+    pgroup = progression.get("guilds", {}).get(str(guild_id), {})
+    tgroup = titles.get("guilds", {}).get(str(guild_id), {})
+    if not isinstance(pgroup, dict) or not isinstance(tgroup, dict):
+        raise MaintenanceError("Server data is malformed; reset blocked.")
+    pdata = pgroup.get(str(user_id), {})
+    current = tgroup.get(str(user_id))
     if not isinstance(pdata, dict):
         raise MaintenanceError("Target player's progression record is malformed.")
     if current is not None and not isinstance(current, str):
@@ -293,9 +297,12 @@ def reset_user_plan(guild_id: int, user_id: int, scope: str = "settings") -> dic
     if not isinstance(owned, dict):
         raise MaintenanceError("Target player's purchased inventory is malformed.")
     try:
-        spent = sum(int(p.get("cost", 0)) for p in owned.values())
-        if spent < 0:
+        costs = [int(p["cost"]) for p in owned.values()]
+        if any(cost < 0 for cost in costs):
             raise ValueError("negative purchase value")
+        spent = sum(costs)
+        if int(pdata.get("retired_spend", 0)) < 0:
+            raise ValueError("negative retired spend")
     except (TypeError, ValueError, AttributeError) as exc:
         raise MaintenanceError("Cannot account for historical purchases; reset blocked.") from exc
     changes = []
@@ -330,6 +337,10 @@ def reset_user(guild_id: int, user_id: int, scope: str, actor_id: int) -> dict:
     audit = _read("admin_audit.json") or {"events": []}
     if not isinstance(audit.get("events", []), list):
         raise MaintenanceError("Admin audit log is malformed.")
+    for root in (progression, titles):
+        group = root.get("guilds", {}).get(str(guild_id), {})
+        if not isinstance(group, dict):
+            raise MaintenanceError("Server data is malformed.")
     backup = create_backup()
     gid, uid = str(guild_id), str(user_id)
     record = progression.setdefault("guilds", {}).setdefault(gid, {}).setdefault(uid, {})
