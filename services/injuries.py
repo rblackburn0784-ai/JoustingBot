@@ -122,6 +122,7 @@ def risk_profile(match: dict, side: str, other: str, category: str, event: dict 
         styles = {"cautious": -4, "balanced": 0, "aggressive": 5}
         mods["riding_style"] = styles.get(own_tactics.get("style"), 0)
         mods["fatigue"] = min(3, max(0, int(own_tactics.get("fatigue", 0)) // 3))
+        mods["reckless_self"] = 4 if own_tactics.get("move") == "reckless_charge" else 0
         mods["rider_target"] = 3 if attack_tactics.get("target") == "rider" else 0
         mods["reckless_move"] = 3 if attack_tactics.get("move") == "reckless_charge" else 0
     base = RISKS[category]
