@@ -371,8 +371,16 @@ class TournamentCog(commands.Cog):
                 if error or prepared is None:
                     return await interaction.followup.send(error or "Riders not ready.", ephemeral=True)
                 prepared.mode = "challenge"
-                engine.reserve_next(interaction.guild_id)
-                joust.lock_challenge(a.id, b.id)
+                if not joust.try_lock_challenge(a.id, b.id):
+                    return await interaction.followup.send(
+                        "❌ A rider became busy before the tournament match began.",
+                        ephemeral=True,
+                    )
+                try:
+                    engine.reserve_next(interaction.guild_id)
+                except Exception:
+                    joust.release_challenge(a.id, b.id)
+                    raise
                 try:
                     result = await joust.send_match(
                         interaction.channel, prepared,
