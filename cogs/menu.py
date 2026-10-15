@@ -26,7 +26,7 @@ from services.competition import (
 from services.equipment import items_by_slot, get_item
 from services.records import load_history
 
-VERSION = "v0.9.0"
+VERSION = "v0.9.0a"
 STYLE = discord.ButtonStyle
 
 
@@ -113,6 +113,13 @@ async def open_maintenance(interaction: discord.Interaction):
     await navigate(interaction, MaintenancePage(interaction.user.id))
 
 
+async def open_user_reset(interaction: discord.Interaction):
+    if not is_admin(interaction):
+        return await interaction.response.send_message("Manage Server required.", ephemeral=True)
+    from cogs.maintenance import ResetUserPage
+    await navigate(interaction, ResetUserPage(interaction.user.id, interaction.guild_id))
+
+
 async def open_tournaments(interaction: discord.Interaction):
     from cogs.tournament import TournamentHub
     await navigate(interaction, TournamentHub(
@@ -126,11 +133,11 @@ class VersionPage(OwnedView):
 
     def make_embed(self):
         return embed(
-            "⚙️ JoustingBot v0.9.0",
+            "⚙️ JoustingBot v0.9.0a",
             "**Stability & Admin Tools**\n"
             "Reliable atomic saves, checksum-verified local backups, safe repair previews, "
             "confirmed restores, challenge locks and cooldowns, and clearer errors.\n\n"
-            "The admin Maintenance Tools panel is visible only to Manage Server users."
+            "Admin tools are restricted to Manage Server users. Commands: /admin health, /admin backup, /admin repair, /admin reset_user."
         )
 
 
@@ -1032,12 +1039,13 @@ class AdminPage(OwnedView):
         self.button("Maintenance Tools", open_maintenance, row=1, style=STYLE.primary, emoji="🛠️")
         self.button("Instant Test Duel", lambda it: navigate(it, DuelPage(it.user.id, instant=True)), row=1)
         self.button("Tournament Director", open_tournaments, row=2, emoji="🏆")
+        self.button("Reset User", open_user_reset, row=2, style=STYLE.danger, emoji="🧹")
         self.home()
 
     def make_embed(self):
         return embed("⚙️ Admin Control Room",
                      "**Restricted: Manage Server permission required.**\n"
-                     "Validate, back up, repair or restore local data with confirmation. "
+                      "Validate, back up, repair or restore local data with confirmation. "
                      "Run unranked test matches and manage tournaments.")
 
     async def health(self, interaction):
