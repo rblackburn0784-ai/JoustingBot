@@ -150,6 +150,42 @@ class TacticRules(unittest.TestCase):
 
 
 class PrivateTacticsTests(unittest.IsolatedAsyncioTestCase):
+    async def test_challenge_needs_two_locked_tactics(self):
+        from cogs.joust import ChallengeView
+        from unittest.mock import Mock
+        prepared = SimpleNamespace(
+            challenger=SimpleNamespace(id=11),
+            opponent=SimpleNamespace(id=22),
+            tactics_a=TacticPlan(), tactics_b=TacticPlan(),
+            tactics_ready={11},
+        )
+        view = ChallengeView(Mock(), prepared)
+        response = SimpleNamespace(send_message=AsyncMock())
+        interaction = SimpleNamespace(
+            user=SimpleNamespace(id=22),
+            response=response,
+        )
+        await view.accept.callback(interaction)
+        self.assertFalse(view.completed)
+        response.send_message.assert_awaited_once()
+        self.assertTrue(response.send_message.await_args.kwargs["ephemeral"])
+
+    async def test_tactical_button_is_private_for_both_players(self):
+        from cogs.joust import ChallengeView
+        from unittest.mock import Mock
+        prepared = SimpleNamespace(
+            challenger=SimpleNamespace(id=11),
+            opponent=SimpleNamespace(id=22),
+            tactics_a=TacticPlan(), tactics_b=TacticPlan(), tactics_ready=set(),
+        )
+        view = ChallengeView(Mock(), prepared)
+        for pid in (11, 22):
+            response = SimpleNamespace(send_message=AsyncMock())
+            interaction = SimpleNamespace(user=SimpleNamespace(id=pid), response=response)
+            await view.choose_tactics.callback(interaction)
+            self.assertTrue(response.send_message.await_args.kwargs["ephemeral"])
+            self.assertIsInstance(response.send_message.await_args.kwargs["view"], TacticEditor)
+
     async def test_private_editor_rows_and_owner_protection(self):
         prepared = SimpleNamespace(
             challenger=SimpleNamespace(id=11), opponent=SimpleNamespace(id=22),
