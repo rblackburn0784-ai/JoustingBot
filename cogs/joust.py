@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import random
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional
 
 import discord
@@ -13,6 +13,7 @@ from cogs.horse import Horse, load_horses
 from cogs.knight import get_knight, load_knights
 from services.arenas import ARENAS, get_arena
 from services.combat import Fighter, MatchResult, PassLog, run_single_match
+from services.tactics import TacticPlan, STYLES, TARGETS, MOVES, label as tactic_label
 from services.equipment import get_item
 from services.records import record_match
 from services.progression import loadout, equipped_standard
@@ -22,8 +23,8 @@ from services.injuries import (
 )
 
 
-VERSION_LABEL = "JoustingBot v0.9.0a — Server Hardening"
-CHALLENGE_TIMEOUT_SECONDS = 120
+VERSION_LABEL = "JoustingBot v0.9.1 — Combat Tactics"
+CHALLENGE_TIMEOUT_SECONDS = 240
 
 
 # Add real hosted GIF/image URLs here later if you want animated match presentation.
@@ -109,6 +110,9 @@ class PreparedDuel:
     support_token_b: Optional[str] = None
     had_injury_a: bool = False
     had_injury_b: bool = False
+    tactics_a: TacticPlan = field(default_factory=TacticPlan)
+    tactics_b: TacticPlan = field(default_factory=TacticPlan)
+    tactics_ready: set[int] = field(default_factory=set)
 
 
 def equipment_name(key: Optional[str]) -> str:
@@ -392,6 +396,13 @@ def make_challenge_embed(prepared: PreparedDuel) -> discord.Embed:
         inline=False,
     )
     e.add_field(name="🩹 Injury Risk Preview", value=preview_risk(prepared), inline=False)
+    ra = prepared.challenger.id in prepared.tactics_ready
+    rb = prepared.opponent.id in prepared.tactics_ready
+    e.add_field(name="🧠 Private Tactics", value=(
+        f"{prepared.knight_a.name}: {'✅ Locked' if ra else '⌛ Choose Tactics'}\n"
+        f"{prepared.knight_b.name}: {'✅ Locked' if rb else '⌛ Choose Tactics'}\n"
+        "**Both riders must lock their private tactics before the opponent can accept.**"
+    ), inline=False)
     seed_text = f"Seed `{prepared.seed}`" if prepared.seed is not None else "Random seed will be generated when accepted."
     e.add_field(
         name="Challenge Rules",
@@ -696,7 +707,9 @@ class JoustCog(commands.Cog):
         intro_embed = make_intro_embed(prepared)
         await sender.send(embed=intro_embed)
 
-        result = run_single_match(prepared.fighter_a, prepared.fighter_b, prepared.arena_key, seed=prepared.seed)
+        result = run_single_match(prepared.fighter_a, prepared.fighter_b, prepared.arena_key,
+                                  seed=prepared.seed, tactics_a=prepared.tactics_a,
+                                  tactics_b=prepared.tactics_b)
         result_embed = make_result_embed(result, prepared.arena_key)
         match_id = record_match(prepared, result, match_id=record_id, tournament_id=tournament_id)
         if prepared.guild_id is not None and prepared.mode == "challenge":
