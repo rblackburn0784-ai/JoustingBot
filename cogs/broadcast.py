@@ -16,7 +16,7 @@ from urllib.parse import urlparse
 
 import discord
 
-from services.broadcast import PHASE_COLORS, make_frames
+from services.broadcast import PHASE_COLORS, make_frames, entrance_commentary
 
 LOG = logging.getLogger(__name__)
 MEDIA_PATH = Path(__file__).resolve().parent.parent / "assets" / "broadcast" / "manifest.json"
@@ -88,16 +88,17 @@ async def send(sender, **kwargs):
     return await sender.send(**kwargs)
 
 
-async def send_intro(sender, prepared, intro_embed) -> object:
+async def send_intro(sender, prepared, intro_embed, home_view=None) -> object:
+    intro_embed.add_field(name='🎺 Knight Entrances', value=entrance_commentary(prepared), inline=False)
     picture = intro_file(prepared)
     manifest = media_manifest()
     if picture is not None:
         intro_embed.set_image(url="attachment://grand_lists_intro.png")
-        return await send(sender, embed=intro_embed, file=picture)
+        return await send(sender, embed=intro_embed, file=picture, view=home_view)
     fallback = media_url("intro", arena_key=prepared.arena_key, manifest=manifest)
     if fallback:
         intro_embed.set_image(url=fallback)
-    return await send(sender, embed=intro_embed)
+    return await send(sender, embed=intro_embed, view=home_view)
 
 
 def frame_embed(result, frame, arena_key: str, manifest: dict | None = None) -> discord.Embed:
@@ -132,6 +133,11 @@ async def play_passes(sender, result, *, arena_key: str, home_view=None, delay: 
     if not frames:
         return None
     manifest = media_manifest()
+    if os.getenv("JOUST_BROADCAST_REDUCED_MOTION", "").lower() in {"true", "1", "yes", "on"}:
+        # Accessibility option: show a static final pass card without live edits.
+        # The authoritative final scoreboard follows as usual.
+        return await send(sender, embed=frame_embed(result, frames[-1], arena_key, manifest),
+                          view=home_view)
     pause = delay_seconds() if delay is None else max(0.0, delay)
     first = frame_embed(result, frames[0], arena_key, manifest)
     message = await send(sender, embed=first, view=home_view)
