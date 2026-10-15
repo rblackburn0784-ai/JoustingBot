@@ -129,7 +129,7 @@ def wallet(guild_id: int, user_id: int, history: dict | None = None, data: dict 
     owned = purchased(guild_id, user_id, data)
     spent = sum(int(x.get("cost", 0)) for x in owned.values() if isinstance(x, dict))
     from services.injuries import healing_spent
-    return max(0, earned_gold(guild_id, user_id, history) - spent - healing_spent(guild_id, user_id, data))
+    return max(0, earned_gold(guild_id, user_id, history) - spent - int(_player(data if data is not None else _db(), guild_id, user_id).get("retired_spend", 0)) - healing_spent(guild_id, user_id, data))
 
 
 def unlocked(guild_id: int | None, user_id: int, key: str, data: dict | None = None) -> bool:
