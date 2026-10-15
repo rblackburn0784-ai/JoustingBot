@@ -26,7 +26,7 @@ from services.competition import (
 from services.equipment import items_by_slot, get_item
 from services.records import load_history
 
-VERSION = "v0.8.5a"
+VERSION = "v0.9.0"
 STYLE = discord.ButtonStyle
 
 
@@ -104,6 +104,13 @@ class PublicHomeView(discord.ui.View):
         view = MainMenuView(interaction.user.id, is_admin(interaction))
         await interaction.response.send_message(embed=view.make_embed(), view=view, ephemeral=True)
 
+
+
+async def open_maintenance(interaction: discord.Interaction):
+    if not is_admin(interaction):
+        return await interaction.response.send_message("⛔ Manage Server required.", ephemeral=True)
+    from cogs.maintenance import MaintenancePage
+    await navigate(interaction, MaintenancePage(interaction.user.id))
 
 
 async def open_tournaments(interaction: discord.Interaction):
@@ -804,23 +811,42 @@ class DuelPage(OwnedView):
         )
         if error or prepared is None:
             return await interaction.response.send_message(error or "❌ Could not prepare duel.", ephemeral=True)
-        await interaction.response.defer(ephemeral=True)
-        if self.instant:
-            try:
-                await cog.send_match(interaction.channel, prepared)
-            except discord.HTTPException:
-                return await interaction.followup.send("❌ Unable to send duel messages.", ephemeral=True)
-            return await interaction.followup.send("✅ Test duel posted; it does not affect competitive rankings.", ephemeral=True)
-        prepared.mode = "challenge"
-        cog.lock_challenge(interaction.user.id, opponent.id)
-        challenge_view = ChallengeView(cog, prepared)
+        if not self.instant:
+            remaining = cog.cooldown_remaining(interaction.guild_id, interaction.user.id)
+            if remaining:
+                return await interaction.response.send_message(
+                    f"⌛ Wait {remaining}s before sending another challenge.", ephemeral=True)
+        if not cog.try_lock_challenge(interaction.user.id, opponent.id):
+            return await interaction.response.send_message("❌ A rider is already busy.", ephemeral=True)
         try:
-            challenge_view.message = await interaction.channel.send(embed=make_challenge_embed(prepared), view=challenge_view)
+            await interaction.response.defer(ephemeral=True)
+            if self.instant:
+                await cog.send_match(interaction.channel, prepared)
+                return await interaction.followup.send(
+                    "✅ Test duel posted. Competitive records are unaffected.", ephemeral=True)
+            prepared.mode = "challenge"
+            challenge_view = ChallengeView(cog, prepared)
+            try:
+                challenge_view.message = await interaction.channel.send(
+                    embed=make_challenge_embed(prepared), view=challenge_view)
+            except Exception:
+                challenge_view.stop()
+                raise
+            cog.mark_challenge_posted(interaction.guild_id, interaction.user.id)
+            await interaction.followup.send("✅ Public challenge posted.", ephemeral=True)
         except Exception:
-            cog.release_challenge(interaction.user.id, opponent.id)
-            challenge_view.stop()
-            return await interaction.followup.send("❌ Could not post the challenge in this channel.", ephemeral=True)
-        await interaction.followup.send("✅ Challenge posted for your opponent to accept.", ephemeral=True)
+            import logging
+            logging.getLogger(__name__).exception("Duel menu action failed")
+            if interaction.response.is_done():
+                await interaction.followup.send(
+                    "❌ Failed to post the match. Ask an admin to check the logs.", ephemeral=True)
+            else:
+                await interaction.response.send_message(
+                    "❌ Failed to post the match.", ephemeral=True)
+        finally:
+            # Accepted challenges retain their lock until declined, expired or completed.
+            if self.instant or 'challenge_view' not in locals() or challenge_view.message is None:
+                cog.release_challenge(interaction.user.id, opponent.id)
 
 
 class OtherPlayerSelect(discord.ui.UserSelect):
@@ -987,7 +1013,7 @@ class AdminPage(OwnedView):
         super().__init__(user_id, admin=True)
         self.button("System Health", self.health, row=0, emoji="💚")
         self.button("Server Summary", self.summary, row=0, emoji="📊")
-        self.button("Backup Data", self.backup, row=1, style=STYLE.primary, emoji="💾")
+        self.button("Maintenance Tools", open_maintenance, row=1, style=STYLE.primary, emoji="🛠️")
         self.button("Instant Test Duel", lambda it: navigate(it, DuelPage(it.user.id, instant=True)), row=1)
         self.button("Tournament Director", open_tournaments, row=2, emoji="🏆")
         self.home()
@@ -995,23 +1021,12 @@ class AdminPage(OwnedView):
     def make_embed(self):
         return embed("⚙️ Admin Control Room",
                      "**Restricted: Manage Server permission required.**\n"
-                     "Inspect storage, view guild totals, back up local JSON data (including progression), "
-                     "or run an instant unranked test match.")
+                     "Validate, back up, repair or restore local data with confirmation. "
+                     "Run unranked test matches and manage tournaments.")
 
     async def health(self, interaction):
-        from services.storage import load_json
-        checks = []
-        for path in ("storage/knights.json", "storage/horses.json", "storage/matches.json", "storage/titles.json", "storage/progression.json", "storage/tournaments.json"):
-            file = Path(path)
-            if not file.exists():
-                checks.append(f"⚪ {file.name}: not yet created")
-                continue
-            try:
-                load_json(path, {})
-                checks.append(f"✅ {file.name}: readable ({file.stat().st_size:,} bytes)")
-            except (OSError, ValueError, TypeError) as exc:
-                checks.append(f"❌ {file.name}: {type(exc).__name__}")
-        await interaction.response.edit_message(embed=embed("⚙️ Storage Health", "\n".join(checks)), view=self)
+        from cogs.maintenance import health_embed
+        await interaction.response.edit_message(embed=health_embed(), view=self)
 
     async def summary(self, interaction):
         from services.competition import aggregate
@@ -1028,24 +1043,8 @@ class AdminPage(OwnedView):
         ), view=self)
 
     async def backup(self, interaction):
-        stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
-        dest = Path("backups") / stamp
-        try:
-            dest.mkdir(parents=True, exist_ok=False)
-            copied = []
-            for name in ("knights.json", "horses.json", "matches.json", "titles.json", "progression.json", "tournaments.json"):
-                src = Path("storage") / name
-                if src.is_file():
-                    shutil.copy2(src, dest / name)
-                    copied.append(name)
-        except OSError as exc:
-            return await interaction.response.send_message(
-                f"❌ Backup could not be created: {type(exc).__name__}.", ephemeral=True)
-        await interaction.response.edit_message(
-            embed=embed("💾 Backup Created", f"Path: `{dest}`\nFiles: {', '.join(copied) or 'No data files exist yet.'}\n"
-                        "Keep this directory private and backed up off-host too."),
-            view=self,
-        )
+        await open_maintenance(interaction)
+
 
 
 class MenuCog(commands.Cog):
