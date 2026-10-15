@@ -31,11 +31,11 @@ jobs:
                   for module in (
                       "cogs.menu", "cogs.knight", "cogs.horse",
                       "cogs.equipment", "cogs.arena", "cogs.joust",
-                      "cogs.profile", "cogs.competition", "cogs.tournament",
+                      "cogs.profile", "cogs.competition", "cogs.tournament", "cogs.maintenance",
                   ):
                       await bot.load_extension(module)
                   names = {command.name for command in bot.tree.get_commands()}
-                  assert {"menu", "profile", "titles", "title", "leaderboard", "knight", "horse", "joust", "tournament"} <= names, names
+                  assert {"menu", "profile", "titles", "title", "leaderboard", "knight", "horse", "joust", "tournament", "version", "maintenance"} <= names, names
                   print("All cogs loaded; slash commands registered.")
 
           asyncio.run(check())
