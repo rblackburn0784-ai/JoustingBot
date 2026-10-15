@@ -2,11 +2,57 @@
 
 A lightweight medieval jousting Discord game bot built with `discord.py`.
 
-**Current version:** `v0.8.5a — Tournament Titles & Achievements`
+**Current version:** `v0.9.0 — Stability & Admin Tools`
 
 Players create a knight, build and bind a horse, equip both rider and horse, choose an arena, and challenge other Discord users to cinematic jousts with accept/decline buttons.
 
 This version focuses on making matches feel more like a sport: richer pass categories, arena-specific lines, gear-specific lines, seed display, debug roll breakdowns, and tunable balance constants.
+
+---
+
+## v0.9.0 — Stability & Admin Tools
+
+This release hardens saved game data, challenge safety, Discord error handling and administrator workflows. It keeps the same knight, horse, injury, equipment, title, leaderboard and tournament data formats—**no reset or manual migration is required**.
+
+### New slash commands
+
+| Command | Permission | Purpose |
+| --- | --- | --- |
+| /version | Everyone | Display the running release and its stability features |
+| /maintenance | Manage Server only | Open the private admin storage maintenance control panel |
+
+Open /menu → **Admin** → **Maintenance Tools** to reach the same controls by buttons. Non-admins cannot open or act on the panel. Each admin action independently verifies permissions. The interface includes **Validate**, **Create Backup**, **Review Repairs**, **Restore Selected**, **Admin Dashboard** and **Main Menu**. Restore and actual repairs require a separate confirmation page.
+
+### Backups and restores
+
+Backups are stored in dated local directories under backups/ and include the six known storage files when they exist:
+
+- knights.json, horses.json, matches.json
+- titles.json, progression.json, tournaments.json
+
+Each snapshot has a manifest with **SHA-256 hashes**. Backups are verified after creation and again before restore. A failed checksum or invalid JSON structure blocks restore. Backup identifiers are strictly validated, rejecting directory traversal or arbitrary paths.
+
+Restore creates an additional **pre-restore safety snapshot**. If the current file is corrupt, the bot saves its raw bytes in a quarantine directory so it can still restore a previously verified healthy snapshot. Restores and repairs are blocked while the current process has an active joust or tournament match. These snapshots remain **on the host**, not in GitHub or a remote service. Maintain separate off-host backups and a persistent disk/volume, particularly for Railway deployments.
+
+**Operational caution:** Restoring overwrites files present in the selected snapshot, but does not erase unrelated files or files absent from that backup. This is a controlled local file restore, not a cross-file database transaction; do not restore while a second copy of the bot is running.
+
+### Validation and conservative repair
+
+The admin **Validate** panel reports present/missing JSON files and schema/type errors, duplicate match IDs and unusual tournament state. **Review Repairs** shows only a dry-run plan; the bot never applies it without a separate button confirmation.
+
+The **Confirm Repair** action can initialize missing JSON files, restore missing top-level containers and remove *identical* duplicate match entries while retaining all other fields. It creates a verified safety backup first. Malformed JSON, conflicting match IDs or complex bracket corruption are intentionally not auto-repaired: the admin must inspect the damaged data and restore a known-good snapshot if necessary. There is no automatic destructive reset.
+
+### Challenge cooldowns, locks and error cleanup
+
+- New challenges have a **30-second per-initiator, per-server posting cooldown**, enforced by both /joust challenge and the main-menu Challenge buttons. Rejected posts do not start the cooldown.
+- A synchronous atomic lock prevents a rider being reserved for multiple live duels. Tournament matches, public challenges and instant admin test duels use the same reservation path.
+- On declines, timeouts, failed challenge posts, completed jousts and handled Discord errors, locks are released. Tournament bracket/match journal restart recovery remains available.
+- Global slash-command error handling reports permission/cooldown problems privately and logs unexpected errors with a short reference ID, without showing internal tracebacks to players.
+- JSON writes now use **unique temporary files, fsync, and atomic os.replace**, preventing concurrent temporary filenames or torn individual JSON writes on supported filesystems.
+
+### Limitations
+
+The bot still assumes **one running application instance** writing to its persistent storage. Per-file atomic writes do not make a multi-file restore transactional; nor do they provide distributed locking or automated cloud backups. The in-memory challenge cooldown and pending public challenge timers reset when the bot process restarts. Tournament brackets and records remain persisted. New automated tests exercise backup/restore checksum enforcement, corrupt-file quarantine, safe repairs, challenge locks/cooldowns, admin permissions and command error messages.
 
 ---
 
