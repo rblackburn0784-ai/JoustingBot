@@ -2,11 +2,63 @@
 
 A lightweight medieval jousting Discord game bot built with `discord.py`.
 
-**Current version:** `v0.9.0a — Server Safety & Admin Cleanup`
+**Current version:** `v0.9.1 — Combat Tactics & Decisions`
 
 Players create a knight, build and bind a horse, equip both rider and horse, choose an arena, and challenge other Discord users to cinematic jousts with accept/decline buttons.
 
-This version focuses on real-server safety: verified backups, conservative recovery tools, secure admin actions, persistent records and stable challenge/tournament workflows.
+This version adds private pre-match tactical decisions to the existing server-safe, seedable jousting game. Knight/horse ownership, saved history, tournaments, progression, injuries and all admin safeguards remain intact.
+
+---
+
+## v0.9.1 — Combat Tactics & Decisions
+
+Players now directly influence competitive jousts without taking control of the RNG. Each accepted **/joust challenge** has a **Choose Tactics** button:
+
+1. The challenger issues a public challenge (by /joust challenge or /menu → Challenge).
+2. **Both knights** press **Choose Tactics**. Each receives a **private ephemeral editor** with three dropdowns.
+3. Each chooses a **riding style**, **lance target**, and optional **special manoeuvre**, then presses **Lock Tactics**.
+4. The public card shows only ✅ Locked / ⌛ Choose Tactics, **never the choices themselves**.
+5. After **both** have locked, the invited opponent may press **Accept Challenge**. The match opens with both strategies revealed and concludes with the pass-by-pass chronicle. Challenges expire after **240 seconds**.
+6. Once one rider locks, the arena cannot be changed. Riders may reopen the private editor and change their own choices until the duel is accepted.
+
+Declines and expired challenges do not create completed matches or affect character statistics. All standard single-duel locks and cooldowns remain in force. **Admin instant-test duels and existing admin-run tournament matches use a neutral default (Balanced / Shield / No Manoeuvre)** and continue to work without an interactive tactics step. Tournament-specific tactical registration may be introduced separately.
+
+### Riding styles
+
+| Style | Effect | Trade-off |
+| --- | --- | --- |
+| Cautious | +2 alignment, gentler horse handling, −4 percentage points to personal injury risk | −1 charge; builds no fatigue per pass |
+| Balanced | No immediate skill bonus/penalty; normal mount behaviour | +1 fatigue per pass |
+| Aggressive | +2 charge, higher impact potential | −3 alignment, +3 fatigue per pass, +5 percentage points to personal injury risk; nervous mounts are less reliable |
+
+### Aim your lance
+
+| Target | Effect |
+| --- | --- |
+| Shield | Standard target and scoring |
+| Lance | +2 alignment, −1 charge; converts successful heavy-hit/stagger events into one-point lance breaks rather than two-point hits |
+| Rider | −2 alignment, +1 charge; +3 percentage points to the struck rider's injury risk on a qualifying hit |
+
+### Optional manoeuvres
+
+| Move | Advantage | Cost / cooldown |
+| --- | --- | --- |
+| No Manoeuvre | Normal jousting | No effect |
+| Precision Strike | +3 alignment | −1 charge |
+| Reckless Charge | +2 charge | −3 alignment, extra fatigue, increased injury risk to both involved riders |
+| Shield Brace | +3 unhorsing resistance, +1 alignment | −1 charge |
+| Feigned Miss | +2 alignment and tactical deception | −1 charge |
+| Last Stand | +2 alignment and +2 charge in a comeback | Available **on pass 3 only** when trailing or fatigued; adds extra fatigue and risk |
+
+Manoeuvres have a **two-full-pass cooldown**. Standard moves may activate on pass 1 and again on pass 4 if the match continues; a match may finish before a later activation. Last Stand is deliberately conditional and activates at most once. Players select their preferred manoeuvre ahead of the match; activation and cooldown are handled automatically rather than requiring five separate Discord prompts.
+
+### Fatigue, temperament and safety
+
+Aggressive charges accumulate more fatigue than Balanced; Cautious gains none. Fatigue penalises charge and alignment over subsequent passes and increases the mount-handling difficulty. A horse with high stamina partially mitigates fatigue, while a nervous or disobedient horse has greater chances of poor behaviour under Aggressive riding.
+
+Injury odds still incorporate **arena, armour, lance, barding and horse breed**, plus the rider's current style, fatigue and dangerous manoeuvres. Existing injury severity, natural healing, capped total effective stat penalties and treatment tiers remain unchanged. The combat engine remains **seeded and reproducible**: the saved match JSON records each rider's tactical plan and the per-pass style, target, move activation, fatigue and roll details. Legacy match records do not need migration.
+
+The automated balance suite performs seeded equal-stat match comparisons of Cautious, Balanced and Aggressive builds (including both seat orders), checking that no tested combination overwhelms the others. This is a useful guardrail, not a guarantee about every equipment/arena combination.
 
 ---
 
