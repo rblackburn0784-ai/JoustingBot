@@ -2,11 +2,69 @@
 
 A lightweight medieval jousting Discord game bot built with `discord.py`.
 
-**Current version:** `v0.9.0 — Stability & Admin Tools`
+**Current version:** `v0.9.0a — Server Safety & Admin Cleanup`
 
 Players create a knight, build and bind a horse, equip both rider and horse, choose an arena, and challenge other Discord users to cinematic jousts with accept/decline buttons.
 
-This version focuses on making matches feel more like a sport: richer pass categories, arena-specific lines, gear-specific lines, seed display, debug roll breakdowns, and tunable balance constants.
+This version focuses on real-server safety: verified backups, conservative recovery tools, secure admin actions, persistent records and stable challenge/tournament workflows.
+
+---
+
+## v0.9.0a — Server Safety & Admin Cleanup
+
+### Quick setup (Python 3.12 or compatible)
+
+Clone or update this repository and install the requirements:
+
+```bash
+git pull
+python -m pip install -r requirements.txt
+```
+
+Create a local .env file with DISCORD_BOT_TOKEN=<token>, invite the bot with applications.commands and bot permissions, and run:
+
+```bash
+python main.py
+```
+
+Do not commit your token or any saved JSON records. Keep ONE running bot process and use a persistent storage directory on hosts such as Railway. Run /version and /menu in your Discord server to verify the install.
+
+### New restricted administrator commands
+
+| Command | What it does | Safety |
+| --- | --- | --- |
+| /admin panel | Open the private admin dashboard | Rechecks Manage Server permission |
+| /admin health | Inspect stored JSON data and highlight issues | Read-only |
+| /admin backup | Create an integrity-checked snapshot | Locks against active matches; local SHA-256 manifest |
+| /admin repair | Preview conservative repairs | Requires explicit confirmation and a safety backup |
+| /admin reset_user member scope | Reset a selected member's guild equipment settings or inventory | Typed confirmation, backup, admin audit |
+| /maintenance | Legacy button-based admin maintenance interface | Still available |
+| /version | Show current release and hardening features | Available to everyone |
+
+The **Admin** menu remains hidden from ordinary users. Commands additionally check authorisation at execution time. Actions are unavailable during active jousts or tournament match operations within the running process.
+
+### Reset User: two safe scopes
+
+Use /admin reset_user member:@Member scope:settings (the default) or scope:inventory. A private review screen identifies the target, scope and effects. The admin must click Confirm Reset and type RESET followed by the member's numeric Discord ID.
+
+- **Settings:** remove their active guild-specific lance/armour/barding selections, cosmetic standard and equipped title. Previously purchased equipment remains owned.
+- **Inventory:** do everything Settings does, and retire the member's purchased unlockable equipment for **this server only**. There is **no gold refund**; retired purchases remain in the spending ledger, so players cannot gain extra gold by repeating a reset.
+
+**Both scopes deliberately preserve** historical match results, leaderboard results, earned-title eligibility, unspent earned gold, previously spent healing gold, injury history, tournaments, globally shared knight and horse records, and data from other Discord servers. This is a *guild settings and inventory reset*, not a destructive character/history wipe. It does not zero the leaderboard.
+
+Every successful reset produces a verified backup and appends an admin action record to storage/admin_audit.json. The audit records actor ID, target ID, guild, scope, time, planned changes and backup name. To reverse a reset, an administrator would need to restore the whole verified snapshot—never perform this lightly.
+
+### File safety and recovery
+
+- Individual JSON writes are staged into unique temporary files, flushed, synchronised and atomically renamed; POSIX hosts also sync the containing directory when possible.
+- Startup warns about invalid or missing files without replacing corrupt JSON.
+- /admin repair can initialise missing files/top-level containers and deduplicate identical match IDs only. Conflicting IDs or corrupt JSON are refused rather than guessed or erased.
+- /admin backup and /maintenance restore use SHA-256 manifests. Data snapshots are LOCAL only. Copy them off-host.
+- All seven recognised data files are: knights.json, horses.json, matches.json, titles.json, progression.json, tournaments.json and admin_audit.json.
+- Single-process locks/cooldowns prevent multiple overlapping jousts or concurrent maintenance in this bot instance. They do NOT coordinate multiple replicas or make cross-file saves transactional.
+- Regression tests cover admin permissions, reset confirmation, cross-server isolation, no-refund gold integrity, audit backups, recovery and command registration.
+
+**Server deployment checklist:** configure a persistent volume, restrict Manage Server permissions, keep your token in environment secrets, run exactly one bot instance, check /admin health, create /admin backup and retain off-host copies. Test /joust challenge with two players before a public tournament.
 
 ---
 
@@ -723,30 +781,8 @@ Current arenas:
 
 ---
 
-## Current scope
+## Current capabilities and limits
 
-Included:
+Working systems include interactive knight/horse creation, gear and equipment sidegrades, arena-specific duels, injury/recovery and three treatment tiers, persistent match history, server leaderboards and titles, gold/prestige/reputation progression, 4- and 8-player tournaments, admin maintenance and recovery controls.
 
-- Main menu
-- Knight builder
-- Horse builder
-- Horse binding
-- Equipment
-- Arenas
-- Challenge/accept duel flow
-- Random arena controls
-- Cinematic duel intro
-- v0.5 match engine categories
-- Dramatic pass-by-pass presentation
-- Seed/debug support
-- Instant duel command for testing
-
-Not currently included:
-
-- Tournaments
-- Ranked ladder
-- Injuries
-- Economy/gold
-- XP/levelling
-- Match replay logs
-- Persistent leaderboards
+Limitations: JSON persistence targets a **single running bot process**. Snapshots are local unless exported. Active-match locks are held in process memory, and cannot coordinate separate replicas. External media assets remain optional and some visuals are still placeholders. Test real Discord permissions, channel access and button interaction behaviour on your server before announcing a production launch.
