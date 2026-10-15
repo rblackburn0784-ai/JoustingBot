@@ -32,7 +32,7 @@ class BracketTests(unittest.TestCase):
     def test_four_player_registration_and_bracket(self):
         item = self.register(size=4)
         self.assertEqual(item["size"], 4)
-        self.assertEqual(len(item["entrants"]), 4)
+        self.assertEqual(len(t.current(100)["entrants"]), 4)
         with self.assertRaisesRegex(t.TournamentError, "full"):
             t.join(100, 99)
         with self.assertRaisesRegex(t.TournamentError, "Finish"):
