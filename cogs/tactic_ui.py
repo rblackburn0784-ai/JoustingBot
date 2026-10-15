@@ -64,6 +64,13 @@ class TacticEditor(discord.ui.View):
         )
         return box
 
+    @discord.ui.button(label="Main Menu", emoji="🏰",
+                       style=discord.ButtonStyle.secondary, row=4)
+    async def home(self, interaction: discord.Interaction, button: discord.ui.Button):
+        from cogs.menu import MainMenuView, is_admin
+        view = MainMenuView(interaction.user.id, is_admin(interaction))
+        await interaction.response.edit_message(embed=view.make_embed(), view=view)
+
     @discord.ui.button(label="Lock Tactics", emoji="🔒",
                        style=discord.ButtonStyle.success, row=3)
     async def lock(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -77,6 +84,7 @@ class TacticEditor(discord.ui.View):
         else:
             return await interaction.response.send_message("❌ Not a joust participant.", ephemeral=True)
         prepared.tactics_ready.add(self.player_id)
+        from cogs.menu import HomeOnlyView
         await interaction.response.edit_message(
             embed=discord.Embed(
                 title="🔒 Your Tactics Are Locked",
@@ -84,7 +92,7 @@ class TacticEditor(discord.ui.View):
                             "once both riders are ready. You can reopen the tactical editor "
                             "and change your plan until acceptance.",
             ),
-            view=None,
+            view=HomeOnlyView(interaction.user.id),
         )
         if self.challenge.message is not None and not self.challenge.completed:
             from cogs.joust import make_challenge_embed
