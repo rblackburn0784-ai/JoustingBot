@@ -248,7 +248,8 @@ def title_progress(guild_id: int, user_id: int, history: dict | None = None,
         "festival_wins": s["festival_wins"], "war_wins": s["war_wins"],
         "clean_jousts": s["clean_jousts"],
     }
-    fields.update(tournament_stats(guild_id, user_id, tournament_data, history))
+    fields.update({f"tourney_{key}": value for key, value in
+                   tournament_stats(guild_id, user_id, tournament_data, history).items()})
     return {key: {"name": name, "description": desc, "progress": fields[field],
                   "required": target, "earned": fields[field] >= target}
             for key, (name, desc, field, target) in TITLE_RULES.items()}
