@@ -267,15 +267,15 @@ class TournamentCog(commands.Cog):
             if choice is None:
                 return await interaction.followup.send("❌ No pairing ready.", ephemeral=True)
             match = choice["match"]
-            a = await member_in(interaction.guild, match["a"])
-            b = await member_in(interaction.guild, match["b"])
-            if not a or not b:
-                return await interaction.followup.send("❌ Rider has left this server.", ephemeral=True)
-            joust = self.bot.get_cog("JoustCog")
-            if joust is None:
-                return await interaction.followup.send("❌ Joust engine unavailable.", ephemeral=True)
             journal = next((m for m in reversed(load_history()["matches"])
                             if m.get("id") == match["id"]), None)
+            a = await member_in(interaction.guild, match["a"])
+            b = await member_in(interaction.guild, match["b"])
+            if journal is None and (not a or not b):
+                return await interaction.followup.send("❌ A rider has left this server.", ephemeral=True)
+            joust = self.bot.get_cog("JoustCog")
+            if journal is None and joust is None:
+                return await interaction.followup.send("❌ Joust engine unavailable.", ephemeral=True)
             if journal is None:
                 if joust.is_player_busy(a.id) or joust.is_player_busy(b.id):
                     return await interaction.followup.send("❌ A rider is already challenging.", ephemeral=True)
@@ -320,7 +320,7 @@ class TournamentCog(commands.Cog):
             label = "🏆 GRAND CHAMPION" if done["status"] == "completed" else "⚔️ Round Complete"
             notice = discord.Embed(
                 title=label,
-                description=f"{a.mention} {score_a} — {score_b} {b.mention}\n"
+                description=f"{at(match['a'])} {score_a} — {score_b} {at(match['b'])}\n"
                             f"Advances: {at(winner)}"
                             + (f"\nTie resolved by {tiebreak}." if tiebreak else "")
                             + ("\nThe champion has been crowned!" if done["status"] == "completed" else ""),
