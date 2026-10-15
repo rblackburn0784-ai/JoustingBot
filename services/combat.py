@@ -24,6 +24,7 @@ from services.balance import (
     UNHORSING_MARGIN,
     WINNING_SCORE,
 )
+from services.tactics import TacticPlan, effects, advance_fatigue, target_result
 from services.equipment import (
     apply_horse_equipment,
     apply_knight_equipment,
@@ -62,6 +63,8 @@ class PassLog:
     arena_line: str = ""
     gear_line: str = ""
     debug_rolls: List[str] = field(default_factory=list)
+    tactics_a: dict = field(default_factory=dict)
+    tactics_b: dict = field(default_factory=dict)
 
 
 @dataclass
@@ -163,6 +166,7 @@ def behaviour_check(
     barding_key: str,
     arena_slip_mod: int = 0,
     arena_panic_mod: int = 0,
+    handling: int = 0,
 ) -> tuple[Optional[str], List[str]]:
     courage = int(horse_stats.get("courage", 0))
     obedience = int(horse_stats.get("obedience", 0))
@@ -174,7 +178,7 @@ def behaviour_check(
     debug: List[str] = []
 
     refuse_d20 = d20(rng)
-    refuse_total = refuse_d20 + courage + obedience + panic_mod
+    refuse_total = refuse_d20 + courage + obedience + panic_mod + handling
     debug.append(
         f"refusal: d20 {refuse_d20} + courage {courage} + obedience {obedience} + panic_mod {panic_mod} = {refuse_total} vs {REFUSAL_TARGET}"
     )
@@ -182,7 +186,7 @@ def behaviour_check(
         return "refused", debug
 
     slip_d20 = d20(rng)
-    slip_total = slip_d20 + obedience + stamina - slip_mod
+    slip_total = slip_d20 + obedience + stamina - slip_mod + handling
     debug.append(
         f"slip: d20 {slip_d20} + obedience {obedience} + stamina {stamina} - slip_mod {slip_mod} = {slip_total} vs {SLIP_TARGET}"
     )
@@ -190,7 +194,7 @@ def behaviour_check(
         return "slipped", debug
 
     bolt_d20 = d20(rng)
-    bolt_total = bolt_d20 + courage + panic_mod
+    bolt_total = bolt_d20 + courage + panic_mod + handling
     debug.append(f"bolt: d20 {bolt_d20} + courage {courage} + panic_mod {panic_mod} = {bolt_total} vs {BOLT_TARGET}")
     if bolt_total < BOLT_TARGET:
         return "bolted", debug
@@ -280,7 +284,8 @@ def make_pass(
     )
 
 
-def run_single_match(fighter_a: Fighter, fighter_b: Fighter, arena_key: str, seed: Optional[int] = None) -> MatchResult:
+def run_single_match(fighter_a: Fighter, fighter_b: Fighter, arena_key: str, seed: Optional[int] = None,
+                     tactics_a: TacticPlan | None = None, tactics_b: TacticPlan | None = None) -> MatchResult:
     arena = get_arena(arena_key)
     seed_value = int(seed if seed is not None else random.randint(1, 2_147_483_647))
     rng = random.Random(seed_value)
@@ -288,8 +293,19 @@ def run_single_match(fighter_a: Fighter, fighter_b: Fighter, arena_key: str, see
     score_a = 0
     score_b = 0
     passes: List[PassLog] = []
+    tactics_a = tactics_a or TacticPlan()
+    tactics_b = tactics_b or TacticPlan()
+    fatigue_a = fatigue_b = 0
+    tactical_snapshots = {}
 
     for pass_no in range(1, PASSES_PER_MATCH + 1):
+        a_fx = effects(tactics_a, pass_no=pass_no, fatigue=fatigue_a,
+                       horse_stats=fighter_a.horse_stats, score_for=score_a, score_against=score_b)
+        b_fx = effects(tactics_b, pass_no=pass_no, fatigue=fatigue_b,
+                       horse_stats=fighter_b.horse_stats, score_for=score_b, score_against=score_a)
+        tactical_snapshots[pass_no] = (a_fx, b_fx)
+        fatigue_a = advance_fatigue(fatigue_a, a_fx)
+        fatigue_b = advance_fatigue(fatigue_b, b_fx)
         notes: List[str] = []
         debug_rolls: List[str] = [f"seed: {seed_value}"]
 
@@ -308,6 +324,7 @@ def run_single_match(fighter_a: Fighter, fighter_b: Fighter, arena_key: str, see
             barding_key=fighter_a.barding_key,
             arena_slip_mod=arena.slip_mod,
             arena_panic_mod=arena.panic_mod,
+            handling=a_fx.handling,
         )
         behaviour_b, behaviour_debug_b = behaviour_check(
             rng=rng,
@@ -315,6 +332,7 @@ def run_single_match(fighter_a: Fighter, fighter_b: Fighter, arena_key: str, see
             barding_key=fighter_b.barding_key,
             arena_slip_mod=arena.slip_mod,
             arena_panic_mod=arena.panic_mod,
+            handling=b_fx.handling,
         )
         debug_rolls.extend([f"{fighter_a.horse_name} {line}" for line in behaviour_debug_a])
         debug_rolls.extend([f"{fighter_b.horse_name} {line}" for line in behaviour_debug_b])
@@ -407,8 +425,8 @@ def run_single_match(fighter_a: Fighter, fighter_b: Fighter, arena_key: str, see
             )
             continue
 
-        penalty_a = arena.alignment_mod
-        penalty_b = arena.alignment_mod
+        penalty_a = arena.alignment_mod + a_fx.alignment
+        penalty_b = arena.alignment_mod + b_fx.alignment
 
         if behaviour_a == "slipped":
             penalty_a += SLIP_ALIGNMENT_PENALTY
@@ -443,8 +461,16 @@ def run_single_match(fighter_a: Fighter, fighter_b: Fighter, arena_key: str, see
             )
             continue
 
-        charge_penalty_a = penalty_a + arena.charge_mod
-        charge_penalty_b = penalty_b + arena.charge_mod
+        charge_penalty_a = arena.charge_mod + a_fx.charge
+        charge_penalty_b = arena.charge_mod + b_fx.charge
+        if behaviour_a == "bolted":
+            charge_penalty_a += BOLT_ALIGNMENT_PENALTY
+        elif behaviour_a == "slipped":
+            charge_penalty_a += SLIP_ALIGNMENT_PENALTY
+        if behaviour_b == "bolted":
+            charge_penalty_b += BOLT_ALIGNMENT_PENALTY
+        elif behaviour_b == "slipped":
+            charge_penalty_b += SLIP_ALIGNMENT_PENALTY
 
         if align_a < ALIGNMENT_TARGET:
             charge_penalty_a += POOR_LINE_CHARGE_PENALTY
@@ -464,14 +490,16 @@ def run_single_match(fighter_a: Fighter, fighter_b: Fighter, arena_key: str, see
             ]
         )
 
-        resist_a = total_unhorse_resist(fighter_a.armour_key)
-        resist_b = total_unhorse_resist(fighter_b.armour_key)
+        resist_a = total_unhorse_resist(fighter_a.armour_key) + a_fx.resistance
+        resist_b = total_unhorse_resist(fighter_b.armour_key) + b_fx.resistance
         margin = charge_a - charge_b
         debug_rolls.append(f"raw margin: {charge_a} - {charge_b} = {margin}; resist A {resist_a}; resist B {resist_b}")
 
         if margin > 0:
             adjusted_margin = max(0, margin - resist_b)
             points, category, label = outcome_from_margin(adjusted_margin)
+            category, points = target_result(category, points, tactics_a.target)
+            label = category.replace('_', ' ')
             score_a += points
             passes.append(
                 make_pass(
@@ -490,6 +518,8 @@ def run_single_match(fighter_a: Fighter, fighter_b: Fighter, arena_key: str, see
         elif margin < 0:
             adjusted_margin = max(0, abs(margin) - resist_a)
             points, category, label = outcome_from_margin(adjusted_margin)
+            category, points = target_result(category, points, tactics_b.target)
+            label = category.replace('_', ' ')
             score_b += points
             passes.append(
                 make_pass(
@@ -522,6 +552,22 @@ def run_single_match(fighter_a: Fighter, fighter_b: Fighter, arena_key: str, see
 
         if score_a >= WINNING_SCORE or score_b >= WINNING_SCORE:
             break
+
+    for log in passes:
+        aa, bb = tactical_snapshots[log.pass_no]
+        log.tactics_a = {**aa.__dict__, **tactics_a.as_dict()}
+        log.tactics_b = {**bb.__dict__, **tactics_b.as_dict()}
+        for knight, plan, detail in ((fighter_a.knight_name, tactics_a, aa),
+                                     (fighter_b.knight_name, tactics_b, bb)):
+            log.notes.append(
+                f"{knight}: {plan.style.title()} / {plan.target.title()} "
+                f"(fatigue {detail.fatigue})"
+                + (f" · {detail.move.replace('_',' ').title()}" if detail.move != "none" else "")
+            )
+            log.debug_rolls.append(
+                f"{knight} tactical align {detail.alignment} charge {detail.charge} "
+                f"resist {detail.resistance} handling {detail.handling} risk {detail.injury_risk:+}pp"
+            )
 
     if score_a > score_b:
         winner = fighter_a.knight_name
