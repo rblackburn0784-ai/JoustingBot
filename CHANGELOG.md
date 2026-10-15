@@ -1,5 +1,22 @@
 # Changelog
 
+## v0.8.5 — Tournament Lite
+
+- Added guild-specific, admin-created 4- and 8-player single-elimination tournaments with one active event at a time.
+- Added /tournament create, /tournament join, /tournament start, /tournament status, /tournament next, and /tournament history.
+- Enforced full brackets, ownership of a bound horse, no bot or duplicate registrations and Manage Server permission on admin operations.
+- Randomised initial entrants; persisted all pairings, arenas, seeds, round winners, tournament champions and completion history.
+- Added a public, restart-persistent tournament control panel and a private button-based tournament hub; integrated both main player menu and Admin Director.
+- Reused the existing cinematic duel engine with the existing ranked, gold, title and injury systems. Registration counts as consent to automatic admin-triggered tournament jousts.
+- Added deterministic seeded marshal tiebreaks when a joust ends level; the underlying player match still records a draw.
+- Added recovery of interrupted in-progress pairings and stable journal IDs to avoid double-counting matches, gold or injuries on retry.
+- Added tournament JSON data to admin health checks and backup snapshots.
+- Added regression tests for 4/8 brackets, capacity, eligibility-related UI, server isolation, history, persistent controls and duplicate match-journal prevention.
+- No league or season systems in this version.
+
+---
+
+
 ## v0.8.1a — Contextual Injury Risk & Tiered Treatment
 
 - Replaced flat injury odds with capped (2–42%) contextual probabilities: arena (Royal/Festival safer; Muddy/Frozen/War-Torn riskier), armour, barding, attacking lance, horse breed, courage, obedience, and riding while injured.
