@@ -8,6 +8,8 @@ from cogs.knight import get_knight, load_knights
 from cogs.horse import Horse, load_horses
 from services.records import knight_record, horse_record, latest_matches
 from services.competition import equipped_title
+from services.tournament_awards import tournament_stats, achievement_progress, TOURNAMENT_TITLES
+from services.competition import title_progress
 from services.progression import equipped_standard, prestige, reputation
 from services.injuries import (
     active as active_injuries, duration as injury_duration,
@@ -33,6 +35,20 @@ def knight_stats_embed(member: discord.abc.User) -> discord.Embed:
                           for i in injuries[:3]) +
                 f"\n(Maximum {PENALTY_CAP} total stat penalties)"
             ) + ("\n🩹 Physician aid ready for next joust" if support_for_next_bout(guild.id, member.id) else "") if injuries else "✅ Fully recovered",
+            inline=False,
+        )
+        tour = tournament_stats(guild.id, member.id)
+        badges = achievement_progress(guild.id, member.id)
+        titles = title_progress(guild.id, member.id)
+        unlocked_titles = sum(titles[key]["earned"] for key in TOURNAMENT_TITLES)
+        unlocked_badges = sum(item["earned"] for item in badges.values())
+        e.add_field(
+            name="🏆 Tournament Trophy Cabinet",
+            value=(f"Gold crowns: **{tour['championships']}** · "
+                   f"Silver finals: **{tour['runners_up']}**\n"
+                   f"Events: **{tour['entries']}** · Bracket advances: **{tour['advances']}**\n"
+                   f"Titles: **{unlocked_titles}/{len(TOURNAMENT_TITLES)}** · "
+                   f"Achievements: **{unlocked_badges}/{len(badges)}**"),
             inline=False,
         )
         e.add_field(
