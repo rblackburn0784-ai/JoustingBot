@@ -96,6 +96,14 @@ class MaintenanceTests(unittest.TestCase):
             m.repair(apply=True)
         self.assertEqual(len(load_json(str(self.data / "matches.json"), {})["matches"]), 2)
 
+    def test_non_scalar_match_ids_are_reported_without_crashing(self):
+        self.write("matches.json", {"matches": [{"id": ["malformed"]}]})
+        result = m.inspect()
+        self.assertFalse(result["healthy"])
+        self.assertTrue(any("invalid ID type" in item for item in result["errors"]))
+        with self.assertRaises(m.MaintenanceError):
+            m.repair(apply=True)
+
     def test_corrupt_json_is_quarantined_before_verified_restore(self):
         self.write("knights.json", {"knights": {"42": {"name": "Saved"}}})
         snapshot = m.create_backup()
