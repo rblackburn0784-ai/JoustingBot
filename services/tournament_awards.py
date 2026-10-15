@@ -11,16 +11,16 @@ from services.tournaments import load_db
 # Title entries follow the existing competition TITLE_RULES tuple format:
 # (display name, unlock description, progress stat, threshold)
 TOURNAMENT_TITLES = {
-    "lists_initiate": ("Lists Initiate", "Enter your first started tournament.", "entries", 1),
-    "bracket_breaker": ("Bracket Breaker", "Advance through 3 tournament matches.", "advances", 3),
-    "the_finalist": ("The Finalist", "Reach a completed tournament final.", "finals", 1),
-    "silver_lance": ("Silver Lance", "Finish a tournament as runner-up.", "runners_up", 1),
-    "cup_bearer": ("Cup Bearer", "Win your first tournament championship.", "championships", 1),
-    "king_of_the_lists": ("King of the Lists", "Win 3 tournaments.", "championships", 3),
-    "elite_eight": ("Elite Eight", "Compete in a started 8-rider tournament.", "eight_entries", 1),
-    "grand_melee_champion": ("Grand Melee Champion", "Win an 8-rider tournament.", "eight_crowns", 1),
-    "marshal_favourite": ("Marshal's Favourite", "Advance by a marshal's tiebreak.", "marshal_advances", 1),
-    "tourney_veteran": ("Tourney Veteran", "Enter 5 started tournaments.", "entries", 5),
+    "lists_initiate": ("Lists Initiate", "Enter your first started tournament.", "tourney_entries", 1),
+    "bracket_breaker": ("Bracket Breaker", "Advance through 3 tournament matches.", "tourney_advances", 3),
+    "the_finalist": ("The Finalist", "Reach a completed tournament final.", "tourney_finals", 1),
+    "silver_lance": ("Silver Lance", "Finish a tournament as runner-up.", "tourney_runners_up", 1),
+    "cup_bearer": ("Cup Bearer", "Win your first tournament championship.", "tourney_championships", 1),
+    "king_of_the_lists": ("King of the Lists", "Win 3 tournaments.", "tourney_championships", 3),
+    "elite_eight": ("Elite Eight", "Compete in a started 8-rider tournament.", "tourney_eight_entries", 1),
+    "grand_melee_champion": ("Grand Melee Champion", "Win an 8-rider tournament.", "tourney_eight_crowns", 1),
+    "marshal_favourite": ("Marshal's Favourite", "Advance by a marshal's tiebreak.", "tourney_marshal_advances", 1),
+    "tourney_veteran": ("Tourney Veteran", "Enter 5 started tournaments.", "tourney_entries", 5),
     "lance_of_the_lists": ("Lance of the Lists", "Unhorse opponents 3 times in tournament matches.", "tourney_unhorsings", 3),
     "arena_conqueror": ("Arena Conqueror", "Win tournament jousts at 3 different arenas.", "tourney_unique_arenas", 3),
 }
