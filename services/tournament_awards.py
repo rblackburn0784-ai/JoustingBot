@@ -21,8 +21,8 @@ TOURNAMENT_TITLES = {
     "grand_melee_champion": ("Grand Melee Champion", "Win an 8-rider tournament.", "eight_crowns", 1),
     "marshal_favourite": ("Marshal's Favourite", "Advance by a marshal's tiebreak.", "marshal_advances", 1),
     "tourney_veteran": ("Tourney Veteran", "Enter 5 started tournaments.", "entries", 5),
-    "lance_of_the_lists": ("Lance of the Lists", "Unhorse opponents 3 times in tournament matches.", "unhorsings", 3),
-    "arena_conqueror": ("Arena Conqueror", "Win tournament jousts at 3 different arenas.", "unique_arenas", 3),
+    "lance_of_the_lists": ("Lance of the Lists", "Unhorse opponents 3 times in tournament matches.", "tourney_unhorsings", 3),
+    "arena_conqueror": ("Arena Conqueror", "Win tournament jousts at 3 different arenas.", "tourney_unique_arenas", 3),
 }
 
 # Achievements add permanent recognition but cannot be equipped as titles.
