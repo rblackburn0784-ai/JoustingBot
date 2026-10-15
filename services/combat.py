@@ -429,6 +429,14 @@ def run_single_match(fighter_a: Fighter, fighter_b: Fighter, arena_key: str, see
 
         penalty_a = arena.alignment_mod + a_fx.alignment
         penalty_b = arena.alignment_mod + b_fx.alignment
+        # The Feigned Miss counters an overcommitted aggressive rider.
+        # Precision Strike remains better against other riding styles.
+        if a_fx.move == "feigned_miss" and tactics_b.style == "aggressive":
+            penalty_b -= 2
+            notes.append(f"{fighter_a.knight_name}'s feint draws {fighter_b.knight_name} off-line.")
+        if b_fx.move == "feigned_miss" and tactics_a.style == "aggressive":
+            penalty_a -= 2
+            notes.append(f"{fighter_b.knight_name}'s feint draws {fighter_a.knight_name} off-line.")
 
         if behaviour_a == "slipped":
             penalty_a += SLIP_ALIGNMENT_PENALTY
