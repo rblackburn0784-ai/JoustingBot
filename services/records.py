@@ -15,10 +15,18 @@ def load_history() -> dict:
         return {"matches": []}
     return data
 
-def record_match(prepared: Any, result: Any) -> str:
+def record_match(prepared: Any, result: Any, *, match_id: str | None = None,
+                 tournament_id: str | None = None) -> str:
     """Append completed matches only; decline/timeout never calls this function."""
     data = load_history()
-    match_id = str(uuid.uuid4())
+    match_id = match_id or str(uuid.uuid4())
+    if tournament_id:
+        existing = next((m for m in data["matches"] if m.get("id") == match_id), None)
+        if existing is not None:
+            if (existing.get("tournament_id") != tournament_id
+                    or existing.get("guild_id") != prepared.guild_id):
+                raise ValueError("Tournament match record identity conflict.")
+            return match_id
     passes = []
     for p in result.passes:
         passes.append({
@@ -33,6 +41,7 @@ def record_match(prepared: Any, result: Any) -> str:
         "mode": getattr(prepared, "mode", "instant"),
         "arena_key": prepared.arena_key, "arena_name": result.arena_name,
         "seed": result.seed,
+        "tournament_id": tournament_id,
         "a": {"user_id": prepared.fighter_a.user_id, "knight": prepared.knight_a.name,
               "horse_id": prepared.horse_a.horse_id, "horse": prepared.horse_a.name,
               "horse_breed": getattr(prepared.horse_a, "breed", ""),
