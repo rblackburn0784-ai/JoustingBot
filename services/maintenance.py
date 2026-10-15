@@ -84,6 +84,9 @@ def inspect() -> dict:
                     problems.append(f"matches.json: entry {index} is not an object.")
                     continue
                 mid = match.get("id")
+                if mid is not None and not isinstance(mid, (str, int)):
+                    problems.append(f"matches.json: entry {index} has invalid ID type.")
+                    continue
                 if not mid:
                     warnings.append(f"matches.json: entry {index} has no ID; left untouched.")
                     continue
@@ -121,6 +124,8 @@ def _safe_state() -> tuple[dict[str, dict | None], list[str]]:
             if not isinstance(item, dict):
                 raise MaintenanceError("matches.json includes a non-object entry; manual review required.")
             mid = item.get("id")
+            if mid is not None and not isinstance(mid, (str, int)):
+                raise MaintenanceError("matches.json has a non-scalar match ID.")
             if not mid:
                 continue
             if mid in seen:
