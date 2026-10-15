@@ -87,7 +87,7 @@ def _breed_modifier(breed: str) -> int:
     return next((mod for label, mod in BREED_RISK.items() if label in text), 0)
 
 
-def risk_profile(match: dict, side: str, other: str, category: str) -> dict:
+def risk_profile(match: dict, side: str, other: str, category: str, event: dict | None = None) -> dict:
     """Percentage points attributable to arena, armour, lance, horse gear and breed."""
     defender = match.get(side, {})
     attacker = match.get(other, {})
@@ -113,6 +113,17 @@ def risk_profile(match: dict, side: str, other: str, category: str) -> dict:
     if category == "horse_slip":
         # Slippery ground primarily causes lower-body rather than shield injuries.
         mods["terrain_slip"] = max(0, ARENA_RISK.get(area, 0)) // 2
+    # Tactical intent affects the *rider accepting the risk*, rather than
+    # allowing one player to injure the other simply by picking Aggressive.
+    # Rider-targeted hits do add a modest extra risk to the defender.
+    if event:
+        own_tactics = event.get("tactics_" + side, {})
+        attack_tactics = event.get("tactics_" + other, {})
+        styles = {"cautious": -4, "balanced": 0, "aggressive": 5}
+        mods["riding_style"] = styles.get(own_tactics.get("style"), 0)
+        mods["fatigue"] = min(3, max(0, int(own_tactics.get("fatigue", 0)) // 3))
+        mods["rider_target"] = 3 if attack_tactics.get("target") == "rider" else 0
+        mods["reckless_move"] = 3 if attack_tactics.get("move") == "reckless_charge" else 0
     base = RISKS[category]
     chance = max(MIN_RISK, min(MAX_RISK, base + sum(mods.values())))
     return {"category": category, "base": base, "modifiers": mods, "chance": chance}
@@ -177,7 +188,7 @@ def make_events(match: dict) -> list[dict]:
                 continue
             if not struck:
                 continue
-            profile = risk_profile(match, side, other, category)
+            profile = risk_profile(match, side, other, category, event=event)
             if strongest is None or profile["chance"] > strongest["chance"]:
                 strongest = profile
         if not strongest or roll(mid, side, "risk") >= strongest["chance"]:
