@@ -26,7 +26,7 @@ from services.competition import (
 from services.equipment import items_by_slot, get_item
 from services.records import load_history
 
-VERSION = "v0.8.5"
+VERSION = "v0.8.5a"
 STYLE = discord.ButtonStyle
 
 
@@ -915,9 +915,11 @@ class LeaderboardPage(OwnedView):
 class TitleSelect(discord.ui.Select):
     def __init__(self, parent: "TitlePage"):
         self.screen = parent
+        items = list(TITLE_RULES.items())
+        visible = items[parent.page * parent.PER_PAGE:(parent.page + 1) * parent.PER_PAGE]
         options = [
             discord.SelectOption(label=label, value=key, default=key == parent.selected)
-            for key, (label, _d, _f, _n) in TITLE_RULES.items()
+            for key, (label, _d, _f, _n) in visible
         ]
         super().__init__(placeholder="Choose title to equip (must be earned)", options=options, row=0)
 
@@ -932,8 +934,9 @@ class TitlePage(OwnedView):
     def __init__(self, user_id: int, guild_id: int | None, page: int = 0, selected: str | None = None):
         super().__init__(user_id)
         self.guild_id = guild_id
-        self.page = page
-        self.selected = selected or next(iter(TITLE_RULES))
+        self.page = max(0, min(page, (len(TITLE_RULES) - 1) // self.PER_PAGE))
+        visible_keys = list(TITLE_RULES)[self.page * self.PER_PAGE:(self.page + 1) * self.PER_PAGE]
+        self.selected = selected if selected in visible_keys else visible_keys[0]
         self.add_item(TitleSelect(self))
         self.button("Equip Selected", self.equip, row=1, style=STYLE.primary)
         self.button("Unequip", self.unequip, row=1)
@@ -958,10 +961,10 @@ class TitlePage(OwnedView):
         return e
 
     async def previous(self, interaction):
-        await navigate(interaction, TitlePage(interaction.user.id, interaction.guild_id, self.page - 1, self.selected))
+        await navigate(interaction, TitlePage(interaction.user.id, interaction.guild_id, self.page - 1))
 
     async def next(self, interaction):
-        await navigate(interaction, TitlePage(interaction.user.id, interaction.guild_id, self.page + 1, self.selected))
+        await navigate(interaction, TitlePage(interaction.user.id, interaction.guild_id, self.page + 1))
 
     async def equip(self, interaction):
         if self.guild_id is None:
