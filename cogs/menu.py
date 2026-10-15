@@ -26,7 +26,7 @@ from services.competition import (
 from services.equipment import items_by_slot, get_item
 from services.records import load_history
 
-VERSION = "v0.9.0a"
+VERSION = "v0.9.1"
 STYLE = discord.ButtonStyle
 
 
@@ -133,11 +133,12 @@ class VersionPage(OwnedView):
 
     def make_embed(self):
         return embed(
-            "⚙️ JoustingBot v0.9.0a",
+            "⚙️ JoustingBot v0.9.1",
             "**Stability & Admin Tools**\n"
             "Reliable atomic saves, checksum-verified local backups, safe repair previews, "
             "confirmed restores, challenge locks and cooldowns, and clearer errors.\n\n"
-            "Admin tools are restricted to Manage Server users. Commands: /admin health, /admin backup, /admin repair, /admin reset_user."
+            "Both riders choose private tactics and lock plans before a challenge is accepted. "
+            "Admin tools remain Manage Server restricted."
         )
 
 
@@ -805,7 +806,8 @@ class DuelPage(OwnedView):
         opponent = f"<@{self.opponent_id}>" if self.opponent_id else "Not yet selected"
         return embed("🎯 " + ("Test Duel" if self.instant else "Joust Challenge"),
                      f"**Opponent:** {opponent}\n**Arena:** {ARENAS[self.arena_key].name}\n\n"
-                     f"{mode}\n\nSelect a player and arena, then press the action button.")
+                     f"{mode}\n\nSelect a player and arena, issue the challenge, then both players "
+                     f"press **Choose Tactics** on the public challenge and privately lock their plans.")
 
     async def random(self, interaction):
         self.arena_key = random.choice(list(ARENAS))
