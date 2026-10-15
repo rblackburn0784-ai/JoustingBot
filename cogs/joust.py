@@ -640,7 +640,9 @@ class JoustCog(commands.Cog):
             guild_id=guild_id,
         )
 
-    async def send_match(self, sender, prepared: PreparedDuel) -> MatchResult:
+    async def send_match(self, sender, prepared: PreparedDuel, *,
+                         record_id: str | None = None,
+                         tournament_id: str | None = None) -> MatchResult:
         # Re-check at acceptance, not at challenge creation; time-based healing
         # and last-minute treatment might have changed the knight's condition.
         if prepared.guild_id is not None:
@@ -663,7 +665,7 @@ class JoustCog(commands.Cog):
 
         result = run_single_match(prepared.fighter_a, prepared.fighter_b, prepared.arena_key, seed=prepared.seed)
         result_embed = make_result_embed(result, prepared.arena_key)
-        match_id = record_match(prepared, result)
+        match_id = record_match(prepared, result, match_id=record_id, tournament_id=tournament_id)
         if prepared.guild_id is not None and prepared.mode == "challenge":
             from services.records import load_history
             entry = next(
