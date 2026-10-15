@@ -167,7 +167,7 @@ class PrivateTacticsTests(unittest.IsolatedAsyncioTestCase):
         screen.plan = TacticPlan("aggressive", "rider", "reckless_charge")
         intr = SimpleNamespace(user=SimpleNamespace(id=11),
                                response=SimpleNamespace(edit_message=AsyncMock()))
-        await screen.lock(intr, None)
+        await screen.lock.callback(intr)
         self.assertEqual(prepared.tactics_a, screen.plan)
         self.assertEqual(prepared.tactics_ready, {11})
         intr.response.edit_message.assert_awaited_once()
