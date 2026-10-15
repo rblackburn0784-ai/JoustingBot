@@ -77,7 +77,7 @@ class AdminResetTests(unittest.TestCase):
         result = m.reset_user(100, 7, "settings", 50)
         self.assertEqual(result["scope"], "settings")
         self.assertIn(result["backup"], m.backup_names())
-        self.assertIn("admin_audit.json", self.json("admin_audit.json").get("events", [{}])[0].get("action"))
+        self.assertEqual(self.json("admin_audit.json")["events"][0]["action"], "reset_user")
         record = self.json("progression.json")["guilds"]["100"]["7"]
         self.assertNotIn("loadout", record)
         self.assertNotIn("horse_barding", record)
