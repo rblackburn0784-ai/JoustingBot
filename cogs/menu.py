@@ -1126,14 +1126,6 @@ class MenuCog(commands.Cog):
         view = StandardPage(interaction.user.id, interaction.guild_id)
         await interaction.response.send_message(embed=view.make_embed(), view=view, ephemeral=True)
 
-    @app_commands.command(name="admin", description="Open the restricted JoustingBot admin dashboard.")
-    @app_commands.default_permissions(manage_guild=True)
-    @app_commands.guild_only()
-    async def admin(self, interaction: discord.Interaction):
-        if not is_admin(interaction):
-            return await interaction.response.send_message("⛔ Manage Server permission required.", ephemeral=True)
-        view = AdminPage(interaction.user.id)
-        await interaction.response.send_message(embed=view.make_embed(), view=view, ephemeral=True)
 
 
 async def setup(bot: commands.Bot):
