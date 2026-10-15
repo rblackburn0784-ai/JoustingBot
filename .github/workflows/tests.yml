@@ -14,7 +14,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install bot dependencies
-        run: python -m pip install "discord.py>=2.3,<3" python-dotenv
+        run: python -m pip install -r requirements.txt
       - name: Compile Python code
         run: python -m compileall -q main.py cogs services tests
       - name: Run competition regression tests
@@ -35,7 +35,9 @@ jobs:
                   ):
                       await bot.load_extension(module)
                   names = {command.name for command in bot.tree.get_commands()}
-                  assert {"menu", "profile", "titles", "title", "leaderboard", "knight", "horse", "joust", "tournament", "version", "maintenance"} <= names, names
+                  assert {"menu", "profile", "titles", "title", "leaderboard", "knight", "horse", "joust", "tournament", "version", "maintenance", "admin"} <= names, names
+                  admin = bot.tree.get_command("admin")
+                  assert {"panel", "backup", "repair", "reset_user", "health"} <= {sub.name for sub in admin.commands}
                   print("All cogs loaded; slash commands registered.")
 
           asyncio.run(check())
