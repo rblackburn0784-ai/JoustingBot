@@ -291,16 +291,89 @@ class MaintenanceCog(commands.Cog):
         self.bot = bot
         self.lock = asyncio.Lock()
 
+    admin_group = app_commands.Group(name="admin", description="Server administration and repair")
+
+    @admin_group.command(name="panel", description="Open the restricted administrator dashboard.")
+    @app_commands.default_permissions(manage_guild=True)
+    @app_commands.guild_only()
+    async def admin_panel(self, interaction: discord.Interaction):
+        if not is_admin(interaction):
+            return await interaction.response.send_message("Manage Server required.", ephemeral=True)
+        view = AdminPage(interaction.user.id)
+        await interaction.response.send_message(embed=view.make_embed(), view=view, ephemeral=True)
+
+    @admin_group.command(name="health", description="Inspect persistent JSON health.")
+    @app_commands.default_permissions(manage_guild=True)
+    @app_commands.guild_only()
+    async def admin_health(self, interaction: discord.Interaction):
+        if not is_admin(interaction):
+            return await interaction.response.send_message("Manage Server required.", ephemeral=True)
+        view = MaintenancePage(interaction.user.id)
+        await interaction.response.send_message(embed=health_embed(), view=view, ephemeral=True)
+
+    @admin_group.command(name="backup", description="Create a verified local JSON backup.")
+    @app_commands.default_permissions(manage_guild=True)
+    @app_commands.guild_only()
+    async def admin_backup(self, interaction: discord.Interaction):
+        if not is_admin(interaction):
+            return await interaction.response.send_message("Manage Server required.", ephemeral=True)
+        async with self.lock:
+            if not idle(interaction.client):
+                return await interaction.response.send_message("Matches are active. Backup blocked.", ephemeral=True)
+            try:
+                name = store.create_backup()
+            except (store.MaintenanceError, OSError) as exc:
+                LOG.exception("Admin backup failed")
+                return await interaction.response.send_message(
+                    f"Backup blocked: {str(exc)[:300]}", ephemeral=True)
+        view = MaintenancePage(interaction.user.id, name)
+        await interaction.response.send_message(
+            content=f"Verified local backup created: {name}.",
+            embed=view.make_embed(), view=view, ephemeral=True)
+
+    @admin_group.command(name="repair", description="Preview safe repairs requiring confirmation.")
+    @app_commands.default_permissions(manage_guild=True)
+    @app_commands.guild_only()
+    async def admin_repair(self, interaction: discord.Interaction):
+        if not is_admin(interaction):
+            return await interaction.response.send_message("Manage Server required.", ephemeral=True)
+        try:
+            plan = store.repair()
+        except store.MaintenanceError as exc:
+            return await interaction.response.send_message(
+                f"Repair blocked: {str(exc)[:300]}", ephemeral=True)
+        if not plan["changes"]:
+            view = MaintenancePage(interaction.user.id)
+            return await interaction.response.send_message(
+                content="No safe repairs required.", embed=view.make_embed(), view=view, ephemeral=True)
+        view = ConfirmPage(interaction.user.id, "repair")
+        await interaction.response.send_message(embed=view.make_embed(), view=view, ephemeral=True)
+
+    @admin_group.command(name="reset_user", description="Safely reset server settings or gear inventory.")
+    @app_commands.default_permissions(manage_guild=True)
+    @app_commands.guild_only()
+    @app_commands.describe(member="The server member to reset", scope="Settings, or purchased inventory without refund")
+    async def admin_reset_user(self, interaction: discord.Interaction, member: discord.Member,
+                               scope: Literal["settings", "inventory"] = "settings"):
+        if not is_admin(interaction) or interaction.guild_id != member.guild.id:
+            return await interaction.response.send_message("Manage Server required.", ephemeral=True)
+        try:
+            view = ConfirmUserResetPage(interaction.user.id, interaction.guild_id, member.id, scope)
+            preview = view.make_embed()
+        except store.MaintenanceError as exc:
+            return await interaction.response.send_message(f"Reset blocked: {exc}", ephemeral=True)
+        await interaction.response.send_message(embed=preview, view=view, ephemeral=True)
+
     @app_commands.command(name="version", description="Show bot release and stability features.")
     async def version(self, interaction: discord.Interaction):
         view = MainMenuView(interaction.user.id, is_admin(interaction))
         await interaction.response.send_message(
-            embed=embed("⚙️ JoustingBot v0.9.0",
+            embed=embed("⚙️ JoustingBot v0.9.0a",
                         "Stability & Admin Tools\n"
                         "✅ Atomic JSON saves · verified local backups · safe repairs\n"
                         "✅ Challenge cooldowns and locks · error cleanup\n"
                         "✅ Admin-only restore with confirmation\n\n"
-                        "Use /maintenance as an admin to manage backups."),
+                        "Use /admin health, /admin backup, /admin repair and /admin reset_user."),
             view=view, ephemeral=True,
         )
 
