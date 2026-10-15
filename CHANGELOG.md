@@ -1,5 +1,20 @@
 # Changelog
 
+## v0.8.5a — Tournament Titles & Achievements
+
+- Introduced twelve equipable, cosmetic tournament titles (30 titles total): Lists Initiate, Bracket Breaker, The Finalist, Silver Lance, Cup Bearer, King of the Lists, Elite Eight, Grand Melee Champion, Marshal's Favourite, Tourney Veteran, Lance of the Lists and Arena Conqueror.
+- Added eight independent tournament achievement badges and a private Trophy Cabinet displaying unlock progress, gold/silver medals and lifetime tournament stats.
+- Added /tournament achievements [player] and /tournament cabinet; integrated Trophy Cabinet buttons in the public tournament panel and private Tournament menu, with Main Menu navigation.
+- Added tournament medal/award progress to knight profiles and post-match announcements of newly unlocked tournament honours for both competitors.
+- Replaced fixed /title equip choices with searchable title autocomplete and paginated the title-selection dropdown to obey Discord's 25-option limit.
+- Kept tournament unhorsing/lance-break stats distinct from regular career title metrics; all previously earned titles remain valid.
+- Rewards derive from verified completed tournament pairings and match journal results, not from registration alone or ordinary duels; server-specific with duplicate protection.
+- Stopped truncating saved tournament history at 20 entries, preserving permanent achievements across long careers; recent-history display remains limited.
+- Added automated tests for achievements, titles, championship and runner-up results, old title preservation, server isolation, unplayed registrations, long history and UI limits.
+
+---
+
+
 ## v0.8.5 — Tournament Lite
 
 - Added guild-specific, admin-created 4- and 8-player single-elimination tournaments with one active event at a time.
