@@ -7,21 +7,21 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 STYLES = {
-    "cautious": ("Cautious", 2, -3, 0, -4, "Safer line and mount handling; weaker impacts."),
+    "cautious": ("Cautious", 2, -1, 0, -4, "Safer line and mount handling; weaker impacts."),
     "balanced": ("Balanced", 0, 0, 1, 0, "No modifier; moderate fatigue."),
-    "aggressive": ("Aggressive", -2, 3, 2, 5, "Harder charge, but fatigue, control and injury risks rise."),
+    "aggressive": ("Aggressive", -3, 2, 3, 5, "Harder charge, but fatigue, control and injury risks rise."),
 }
 TARGETS = {
     "shield": ("Shield", 0, 0, 0, "Balanced, conventional target."),
-    "lance": ("Lance", 2, -2, -1, "Cleaner line, less force; broken-lance scoring."),
-    "rider": ("Rider", -2, 2, 3, "Higher-impact target, poorer alignment and extra injury risk."),
+    "lance": ("Lance", 2, -1, -1, "Cleaner line, less force; broken-lance scoring."),
+    "rider": ("Rider", -2, 1, 3, "Higher-impact target, poorer alignment and extra injury risk."),
 }
 MOVES = {
     "none": ("No Manoeuvre", 0, 0, 0, 0, 0, "No special move."),
-    "precision_strike": ("Precision Strike", 3, -2, 0, 0, 2, "Steady the lance; sacrifices impact."),
-    "reckless_charge": ("Reckless Charge", -3, 4, 0, 4, 2, "Extra impact, difficult control and serious risk."),
-    "shield_brace": ("Shield Brace", 1, -2, 3, -2, 2, "Improves seat and defence; sacrifices momentum."),
-    "feigned_miss": ("Feigned Miss", 2, -2, 0, -1, 2, "A deceptive late correction; controlled but light."),
+    "precision_strike": ("Precision Strike", 3, -1, 0, 0, 2, "Steady the lance; sacrifices impact."),
+    "reckless_charge": ("Reckless Charge", -3, 2, 0, 4, 2, "Extra impact, difficult control and serious risk."),
+    "shield_brace": ("Shield Brace", 1, -1, 3, -2, 2, "Improves seat and defence; sacrifices momentum."),
+    "feigned_miss": ("Feigned Miss", 2, -1, 0, -1, 2, "A deceptive late correction; controlled but light."),
     "last_stand": ("Last Stand", 2, 2, 0, 3, 3, "A comeback attempt from pass three, with extra fatigue."),
 }
 MAX_FATIGUE = 8
