@@ -26,7 +26,7 @@ from services.competition import (
 from services.equipment import items_by_slot, get_item
 from services.records import load_history
 
-VERSION = "v0.9.1"
+VERSION = "v0.9.2"
 STYLE = discord.ButtonStyle
 
 
@@ -133,7 +133,7 @@ class VersionPage(OwnedView):
 
     def make_embed(self):
         return embed(
-            "⚙️ JoustingBot v0.9.1",
+            "⚙️ JoustingBot v0.9.2",
             "**Stability & Admin Tools**\n"
             "Reliable atomic saves, checksum-verified local backups, safe repair previews, "
             "confirmed restores, challenge locks and cooldowns, and clearer errors.\n\n"
