@@ -4,7 +4,7 @@
 
 - Added private challenge-phase choices for both riders: Cautious/Balanced/Aggressive styles, Shield/Lance/Rider targets and an optional manoeuvre.
 - Both players must explicitly lock their choices before a public /joust challenge can be accepted; tactics are private until the cinematic match introduction. Timeout extended to 240 seconds.
-- Added Precision Strike, Reckless Charge, Shield Brace, Feigned Miss and conditional Last Stand, with two-pass cooldowns.
+- Added Precision Strike, Reckless Charge, Shield Brace, Feigned Miss (a situational counter to Aggressive riders) and conditional Last Stand, with two-pass cooldowns.
 - Added per-pass fatigue and mount-handling modifiers. Aggressive riding creates more charge but worse alignment, nervous horse behaviour and higher injury risk.
 - Integrated style, target, fatigue and activated manoeuvres into existing seeded combat, risk profiles and the match JSON journal. No character-save migration needed.
 - Prevented arena rerolls once either rider has locked a tactical plan.
