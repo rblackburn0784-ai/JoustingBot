@@ -2,11 +2,48 @@
 
 A lightweight medieval jousting Discord game bot built with `discord.py`.
 
-**Current version:** `v0.8.1a — Contextual Injuries & Treatment`
+**Current version:** `v0.8.5 — Tournament Lite`
 
 Players create a knight, build and bind a horse, equip both rider and horse, choose an arena, and challenge other Discord users to cinematic jousts with accept/decline buttons.
 
 This version focuses on making matches feel more like a sport: richer pass categories, arena-specific lines, gear-specific lines, seed display, debug roll breakdowns, and tunable balance constants.
+
+---
+
+## v0.8.5 — Tournament Lite
+
+A deliberately small, **one-at-a-time single-elimination tournament** for each Discord server. Choose 4 or 8 riders. No leagues, seasons, divisions, substitutions or complicated seeding rules yet.
+
+### Commands
+
+| Slash command | Who may use it | Purpose |
+| --- | --- | --- |
+| /tournament create name:<name> size:<4 or 8> | Manage Server admins | Create and open registration |
+| /tournament join | Players | Register your own knight and bound horse |
+| /tournament start | Manage Server admins | Randomly seed a full 4/8-player bracket |
+| /tournament status | Everyone | Public tournament registration / live bracket |
+| /tournament next | Manage Server admins | Run the next pairing and advance the winner |
+| /tournament history | Everyone | View the last ten champions |
+
+Every player must own a knight with a bound horse and must join voluntarily. No bots or duplicate registrations. Registration cannot exceed event capacity, and an admin cannot start until the bracket is full. **Only one active tournament per server** can exist at a time. A new tournament may be created after its predecessor finishes.
+
+When the admin starts, the bot randomly seeds registered players and allocates one arena and deterministic seed per pairing. Each press of **Start Next Match** plays one cinematic joust and advances its winner. After the final, the bot announces the **champion** publicly and moves the completed event into server tournament history. There are three matches in a 4-player tournament or seven in an 8-player tournament.
+
+**Tie rule (Tournament Lite only):** A level result is resolved by a deterministic seeded marshal's decision for bracket advancement, which is announced. The underlying joust remains a draw in normal career statistics. A full overtime/sudden-death ruleset is outside v0.8.5's scope.
+
+### Buttons and permissions
+
+Use /menu → **Tournaments** for a private, button-based tournament dashboard (Join, Refresh, History). Admins also see **Create**, **Start** and **Start Next Match**. Admin-only Tournament Director is also accessible from /menu → **Admin**. Administrators may create an event from a modal.
+
+The public status message includes **Join Tournament**, **Start Tournament**, **Start Next Match**, **History**, **Refresh** and **Main Menu** buttons. The bot checks **Manage Server** on every admin action (including button clicks); public controls cannot grant admin access. Public button handlers are restart-persistent; returning to Main Menu always opens a private dashboard.
+
+### Progression and persistence
+
+**Registering is consent to tournament jousts**: there is no Accept/Decline step for each pairing. Tournament jousts use the existing combat system and count as competitive matches, including the existing equipment, title, gold and injury mechanics. Running admin test duels separately remains unranked.
+
+State and bracket history are stored in storage/tournaments.json. Each bracket pairing has a stable match ID, seed and arena. If the process is interrupted, the admin can press **Start Next Match** again; the bot checks the match journal before resimulating or advancing, preventing duplicate match awards or injury records. All tournament JSON is included in the Admin backup/health checks.
+
+**Operational limits:** v0.8.5 supports a single running bot instance and local/volume-backed JSON files. Keep storage/matches.json and storage/tournaments.json together on the same persistent disk (for example, a Railway volume). If an unplayed pairing loses a member or valid mount, the admin needs to resolve the entry before play; advanced forfeit/substitution tooling belongs in a later update. The bot does not schedule matches automatically.
 
 ---
 
