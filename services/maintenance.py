@@ -27,6 +27,7 @@ SCHEMAS = {
     "titles.json": ("guilds", dict),
     "progression.json": ("guilds", dict),
     "tournaments.json": ("guilds", dict),
+    "admin_audit.json": ("events", list),
 }
 BACKUP_RE = re.compile(r"^bkp-[0-9]{8}T[0-9]{6}Z-[a-f0-9]{8}$")
 
@@ -266,3 +267,93 @@ def restore_backup(name: str) -> str:
         save_json(str(DATA_DIR / filename), payload)
     LOG.warning("Restored snapshot %s; pre-restore backup %s", name, rollback)
     return rollback
+
+
+# Admin resets are deliberately scoped to the current Discord server.
+# Shared knight/horse records and historical match journals remain untouched.
+RESET_SCOPES = {
+    "settings": "Clear selected title, active equipment and cosmetic standard. Preserve purchased gear.",
+    "inventory": "Also retire owned unlockable equipment WITHOUT refunding previous purchases.",
+}
+
+
+def reset_user_plan(guild_id: int, user_id: int, scope: str = "settings") -> dict:
+    if scope not in RESET_SCOPES or guild_id <= 0 or user_id <= 0:
+        raise MaintenanceError("Invalid reset scope, guild or player.")
+    # Fail closed on malformed JSON: admins should repair/restore first.
+    progression = _read("progression.json") or {"guilds": {}}
+    titles = _read("titles.json") or {"guilds": {}}
+    pdata = progression.get("guilds", {}).get(str(guild_id), {}).get(str(user_id), {})
+    current = titles.get("guilds", {}).get(str(guild_id), {}).get(str(user_id))
+    if not isinstance(pdata, dict):
+        raise MaintenanceError("Target player's progression record is malformed.")
+    if current is not None and not isinstance(current, str):
+        raise MaintenanceError("Target player's title record is malformed.")
+    owned = pdata.get("purchases", {})
+    if not isinstance(owned, dict):
+        raise MaintenanceError("Target player's purchased inventory is malformed.")
+    try:
+        spent = sum(int(p.get("cost", 0)) for p in owned.values())
+        if spent < 0:
+            raise ValueError("negative purchase value")
+    except (TypeError, ValueError, AttributeError) as exc:
+        raise MaintenanceError("Cannot account for historical purchases; reset blocked.") from exc
+    changes = []
+    if current:
+        changes.append("Unequip selected title")
+    for key in ("loadout", "horse_barding"):
+        if pdata.get(key):
+            changes.append("Clear " + key.replace("_", " "))
+    if pdata.get("standard") not in (None, "none"):
+        changes.append("Unequip cosmetic standard")
+    if scope == "inventory" and owned:
+        changes.append(f"Retire {len(owned)} unlocked items without refund ({spent} gold already spent)")
+    return {
+        "scope": scope, "guild_id": guild_id, "user_id": user_id,
+        "changes": changes, "retired_purchase_cost": spent if scope == "inventory" else 0,
+        "preserved": ["Match history", "Knights and horses", "Treatments/injuries",
+                      "Earned gold history", "Tournament entries", "Other servers"],
+    }
+
+
+def reset_user(guild_id: int, user_id: int, scope: str, actor_id: int) -> dict:
+    """Apply a confirmed, backup-protected server-only user reset.
+
+    Prevents a reset from laundering previously spent gold back into the wallet.
+    Returns the backup ID; the caller must check authorisation and active matches.
+    """
+    if actor_id <= 0:
+        raise MaintenanceError("Invalid reset operator.")
+    plan = reset_user_plan(guild_id, user_id, scope)
+    progression = _read("progression.json") or {"guilds": {}}
+    titles = _read("titles.json") or {"guilds": {}}
+    audit = _read("admin_audit.json") or {"events": []}
+    if not isinstance(audit.get("events", []), list):
+        raise MaintenanceError("Admin audit log is malformed.")
+    backup = create_backup()
+    gid, uid = str(guild_id), str(user_id)
+    record = progression.setdefault("guilds", {}).setdefault(gid, {}).setdefault(uid, {})
+    record.pop("loadout", None)
+    record.pop("horse_barding", None)
+    record["standard"] = "none"
+    if scope == "inventory":
+        retired = int(record.get("retired_spend", 0))
+        if retired < 0:
+            raise MaintenanceError("Negative retired spending encountered.")
+        record["retired_spend"] = retired + plan["retired_purchase_cost"]
+        record["purchases"] = {}
+    titles.setdefault("guilds", {}).setdefault(gid, {}).pop(uid, None)
+    audit.setdefault("events", []).append({
+        "at": _now(), "action": "reset_user", "guild_id": guild_id,
+        "target_user_id": user_id, "admin_user_id": actor_id,
+        "scope": scope, "backup": backup,
+        "changes": plan["changes"],
+    })
+    # Each file is atomic, but multi-file operations are not a transaction.
+    # Admin backup permits manual restore if the process stops mid-operation.
+    save_json(str(DATA_DIR / "progression.json"), progression)
+    save_json(str(DATA_DIR / "titles.json"), titles)
+    save_json(str(DATA_DIR / "admin_audit.json"), audit)
+    LOG.warning("Admin reset guild=%s player=%s admin=%s scope=%s backup=%s",
+                guild_id, user_id, actor_id, scope, backup)
+    return {**plan, "backup": backup}
