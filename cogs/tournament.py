@@ -155,8 +155,13 @@ class TournamentCabinet(OwnedView):
             f"    {p['description']}" for p in progress.values()
         ]
         e.description += f"\n**Unlocked: {unlocked}/{len(progress)}**"
-        e.add_field(name="🏅 Tournament Titles" if self.tab == "titles" else "🎖️ Achievements",
-                    value="\n\n".join(lines)[:1024], inline=False)
+        for start in range(0, len(lines), 6):
+            e.add_field(
+                name=("🏅 Tournament Titles" if self.tab == "titles" else "🎖️ Achievements")
+                     + (f" · Page {start // 6 + 1}" if len(lines) > 6 else ""),
+                value="\n\n".join(lines[start:start + 6])[:1024],
+                inline=False,
+            )
         e.set_footer(text="Titles can be equipped. Achievements are permanent recognition.")
         return e
 
@@ -391,6 +396,14 @@ class TournamentCog(commands.Cog):
             else:
                 winner = engine.tie_winner(a.id, b.id, match["seed"])
                 tiebreak = "seeded marshal decision"
+            # Compare progress across the bracket commit so only newly earned
+            # achievements/titles are announced, including runner-up awards.
+            previous = {
+                uid: (
+                    title_progress(interaction.guild_id, uid),
+                    achievement_progress(interaction.guild_id, uid),
+                ) for uid in (a.id if a else match["a"], b.id if b else match["b"])
+            }
             try:
                 done = engine.complete_match(interaction.guild_id, state["id"],
                                               match["id"], winner, match["id"],
@@ -398,6 +411,20 @@ class TournamentCog(commands.Cog):
             except engine.TournamentError as ex:
                 return await interaction.followup.send(f"⚠️ Result saved, bracket update failed: {ex}",
                                                         ephemeral=True)
+            newly_earned = []
+            for uid, (old_titles, old_badges) in previous.items():
+                fresh_titles = title_progress(interaction.guild_id, uid)
+                fresh_badges = achievement_progress(interaction.guild_id, uid)
+                names = [
+                    f"🏅 {value['name']}" for key, value in fresh_titles.items()
+                    if key in TOURNAMENT_TITLES and value["earned"]
+                    and not old_titles.get(key, {}).get("earned")
+                ] + [
+                    f"🎖️ {value['name']}" for key, value in fresh_badges.items()
+                    if value["earned"] and not old_badges.get(key, {}).get("earned")
+                ]
+                if names:
+                    newly_earned.append(at(uid) + ": " + ", ".join(names))
             label = "🏆 GRAND CHAMPION" if done["status"] == "completed" else "⚔️ Round Complete"
             notice = discord.Embed(
                 title=label,
@@ -406,6 +433,12 @@ class TournamentCog(commands.Cog):
                             + (f"\nTie resolved by {tiebreak}." if tiebreak else "")
                             + ("\nThe champion has been crowned!" if done["status"] == "completed" else ""),
                 colour=discord.Colour.gold())
+            if newly_earned:
+                notice.add_field(
+                    name="🎖️ Tournament Honours Unlocked",
+                    value="\n".join(newly_earned)[:1024],
+                    inline=False,
+                )
             if interaction.channel:
                 await interaction.channel.send(embed=notice)
                 await interaction.channel.send(embed=status_embed(interaction.guild_id),
