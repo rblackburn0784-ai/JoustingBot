@@ -306,6 +306,22 @@ def make_result_embed(result: MatchResult, arena_key: str) -> discord.Embed:
         loser = result.fighter_b if result.winner == result.fighter_a else result.fighter_a
         summary = f"{result.winner} edges out {loser}, turning pressure into points when it mattered."
 
+    from services.broadcast import statistics
+    stats = statistics(result)
+    e.add_field(
+        name="📊 Match Statistics",
+        value=(
+            f"**{result.fighter_a}:** {stats['a']['lance_breaks']} lance breaks · "
+            f"{stats['a']['unhorsings']} unhorsings · {stats['a']['heavy_hits']} heavy hits\n"
+            f"**{result.fighter_b}:** {stats['b']['lance_breaks']} lance breaks · "
+            f"{stats['b']['unhorsings']} unhorsings · {stats['b']['heavy_hits']} heavy hits"
+        ),
+        inline=False,
+    )
+    if result.winner != "Draw":
+        summary += f" 🎺 The herald raises {result.winner}'s banner as the crowd salutes the victor."
+    else:
+        summary += " The marshals salute both riders for a fiercely contested field."
     e.add_field(name="🧾 Match Summary", value=summary, inline=False)
     e.set_footer(text=VERSION_LABEL)
 
