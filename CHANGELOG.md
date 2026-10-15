@@ -1,5 +1,22 @@
 # Changelog
 
+## v0.9.0 — Stability & Admin Tools
+
+- Added /version and restricted /maintenance command, linked from the admin dashboard.
+- Added SHA256-manifested local JSON backups, verification before restore, strictly validated snapshot names and safety backups before applying changes.
+- Implemented an owner/admin-confirmation UI for safe repairs and snapshot restore, with checks to block maintenance while current-process matches are running.
+- Added storage health inspection and conservative, dry-run-first repairs: initialize missing files/containers and deduplicate *identical* match records. Conflicting IDs or corrupt structures remain blocked for manual review.
+- Added raw quarantine copies when restoring over already-corrupt JSON, so evidence is preserved before recovery.
+- Improved JSON save reliability using per-write unique temporary files, fsync and atomic replacement.
+- Added 30-second per-player/server challenge posting cooldowns across slash commands and menu buttons.
+- Added atomic rider reservation locks to normal, admin test and tournament matches, with release on response errors, cancellations, timeouts and finished matches.
+- Added global slash-command error cleanup, private user-friendly failure feedback, logged exception details and short incident references.
+- Added regression tests covering backup verification, repair safety, restore, invalid data, atomic storage, cooldowns, locks, admin UI and slash-command error handling.
+- Documented limitations: one running bot instance, no distributed transactions, backup files remain local unless copied off-host.
+
+---
+
+
 ## v0.8.5a — Tournament Titles & Achievements
 
 - Introduced twelve equipable, cosmetic tournament titles (30 titles total): Lists Initiate, Bracket Breaker, The Finalist, Silver Lance, Cup Bearer, King of the Lists, Elite Eight, Grand Melee Champion, Marshal's Favourite, Tourney Veteran, Lance of the Lists and Arena Conqueror.
