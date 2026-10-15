@@ -21,7 +21,7 @@ MOVES = {
     "precision_strike": ("Precision Strike", 3, -1, 0, 0, 2, "Steady the lance; sacrifices impact."),
     "reckless_charge": ("Reckless Charge", -3, 2, 0, 4, 2, "Extra impact, difficult control and serious risk."),
     "shield_brace": ("Shield Brace", 1, -1, 3, -2, 2, "Improves seat and defence; sacrifices momentum."),
-    "feigned_miss": ("Feigned Miss", 2, -1, 0, -1, 2, "A deceptive late correction; controlled but light."),
+    "feigned_miss": ("Feigned Miss", 2, -1, 0, -1, 2, "Disrupts an aggressive opponent by -2 alignment while active; light impact."),
     "last_stand": ("Last Stand", 2, 2, 0, 3, 3, "A comeback attempt from pass three, with extra fatigue."),
 }
 MAX_FATIGUE = 8
