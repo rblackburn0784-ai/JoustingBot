@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.9.0a — Stability, Admin Tools & Cleanup
+
+- Added protected /admin group: /admin panel, /admin health, /admin backup, /admin repair and /admin reset_user; kept /maintenance and /version for compatibility.
+- Admin Reset User includes server member selection, Settings/Inventory scopes, impact preview, explicit confirmation button and typed RESET <user ID> modal.
+- Protected global player/horse records, history, tournament data, gold earning and other guilds from resets. Inventory retirement retains prior gold spending, preventing reset/refund abuse.
+- Every reset creates a SHA-256-verified safety snapshot and an admin_audit.json entry recording scope, target, actor and time. Admin audit data is included in subsequent backup verification/restore checks.
+- Admin menu has a direct Reset User button, independently gated by Manage Server permissions.
+- Added non-destructive startup JSON health diagnostics, POSIX directory sync after atomic writes and updated version banners.
+- Expanded regression tests for reset permissions, scope safety, cross-guild isolation, malformed data rejection, repeat resets, spending integrity and audit snapshots.
+- Rewrote the README quick start, command reference and production safety checklist; removed obsolete scope statements.
+
+---
+
+
 ## v0.9.0 — Stability & Admin Tools
 
 - Hardened v0.8.1a physician support so multiple treatment bonuses cannot be banked for several later jousts; only the first completed accepted match after treatment can use one. Added regression coverage.
