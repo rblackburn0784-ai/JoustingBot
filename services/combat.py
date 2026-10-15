@@ -77,6 +77,8 @@ class MatchResult:
     winner: str
     passes: List[PassLog]
     seed: int
+    tactics_a: TacticPlan = field(default_factory=TacticPlan)
+    tactics_b: TacticPlan = field(default_factory=TacticPlan)
 
 
 def d20(rng: random.Random) -> int:
@@ -585,4 +587,6 @@ def run_single_match(fighter_a: Fighter, fighter_b: Fighter, arena_key: str, see
         winner=winner,
         passes=passes,
         seed=seed_value,
+        tactics_a=tactics_a,
+        tactics_b=tactics_b,
     )
