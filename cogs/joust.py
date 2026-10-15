@@ -790,7 +790,7 @@ class JoustCog(commands.Cog):
         display = logging.getLogger(__name__)
         if broadcast.enabled():
             try:
-                await broadcast.send_intro(sender, prepared, intro_embed)
+                await broadcast.send_intro(sender, prepared, intro_embed, home_view=ChallengeHomeView())
                 await broadcast.play_passes(
                     sender, result, arena_key=prepared.arena_key,
                     home_view=ChallengeHomeView(),
