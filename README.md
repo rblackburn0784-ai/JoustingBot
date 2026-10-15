@@ -2,11 +2,69 @@
 
 A lightweight medieval jousting Discord game bot built with `discord.py`.
 
-**Current version:** `v0.8.5 — Tournament Lite`
+**Current version:** `v0.8.5a — Tournament Titles & Achievements`
 
 Players create a knight, build and bind a horse, equip both rider and horse, choose an arena, and challenge other Discord users to cinematic jousts with accept/decline buttons.
 
 This version focuses on making matches feel more like a sport: richer pass categories, arena-specific lines, gear-specific lines, seed display, debug roll breakdowns, and tunable balance constants.
+
+---
+
+## v0.8.5a — Tournament Titles & Achievements
+
+Tournament Lite now awards **12 new equipable tournament titles and 8 achievement badges**. The title collection contains **30 titles** in total (the previous 18 plus the new 12). Existing titles and equipment remain unchanged. These rewards are cosmetic: they never alter knight stats, horse stats, injury risk or tournament seeding.
+
+### Twelve new tournament titles
+
+| Title | Requirement |
+| --- | --- |
+| Lists Initiate | Enter one started tournament |
+| Bracket Breaker | Advance through 3 tournament matches |
+| The Finalist | Compete in a completed tournament final |
+| Silver Lance | Finish a tournament as runner-up |
+| Cup Bearer | Win one tournament |
+| King of the Lists | Win 3 tournaments |
+| Elite Eight | Enter a started 8-rider tournament |
+| Grand Melee Champion | Win an 8-rider tournament |
+| Marshal's Favourite | Advance after a seeded marshal's tie-break |
+| Tourney Veteran | Enter 5 started tournaments |
+| Lance of the Lists | Unhorse 3 opponents in tournament matches |
+| Arena Conqueror | Win tournament jousts in 3 different arenas |
+
+### Eight achievement badges
+
+| Achievement | Requirement |
+| --- | --- |
+| First Entry | Join a tournament that has actually started |
+| Opening Victory | Advance from your first tournament pairing |
+| Centre of the Lists | Compete in a completed final |
+| Raise the Banner | Win a tournament championship |
+| A Noble Defeat | Finish as runner-up |
+| Grand Melee | Compete in an 8-rider tournament |
+| Still Standing | Win a tournament joust while already injured |
+| Tournament Splinters | Break 5 lances in tournament matches |
+
+**Titles** may be equipped and appear on the player's profile and server leaderboards. **Achievement badges** are permanent recognitions shown in the Tournament Trophy Cabinet, not additional equippable titles. Both show locked/unlocked state and actual progress.
+
+### Commands and buttons
+
+- \`/tournament achievements\` — private interactive achievement cabinet; optionally pass \`player:@Member\` to view another rider's progress.
+- \`/tournament cabinet\` — open your tournament medal and career-stat screen.
+- \`/titles\` or \`/title equip\` — see and equip all 30 titles, including tournament titles.
+- \`/menu\` → **Tournaments** → **Trophy Cabinet** — browse achievements, tournament titles, and career medals with Home navigation.
+- The public tournament control panel also includes a **Trophy Cabinet** button that opens a *private* personal screen.
+
+The title dropdown now displays six titles at a time rather than attempting to exceed Discord's 25-choice limit. The \`/title equip\` command uses name-search autocomplete so every title remains selectable. The player profile also displays tournament crowns, silver finishes, entry counts and unlocked award totals.
+
+After a completed tournament pairing, the bot automatically announces newly earned tournament titles and achievements for either competitor. Champions and runners-up can both earn honours.
+
+### Progression safety and persistence
+
+Tournament awards are calculated from **verified completed brackets** and the corresponding guild-specific match-journal results. Ordinary duels, admin test matches, registrations that never start, duplicate match records, and tournament records from other Discord servers cannot grant these trophies. Seeded marshal tie-breaks count as a bracket advance but do not change the underlying joust's draw result.
+
+Awards are associated with Discord member IDs, so changing a knight's name does not reset them. Tournament history is now retained indefinitely rather than discarding completed events after 20, preserving long-term achievement progress. History screens still limit how many older events they display.
+
+Back up \`storage/tournaments.json\`, \`storage/matches.json\`, and \`storage/titles.json\` together using the existing admin backup feature; no data migration or reset is required.
 
 ---
 
