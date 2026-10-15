@@ -751,7 +751,12 @@ class JoustCog(commands.Cog):
         if error or not prepared:
             return await interaction.followup.send(error or "❌ Could not prepare joust.")
 
-        result = await self.send_match(interaction.followup, prepared)
+        if not self.try_lock_challenge(interaction.user.id, opponent.id):
+            return await interaction.followup.send("❌ One rider is already busy.", ephemeral=True)
+        try:
+            result = await self.send_match(interaction.followup, prepared)
+        finally:
+            self.release_challenge(interaction.user.id, opponent.id)
 
         if debug_allowed:
             await interaction.followup.send(embed=make_debug_embed(result), ephemeral=True)
@@ -786,12 +791,22 @@ class JoustCog(commands.Cog):
         if error or not prepared:
             return await interaction.response.send_message(error or "❌ Could not prepare challenge.", ephemeral=True)
 
+        remaining = self.cooldown_remaining(interaction.guild_id, interaction.user.id)
+        if remaining:
+            return await interaction.response.send_message(
+                f"⌛ Please wait {remaining}s before issuing another challenge.", ephemeral=True)
         prepared.mode = "challenge"
-        self.lock_challenge(interaction.user.id, opponent.id)
-
+        if not self.try_lock_challenge(interaction.user.id, opponent.id):
+            return await interaction.response.send_message("❌ A rider is already busy.", ephemeral=True)
         view = ChallengeView(self, prepared)
-        await interaction.response.send_message(embed=make_challenge_embed(prepared), view=view)
-        view.message = await interaction.original_response()
+        try:
+            await interaction.response.send_message(embed=make_challenge_embed(prepared), view=view)
+            view.message = await interaction.original_response()
+        except Exception:
+            self.release_challenge(interaction.user.id, opponent.id)
+            view.stop()
+            raise
+        self.mark_challenge_posted(interaction.guild_id, interaction.user.id)
 
         if debug and not debug_allowed:
             await interaction.followup.send("❌ Debug output requires Manage Server permission.", ephemeral=True)
