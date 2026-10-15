@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import random
+import time
 from dataclasses import dataclass
 from typing import Optional
 
@@ -21,7 +22,7 @@ from services.injuries import (
 )
 
 
-VERSION_LABEL = "JoustingBot v0.8.1a — Injury Risk & Treatment"
+VERSION_LABEL = "JoustingBot v0.9.0 — Stability & Admin Tools"
 CHALLENGE_TIMEOUT_SECONDS = 120
 
 
@@ -526,15 +527,33 @@ class JoustCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.active_challenge_players: set[int] = set()
+        self.last_challenge_at: dict[tuple[int, int], float] = {}
+        self.challenge_cooldown_seconds = 30
 
     joust_group = app_commands.Group(name="joust", description="Single joust matches")
 
     def is_player_busy(self, user_id: int) -> bool:
         return user_id in self.active_challenge_players
 
+    def try_lock_challenge(self, challenger_id: int, opponent_id: int) -> bool:
+        """Synchronous check-and-reserve, without coroutine switching."""
+        if (challenger_id == opponent_id or challenger_id in self.active_challenge_players
+                or opponent_id in self.active_challenge_players):
+            return False
+        self.active_challenge_players.update((challenger_id, opponent_id))
+        return True
+
+    def cooldown_remaining(self, guild_id: int | None, challenger_id: int) -> int:
+        key = (guild_id or 0, challenger_id)
+        elapsed = time.monotonic() - self.last_challenge_at.get(key, -1e12)
+        return max(0, int(self.challenge_cooldown_seconds - elapsed + 0.999))
+
+    def mark_challenge_posted(self, guild_id: int | None, challenger_id: int) -> None:
+        self.last_challenge_at[(guild_id or 0, challenger_id)] = time.monotonic()
+
     def lock_challenge(self, challenger_id: int, opponent_id: int) -> None:
-        self.active_challenge_players.add(challenger_id)
-        self.active_challenge_players.add(opponent_id)
+        if not self.try_lock_challenge(challenger_id, opponent_id):
+            raise ValueError("One rider is already busy.")
 
     def release_challenge(self, challenger_id: int, opponent_id: int) -> None:
         self.active_challenge_players.discard(challenger_id)
