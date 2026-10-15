@@ -199,6 +199,13 @@ def make_intro_embed(prepared: PreparedDuel) -> discord.Embed:
         inline=True,
     )
 
+    e.add_field(
+        name="🧠 Revealed Tactics",
+        value=f"**{prepared.knight_a.name}:** {tactic_label(prepared.tactics_a)}\n"
+              f"**{prepared.knight_b.name}:** {tactic_label(prepared.tactics_b)}",
+        inline=False,
+    )
+
     if prepared.guild_id is not None:
         standard_a = equipped_standard(prepared.guild_id, prepared.challenger.id)
         standard_b = equipped_standard(prepared.guild_id, prepared.opponent.id)
@@ -280,6 +287,13 @@ def make_result_embed(result: MatchResult, arena_key: str) -> discord.Embed:
     e.add_field(
         name="📜 Pass-by-Pass Chronicle",
         value="\n\n".join(pass_lines)[:1024],
+        inline=False,
+    )
+
+    e.add_field(
+        name="🧠 Tactical Plans",
+        value=f"**{result.fighter_a}:** {tactic_label(getattr(result, 'tactics_a', TacticPlan()))}\n"
+              f"**{result.fighter_b}:** {tactic_label(getattr(result, 'tactics_b', TacticPlan()))}",
         inline=False,
     )
 
@@ -471,6 +485,17 @@ class ChallengeView(discord.ui.View):
         view = MainMenuView(interaction.user.id, is_admin(interaction))
         await interaction.response.send_message(embed=view.make_embed(), view=view, ephemeral=True)
 
+    @discord.ui.button(label="Choose Tactics", emoji="🧠", style=discord.ButtonStyle.primary)
+    async def choose_tactics(self, interaction: discord.Interaction, button: discord.ui.Button):
+        prepared = self.prepared
+        if self.completed or interaction.user.id not in (prepared.challenger.id, prepared.opponent.id):
+            return await interaction.response.send_message(
+                "❌ Only active challenge participants can select tactics.", ephemeral=True)
+        from cogs.tactic_ui import TacticEditor
+        current = prepared.tactics_a if interaction.user.id == prepared.challenger.id else prepared.tactics_b
+        panel = TacticEditor(self, interaction.user.id, current)
+        await interaction.response.send_message(embed=panel.make_embed(), view=panel, ephemeral=True)
+
     @discord.ui.button(label="Accept Challenge", style=discord.ButtonStyle.success)
     async def accept(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user.id != self.prepared.opponent.id:
@@ -478,6 +503,10 @@ class ChallengeView(discord.ui.View):
 
         if self.completed:
             return await interaction.response.send_message("❌ This challenge is already closed.", ephemeral=True)
+        if self.prepared.tactics_ready != {self.prepared.challenger.id, self.prepared.opponent.id}:
+            return await interaction.response.send_message(
+                "🧠 Both riders must choose and **Lock Tactics** before accepting.",
+                ephemeral=True)
         self.completed = True
 
         for item in self.children:
