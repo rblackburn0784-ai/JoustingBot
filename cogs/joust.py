@@ -22,7 +22,7 @@ from services.injuries import (
 )
 
 
-VERSION_LABEL = "JoustingBot v0.9.0 — Stability & Admin Tools"
+VERSION_LABEL = "JoustingBot v0.9.0a — Server Hardening"
 CHALLENGE_TIMEOUT_SECONDS = 120
 
 
