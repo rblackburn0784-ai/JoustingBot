@@ -219,6 +219,8 @@ The provider argument is optional and defaults to Shady Doctor. Existing injurie
 
 ---
 
+**One-bout anti-stacking rule:** Multiple successful treatments before a match do not accumulate extra bonuses. The first completed accepted joust after treatment consumes all preceding temporary physician support opportunities. Declines, timeouts and instant admin tests do not consume support.
+
 ## v0.8.1 — Injuries & Recovery
 
 Knights can suffer **minor, temporary injuries** from serious impacts in **accepted** jousts. Injuries are part of the match history, are generated once per completed match, and have no permanent effects. Admin-only instant test duels do not cause injuries.
