@@ -29,6 +29,6 @@ The resolver prioritises an impact-specific clip, then an arena/stage clip, then
 
 - `JOUST_BROADCAST_ENABLED=true` — set to `false` to skip the live pass animation and send intro/final only.
 - `JOUST_BROADCAST_STAGE_DELAY=0.85` — seconds per stage edit (clamped to 0.35–2.5), balancing theatre against Discord rate limits.
-- `JOUST_BROADCAST_REDUCED_MOTION=true` — optional reduced-motion mode (one post per pass rather than repeated live edits, if enabled in a future release).
+- `JOUST_BROADCAST_REDUCED_MOTION=true` — show one static final-pass summary without repeated live-screen edits, followed by the full final scoreboard.
 
 The graphical card contains all dynamic text; do not burn the knight names or scores into the background PNGs.
