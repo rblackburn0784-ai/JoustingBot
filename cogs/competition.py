@@ -19,6 +19,16 @@ async def require_guild(interaction: discord.Interaction) -> int | None:
     return interaction.guild_id
 
 
+async def title_autocomplete(interaction: discord.Interaction, typed: str):
+    needle = typed.strip().casefold()
+    results = [
+        app_commands.Choice(name=name, value=key)
+        for key, (name, _description, _field, _count) in TITLE_RULES.items()
+        if needle in name.casefold() or needle in key.casefold()
+    ]
+    return results[:25]
+
+
 class CompetitionCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -113,10 +123,7 @@ class CompetitionCog(commands.Cog):
         await interaction.response.send_message(embed=view.make_embed(), view=view, ephemeral=True)
 
     @title_group.command(name="equip", description="Display one of your earned titles.")
-    @app_commands.choices(title=[
-        app_commands.Choice(name=display, value=key)
-        for key, (display, _description, _field, _threshold) in TITLE_RULES.items()
-    ])
+    @app_commands.autocomplete(title=title_autocomplete)
     async def equip(self, interaction: discord.Interaction, title: str):
         guild_id = await require_guild(interaction)
         if guild_id is None:
