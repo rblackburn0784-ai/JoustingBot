@@ -47,7 +47,7 @@ Declines and expired challenges do not create completed matches or affect charac
 | Precision Strike | +3 alignment | −1 charge |
 | Reckless Charge | +2 charge | −3 alignment, extra fatigue, increased injury risk to both involved riders |
 | Shield Brace | +3 unhorsing resistance, +1 alignment | −1 charge |
-| Feigned Miss | +2 alignment and tactical deception | −1 charge |
+| Feigned Miss | +2 alignment; also disrupts an Aggressive opponent's alignment by −2 while active | −1 charge; offers no disruption against Balanced/Cautious riders |
 | Last Stand | +2 alignment and +2 charge in a comeback | Available **on pass 3 only** when trailing or fatigued; adds extra fatigue and risk |
 
 Manoeuvres have a **two-full-pass cooldown**. Standard moves may activate on pass 1 and again on pass 4 if the match continues; a match may finish before a later activation. Last Stand is deliberately conditional and activates at most once. Players select their preferred manoeuvre ahead of the match; activation and cooldown are handled automatically rather than requiring five separate Discord prompts.
