@@ -478,12 +478,26 @@ class ChallengeView(discord.ui.View):
             f"{self.prepared.opponent.mention} accepts {self.prepared.challenger.mention}'s challenge. The riders take the field.",
         )
 
-        await interaction.response.edit_message(embed=accepted_embed, view=ChallengeHomeView())
-
         try:
+            await interaction.response.edit_message(embed=accepted_embed, view=ChallengeHomeView())
             result = await self.cog.send_match(interaction.followup, self.prepared)
             if self.prepared.debug_requested:
                 await interaction.followup.send(embed=make_debug_embed(result), ephemeral=True)
+        except Exception:
+            import logging
+            logging.getLogger(__name__).exception("Accepted challenge interaction failed")
+            try:
+                if interaction.response.is_done():
+                    await interaction.followup.send(
+                        "⚠️ The challenge could not finish; please ask an admin to check the bot logs.",
+                        ephemeral=True,
+                    )
+                else:
+                    await interaction.response.send_message(
+                        "⚠️ The challenge could not finish.", ephemeral=True,
+                    )
+            except discord.HTTPException:
+                pass
         finally:
             self.cog.release_challenge(self.prepared.challenger.id, self.prepared.opponent.id)
             self.stop()
