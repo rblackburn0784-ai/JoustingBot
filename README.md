@@ -14,12 +14,15 @@ This version focuses on real-server safety: verified backups, conservative recov
 
 ### Quick setup (Python 3.12 or compatible)
 
-Clone or update this repository and install the requirements:
+For a fresh installation, clone the repository; for an existing installation use git pull. Then install dependencies:
 
 ```bash
-git pull
+git clone https://github.com/rblackburn0784-ai/JoustingBot.git
+cd JoustingBot
 python -m pip install -r requirements.txt
 ```
+
+For an existing checkout, run `git pull` inside the project folder before starting the bot.
 
 Create a local .env file with DISCORD_BOT_TOKEN=<token>, invite the bot with applications.commands and bot permissions, and run:
 
