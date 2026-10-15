@@ -101,6 +101,21 @@ class TacticRules(unittest.TestCase):
         normal = run_single_match(a, b, "frozen_ground", seed=98421)
         self.assertNotEqual(asdict(normal), asdict(first))
 
+    def test_feigned_miss_counters_aggressive_opponents(self):
+        from unittest.mock import patch
+        left = TacticPlan("balanced", "shield", "feigned_miss")
+        angry = TacticPlan("aggressive", "rider", "none")
+        calm = TacticPlan("balanced", "rider", "none")
+        with patch("services.combat.behaviour_check", return_value=(None, [])):
+            vs_aggressive = run_single_match(
+                fighter(1), fighter(2), "royal_lists", seed=1192, tactics_a=left, tactics_b=angry
+            )
+            vs_calm = run_single_match(
+                fighter(1), fighter(2), "royal_lists", seed=1192, tactics_a=left, tactics_b=calm
+            )
+        self.assertTrue(any("feint draws" in note for p in vs_aggressive.passes for note in p.notes))
+        self.assertFalse(any("feint draws" in note for p in vs_calm.passes for note in p.notes))
+
     def test_tactical_risk_changes_with_style_and_rider_target(self):
         base = {
             "arena_key": "royal_lists",
