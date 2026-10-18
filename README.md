@@ -2,7 +2,7 @@
 
 A lightweight medieval jousting Discord game bot built with `discord.py`.
 
-**Current version:** `v0.9.2a — Dynamic Sprite Matchday Broadcast`
+**Current version:** `v0.9.2b — Live Match Broadcast Flow`
 
 Players create a knight, build and bind a horse, equip both rider and horse, choose an arena, and challenge other Discord users to cinematic jousts with accept/decline buttons.
 
@@ -10,6 +10,45 @@ This version adds cinematic stage-by-stage Discord commentary and generated entr
 
 ---
 
+## v0.9.2b — Live Match Broadcast Flow
+
+The sprite broadcast now behaves like the Bowling Bot's **single live screen** instead of posting a dump of completed clips. Each recorded pass plays its five moments as one short animated image, and **the same Discord message** changes when the next pass begins. The final scoreboard replaces that screen **only after the last pass has finished**. The accessible result embed, injuries, match ID and tactical recap appear on the final message.
+
+### Visual sequence (per pass)
+
+1. **Prep** — riders and horses steady at opposite ends, lances raised.
+2. **Gallop** — animated horses move inwards with dust; crowd idle.
+3. **Lance Ready** — riders lower their separate lances and charge towards the rail.
+4. **Collision** — real recorded miss / break / shield strike / horse refusal or other outcome animates at centre.
+5. **Outcome** — rider recoils or falls, splinters and crowd react, new points and score appear; the image holds for a beat.
+
+A pause separates each pass (default 0.9 seconds). Renderer animation frames are generated on demand from your local PNG sprites; **no uploaded pre-made GIFs** are used. Each pass's GIF plays once, then the same public message is edited to attach the next pass's animation. The next pass is rendered off-thread while the current clip is playing. Discord may introduce some buffering depending on network and attachment size.
+
+### Configuration
+
+Put these optional settings into your `.env` file:
+
+```dotenv
+JOUST_SPRITE_ENABLED=true
+JOUST_LIVE_PASS_PAUSE=0.9
+JOUST_LIVE_TICKER=true
+JOUST_LIVE_MAX_KIB=7500
+JOUST_LIVE_KEEP_RENDERS=false
+JOUST_BROADCAST_REDUCED_MOTION=false
+```
+
+- **PASS_PAUSE:** 0.2 to 3.0 seconds; a short pause between outcome and the next pass.
+- **TICKER:** toggle dynamic commentary on the graphic; scores and phase labels remain visible.
+- **MAX_KIB:** upload limit safety budget, capped at 7500 KiB; the renderer automatically reduces resolution/palette if necessary.
+- **KEEP_RENDERS:** retain generated clips under `storage/renders/` for debugging; otherwise remove after upload.
+- **REDUCED_MOTION:** show a static result PNG per pass rather than animated motion, still using the same editable message.
+- **SPRITE_ENABLED=false:** retain the previous v0.9.2 staged text-card broadcaster.
+
+Combat and rewards still run **once**, before presentation. The broadcaster reads the saved combat pass log, validates totals/unique pass IDs and never re-simulates the match. The original v0.9.2 broadcaster is used if artwork is absent or the *first* live frame cannot render. Later rendering/network failures finish with the recorded result instead of rerunning or duplicating the match.
+
+**Upgrade:** `git pull`, `python -m pip install -r requirements.txt`, `python -m unittest discover -s tests -v`, then `python main.py`. Keep your existing `assets/jousting/` PNG pack; the old one-time sprite installer is not required.
+
+---
 ## v0.9.2a — Dynamic Sprite Animation Engine
 
 **The latest v0.9.2 combat, tactical choices, match journals and tournaments are unchanged.** After a match is recorded, the optional sprite renderer uses its existing result to generate a side-on animated joust.
