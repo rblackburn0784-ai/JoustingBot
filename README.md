@@ -2,7 +2,7 @@
 
 A lightweight medieval jousting Discord game bot built with `discord.py`.
 
-**Current version:** `v0.9.2 — Cinematic Matchday Broadcast`
+**Current version:** `v0.9.2a — Dynamic Sprite Matchday Broadcast`
 
 Players create a knight, build and bind a horse, equip both rider and horse, choose an arena, and challenge other Discord users to cinematic jousts with accept/decline buttons.
 
@@ -10,6 +10,28 @@ This version adds cinematic stage-by-stage Discord commentary and generated entr
 
 ---
 
+## v0.9.2a — Dynamic Sprite Animation Engine
+
+**The latest v0.9.2 combat, tactical choices, match journals and tournaments are unchanged.** After a match is recorded, the optional sprite renderer uses its existing result to generate a side-on animated joust.
+
+- Layering: arena → crowd → horse → knight → shield and lance → dust and impacts → foreground barrier → scoreboard.
+- Horse coats: Bay, Black, Chestnut, Grey, White; states: idle, gallop, refusal, slip and rear.
+- Knights: red and blue, separate left/right artwork; idle, gallop, lower lance, impact and unhorsed states.
+- Stage order: Approach → Charge → Impact → Aftermath, with scored points revealed only after the impact.
+- No pre-made uploaded GIFs: Pillow builds the clips from PNG animation frames on demand; long matches are split into pass-sized uploads.
+- If the asset pack is missing, disabled, or cannot be rendered, the original v0.9.2 broadcast runs instead. Existing final scoreboards, injury reports and match IDs are always sent.
+
+### Installation and asset folder
+
+The 581 PNG files are distributed separately as **JoustingBot_v0.9.2a_Asset_Overlay.zip**. First run `git pull` and install `requirements.txt`, then extract this overlay into your existing repository root. The key path must be `assets/jousting/arenas/royal_lists.png`.
+
+See [the sprite art guide](assets/jousting/README.md) and [the breed-to-coat mapping](assets/jousting/visual_mapping.json).
+
+Set `JOUST_SPRITE_ENABLED=false` in `.env` to return to the old staged broadcaster. Do not run the previous `tools/install_sprite_v092a.py` against GitHub main: integration is already included.
+
+Tests: `python -m unittest discover -s tests -v`. A real Discord duel is still needed to verify your server's upload limits and performance.
+
+---
 ## v0.9.2 — Cinematic Matchday Broadcast
 
 Each joust now has a staged replay of one authoritative saved combat result. Scoring, RNG, reward calculations and injury events are unchanged.
