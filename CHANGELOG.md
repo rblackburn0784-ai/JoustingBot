@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.9.2b — Live Match Broadcast Flow
+
+- Replaced the multi-attachment sprite recap with **one evolving Discord broadcast message**: one chronological animation per real jousting pass, changed in place between rounds.
+- Added Prep → Gallop → Lance Ready → Collision → Outcome phases with sprite-pose progression, authentic misses/refusals/falls and delayed outcome scoring.
+- Added off-thread pass render/prefetch and short, configurable pauses between rounds; GIFs play once and hold on each pass's result.
+- Final card replaces the same live graphic only after all actual passes, retaining the existing score, injuries, tactical recap and match ID.
+- Added optional commentary ticker, reduced-motion per-pass PNGs, upload-size fallback, temporary file cleanup and safe fallback to v0.9.2 if art is unavailable.
+- No changes to combat RNG, progression, rewards or persistent journals; tests verify single-message delivery and no premature results.
+
+---
+
 ## v0.9.2a — Dynamic Sprite Animation Engine
 
 - Integrated real-time sprite composition into the existing recorded-once v0.9.2 match broadcast. Tactical combat, tournaments, injuries, rewards and logs are unchanged.
