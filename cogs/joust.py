@@ -23,7 +23,7 @@ from services.injuries import (
 )
 
 
-VERSION_LABEL = "JoustingBot v0.9.2 — Cinematic Matchday Broadcast"
+VERSION_LABEL = "JoustingBot v0.9.2a — Dynamic Sprite Matchday Broadcast"
 CHALLENGE_TIMEOUT_SECONDS = 240
 
 
@@ -804,7 +804,17 @@ class JoustCog(commands.Cog):
         import logging
         from cogs import broadcast
         display = logging.getLogger(__name__)
-        if broadcast.enabled():
+        # v0.9.2a — replay the ONE already recorded combat result with sprite art.
+        sprite_sent = False
+        try:
+            from services.sprite_broadcast_adapter import send_sprite_broadcast
+            sprite_sent = await send_sprite_broadcast(sender, result, prepared)
+        except Exception:
+            display.exception("Sprite replay failed for recorded match %s", match_id)
+
+        # Sprite replay replaces stage edits, NOT the final scorecard/history.
+        # Missing media or renderer failure falls back to v0.9.2 presentation.
+        if not sprite_sent and broadcast.enabled():
             try:
                 await broadcast.send_intro(sender, prepared, intro_embed, home_view=ChallengeHomeView())
                 await broadcast.play_passes(
@@ -813,7 +823,7 @@ class JoustCog(commands.Cog):
                 )
             except Exception:
                 display.exception("Cinematic stages failed for recorded match %s", match_id)
-        else:
+        elif not sprite_sent:
             try:
                 await sender.send(embed=intro_embed, view=ChallengeHomeView())
             except Exception:
