@@ -204,12 +204,14 @@ async def play_live_match(sender, result, prepared, *,
         await _show_final_uneditable(sender, result, prepared, final_embed, home_view)
         return True
 
+    last_clip_played = False
     try:
         for index in range(1, len(jobs)):
             # Render the next pass off-thread DURING the previous GIF playback,
             # so there is no extra rendering pause between rounds.
             pending = asyncio.create_task(asyncio.to_thread(render, jobs[index]))
             await sleep(current_clip.duration_ms / 1000 + interval)
+            last_clip_played = True
             try:
                 next_clip = await pending
             except Exception:
@@ -229,12 +231,20 @@ async def play_live_match(sender, result, prepared, *,
                 file.close()
             _cleanup(next_clip.path)
             current_clip = next_clip
-        # Leave the final outcome visible and a short beat before the end card.
-        await sleep(current_clip.duration_ms / 1000 + interval)
+            last_clip_played = False
+        # Leave the last outcome on screen before showing the final card.
+        # Do not wait twice if a later pass was unable to render.
+        if not last_clip_played:
+            await sleep(current_clip.duration_ms / 1000 + interval)
     finally:
         # No state of the match is changed, even if artwork is unavailable.
         pass
-    await _show_final(message, sender, result, prepared, final_embed, home_view)
+    try:
+        await _show_final(message, sender, result, prepared, final_embed, home_view)
+    except Exception:
+        # Playback has already been publicly shown. Never re-run the old
+        # stages and display the same bout twice if Discord is unavailable.
+        LOG.exception("Live match completed but Discord rejected its final scorecard.")
     return True
 
 
