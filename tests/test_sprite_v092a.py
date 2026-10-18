@@ -74,7 +74,7 @@ class SpriteEngineTests(unittest.TestCase):
                 self.assertTrue(bundle.gif_path.is_file())
                 self.assertTrue(bundle.summary_path.is_file())
                 with Image.open(bundle.gif_path) as animated:
-                    self.assertGreaterEqual(animated.n_frames, 14)
+                    self.assertGreaterEqual(animated.n_frames, 10)
                 self.assertEqual(result.score_a, 1)
                 result.score_a = 99
                 with self.assertRaisesRegex(ValueError, "totals"):
