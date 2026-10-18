@@ -244,9 +244,13 @@ def _rider(canvas, atlas, coat, face_right, state, mount_state, x, step,
     _place(canvas, horse[step % len(horse)], x - 142, hy)
     knight = rider[step % len(rider)]
     if fallen:
-        knight = knight.rotate(-40 if face_right else 40, expand=True,
+        # Progress a falling rider towards the ground over successive frames.
+        progress = min(1.0, max(0.0, step / 4))
+        angle = 20 + round(60 * progress)
+        knight = knight.rotate(-angle if face_right else angle, expand=True,
                                resample=Image.Resampling.BICUBIC)
-        _place(canvas, knight, x-82 + (62 if face_right else -56), hy-40)
+        _place(canvas, knight, x-82 + (round(74 * progress) if face_right else -round(74 * progress)),
+               hy-40 + round(130 * progress))
     else:
         _place(canvas, knight, x-85, hy-55)
         shield_name = "shield_red" if face_right else "shield_blue"
@@ -266,39 +270,40 @@ def _rider(canvas, atlas, coat, face_right, state, mount_state, x, step,
 
 
 def _scene(background, atlas, fa, fb, coat_a, coat_b, log, phase, step, pos,
-           scores, kind, affected, winner):
+           scores, kind, affected, winner, commentary=None):
     picture = background.copy()
-    mood = ("idle_1" if phase in ("APPROACH", "CHARGE") else
+    mood = ("idle_1" if phase in ("PREP", "APPROACH", "CHARGE", "GALLOP", "LANCE READY") else
             "applause" if kind == "unhorsed" else
             "boo" if kind in ("refusal", "slip") else
             "cheer" if kind in ("heavy_hit", "lance_break") else "idle_2")
     _place(picture, atlas.crowd(mood), 10, 139)
     xa, xb = round(95 + 260 * pos), round(865 - 260 * pos)
-    mount_a = "gallop"
-    mount_b = "gallop"
-    if phase in ("IMPACT", "AFTERMATH") and kind in ("refusal", "slip"):
+    mount_a = "idle" if phase == "PREP" else "gallop"
+    mount_b = "idle" if phase == "PREP" else "gallop"
+    if phase in ("IMPACT", "AFTERMATH", "COLLISION", "OUTCOME") and kind in ("refusal", "slip"):
         if "a" in affected: mount_a = kind
         if "b" in affected: mount_b = kind
-    elif phase == "AFTERMATH" and kind == "unhorsed":
+    elif phase in ("AFTERMATH", "OUTCOME") and kind == "unhorsed":
         if "a" in affected: mount_a = "rear"
         if "b" in affected: mount_b = "rear"
-    rider_a = ("gallop" if phase == "APPROACH" else
-               "lower_lance" if phase == "CHARGE" else "impact")
+    rider_a = ("idle" if phase == "PREP" else
+               "gallop" if phase in ("APPROACH", "GALLOP") else
+               "lower_lance" if phase in ("CHARGE", "LANCE READY") else "impact")
     rider_b = rider_a
-    if phase == "AFTERMATH" and kind == "unhorsed":
+    if phase in ("AFTERMATH", "OUTCOME") and kind == "unhorsed":
         if "a" in affected: rider_a = "unhorsed"
         if "b" in affected: rider_b = "unhorsed"
     _rider(picture, atlas, coat_a, True, rider_a, mount_a, xa, step,
-           phase != "APPROACH", rider_a == "unhorsed",
-           phase == "AFTERMATH" and kind == "lance_break" and winner == "a")
+           phase not in ("PREP", "APPROACH", "GALLOP"), rider_a == "unhorsed",
+           phase in ("AFTERMATH", "OUTCOME") and kind == "lance_break" and winner == "a")
     _rider(picture, atlas, coat_b, False, rider_b, mount_b, xb, step,
-           phase != "APPROACH", rider_b == "unhorsed",
-           phase == "AFTERMATH" and kind == "lance_break" and winner == "b")
-    if phase in ("APPROACH", "CHARGE"):
+           phase not in ("PREP", "APPROACH", "GALLOP"), rider_b == "unhorsed",
+           phase in ("AFTERMATH", "OUTCOME") and kind == "lance_break" and winner == "b")
+    if phase in ("APPROACH", "CHARGE", "GALLOP", "LANCE READY"):
         dust = atlas.effect("dust_1", (105, 72))
         _place(picture, dust[step % len(dust)], xa-70, 393)
         _place(picture, dust[(step+2) % len(dust)], xb+10, 393)
-    elif phase == "IMPACT" and kind in ("heavy_hit", "lance_break", "unhorsed"):
+    elif phase in ("IMPACT", "COLLISION") and kind in ("heavy_hit", "lance_break", "unhorsed"):
         effects = ["impact_flash"]
         if kind in ("lance_break", "unhorsed"): effects.append("splinter")
         if kind == "unhorsed": effects.append("stars")
@@ -306,7 +311,8 @@ def _scene(background, atlas, fa, fb, coat_a, coat_b, log, phase, step, pos,
             sprites = atlas.effect(effect)
             _place(picture, sprites[step % len(sprites)], 435+22*i, 225+12*i)
     _place(picture, atlas.prop("barrier", (875, 115)), 43, 408)
-    detail = str(log.result) if phase in ("IMPACT", "AFTERMATH") else ""
+    detail = (str(log.result) if phase in ("IMPACT", "AFTERMATH", "COLLISION", "OUTCOME")
+              else "") if commentary is None else commentary
     _hud(picture, fa.knight_name, fb.knight_name, scores, log.pass_no, phase, detail)
     return picture
 
