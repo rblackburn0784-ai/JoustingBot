@@ -31,6 +31,33 @@ def match(passes=1):
 
 
 class SpriteEngineTests(unittest.TestCase):
+    def test_fighter_breed_positional_compatibility_and_seeded_combat(self):
+        """Previous asset audits pass breed as ninth positional field."""
+        from services.combat import Fighter, run_single_match
+
+        args_a = (11, "Arthur", "Sable", 
+                  {"strength": 6, "control": 6, "endurance": 6,
+                   "agility": 5, "resolve": 5, "tactics": 5},
+                  {"speed": 6, "stamina": 6, "power": 5,
+                   "obedience": 6, "courage": 6},
+                  "lance_ash", "armour_mail", "barding_none")
+        args_b = (12, "Basil", "Misty",
+                  {"strength": 6, "control": 6, "endurance": 6,
+                   "agility": 5, "resolve": 5, "tactics": 5},
+                  {"speed": 6, "stamina": 6, "power": 5,
+                   "obedience": 6, "courage": 6},
+                  "lance_ash", "armour_mail", "barding_none")
+        legacy_a = Fighter(*args_a)
+        legacy_b = Fighter(*args_b)
+        sprite_a = Fighter(*args_a, "destrier")
+        sprite_b = Fighter(*args_b, "courser")
+        self.assertEqual(legacy_a.horse_breed, "rouncey")
+        self.assertEqual(sprite_a.horse_breed, "destrier")
+        self.assertEqual(engine.AssetCatalog().horse_coat(sprite_a), "Black")
+        first = run_single_match(legacy_a, legacy_b, "royal_lists", seed=2345)
+        second = run_single_match(sprite_a, sprite_b, "royal_lists", seed=2345)
+        self.assertEqual(first, second)  # breed is purely visual metadata
+
     def test_strict_numbering_excludes_previews_and_strips(self):
         with tempfile.TemporaryDirectory() as name:
             folder = Path(name)
