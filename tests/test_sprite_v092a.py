@@ -107,32 +107,16 @@ class SpriteAdapterTests(unittest.IsolatedAsyncioTestCase):
                                                           SimpleNamespace(arena_key="royal_lists")))
         sender.send.assert_not_awaited()
 
-    async def test_success_uploads_one_clip_without_combat_calls(self):
-        with tempfile.TemporaryDirectory() as name:
-            root = Path(name)
-            (root/"arenas").mkdir()
-            (root/"arenas"/"royal_lists.png").touch()
-            clip = root/"pass_01.gif"
-            clip.write_bytes(b"GIF89a")
-            bundle = SimpleNamespace(gif_path=clip, gif_parts=(), error=None)
-            prepared = SimpleNamespace(
-                arena_key="royal_lists",
-                fighter_a=fighter(1, "Red", "rouncey"),
-                fighter_b=fighter(2, "Blue", "destrier"),
-                horse_a=SimpleNamespace(breed="rouncey"),
-                horse_b=SimpleNamespace(breed="destrier"),
-            )
-            sender = SimpleNamespace(send=AsyncMock())
-            with patch("services.sprite_engine.ASSET_ROOT", root), \
-                 patch("services.sprite_broadcast_adapter.maybe_render_match_media",
-                       create=True) as _unused:
-                # The adapter imports the renderer lazily, so patch the true source.
-                with patch("services.sprite_engine.maybe_render_match_media",
-                           return_value=bundle):
-                    sent = await send_sprite_broadcast(sender, match(), prepared)
-            self.assertTrue(sent)
-            sender.send.assert_awaited_once()
-            self.assertIn("Sprite Broadcast", sender.send.await_args.kwargs["content"])
+    async def test_adapter_delegates_to_single_live_message_without_combat(self):
+        sender = SimpleNamespace(send=AsyncMock())
+        prepared = SimpleNamespace(arena_key="royal_lists")
+        with patch("services.live_broadcast.play_live_match", new_callable=AsyncMock,
+                   return_value=True) as live:
+            sent = await send_sprite_broadcast(sender, match(), prepared)
+        self.assertTrue(sent)
+        live.assert_awaited_once()
+        sender.send.assert_not_awaited()
+
 
 
 if __name__ == "__main__":
