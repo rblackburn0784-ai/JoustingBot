@@ -368,11 +368,11 @@ class MaintenanceCog(commands.Cog):
     async def version(self, interaction: discord.Interaction):
         view = MainMenuView(interaction.user.id, is_admin(interaction))
         await interaction.response.send_message(
-            embed=embed("⚙️ JoustingBot v0.9.2a",
-                        "Dynamic Sprite Matchday Broadcast\n"
+            embed=embed("⚙️ JoustingBot v0.9.2b",
+                        "Live Match Broadcast Flow\n"
                         "✅ Atomic JSON saves · verified local backups · safe repairs\n"
-                        "✅ Private riding tactics · staged Approach / Charge / Impact / Aftermath\n"
-                        "✅ Generated intro and final scoreboard art · optional GIF slots\n"
+                        "✅ Private tactics · one-screen Prep / Gallop / Lance / Collision / Outcome\n"
+                        "✅ One evolving animated graphic per pass · final scorecard after last pass\n"
                         "✅ Fatigue, temperament and injury trade-offs · seeded replay\n"
                         "✅ Challenge cooldowns and locks · error cleanup\n"
                         "✅ Admin-only restore with confirmation\n\n"
