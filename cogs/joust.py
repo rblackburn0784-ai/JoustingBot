@@ -707,6 +707,7 @@ class JoustCog(commands.Cog):
             lance_key=knight_a.equipped_lance_key,
             armour_key=knight_a.equipped_armour_key,
             barding_key=horse_a.equipped_barding_key,
+            horse_breed=horse_a.breed,
         )
 
         fighter_b = Fighter(
@@ -718,6 +719,7 @@ class JoustCog(commands.Cog):
             lance_key=knight_b.equipped_lance_key,
             armour_key=knight_b.equipped_armour_key,
             barding_key=horse_b.equipped_barding_key,
+            horse_breed=horse_b.breed,
         )
 
         return None, PreparedDuel(
