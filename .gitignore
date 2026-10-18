@@ -21,3 +21,6 @@ storage/*.json
 
 # Admin-created JSON snapshots
 backups/
+
+# Generated sprite GIFs and scoreboard PNGs (not source assets)
+storage/renders/
