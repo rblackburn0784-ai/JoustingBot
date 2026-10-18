@@ -1,0 +1,10 @@
+{
+  "breed_to_coat": {
+    "courser": "Bay",
+    "destrier": "Black",
+    "rouncey": "Chestnut",
+    "palfrey": "Grey",
+    "charger": "White"
+  },
+  "player_coats": {}
+}
