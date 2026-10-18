@@ -49,6 +49,10 @@ class Fighter:
     lance_key: str
     armour_key: str
     barding_key: str
+    # Optional visual metadata only. Existing 8-argument Fighter calls remain
+    # valid; older sprite tests/tools may supply breed as a ninth argument.
+    # Combat calculations must not depend on this field.
+    horse_breed: str = "rouncey"
 
 
 @dataclass
