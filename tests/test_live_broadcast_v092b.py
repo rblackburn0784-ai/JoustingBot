@@ -218,5 +218,71 @@ class LiveDeliveryTests(unittest.IsolatedAsyncioTestCase):
             self.assertIn("still.png", sender.send.await_args.kwargs["embed"].image.url)
 
 
+    async def test_modern_joust_handler_does_not_send_second_final_card(self):
+        from cogs.joust import JoustCog
+        current = saved_bout()
+        ready = prepared()
+        ready.guild_id = None
+        ready.seed = 9192
+        ready.tactics_a = SimpleNamespace()
+        ready.tactics_b = SimpleNamespace()
+        ready.support_token_a = None
+        ready.support_token_b = None
+        ready.mode = "instant"
+        sender = SimpleNamespace(send=AsyncMock())
+        with patch("cogs.joust.make_intro_embed", return_value=discord.Embed(title="Intro")), \
+             patch("cogs.joust.make_result_embed",
+                   return_value=discord.Embed(title="Recorded Result")), \
+             patch("cogs.joust.run_single_match", return_value=current) as combat, \
+             patch("cogs.joust.record_match", return_value="saved-match") as journal, \
+             patch("services.sprite_broadcast_adapter.send_sprite_broadcast",
+                   new_callable=AsyncMock, return_value=True) as stream, \
+             patch("cogs.broadcast.send_final", new_callable=AsyncMock) as old_final:
+            returned = await JoustCog.send_match(None, sender, ready)
+        self.assertIs(returned, current)
+        combat.assert_called_once()
+        journal.assert_called_once()
+        stream.assert_awaited_once()
+        old_final.assert_not_awaited()
+        self.assertEqual(stream.await_args.kwargs["final_embed"].title,
+                         "Recorded Result")
+
+    async def test_failed_next_pass_ends_at_final_without_repeating_full_bout(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            (root/"arenas").mkdir()
+            (root/"arenas"/"royal_lists.png").touch()
+            path = root/"pass_1.gif"
+            path.write_bytes(b"GIF89a")
+            first = render.PassClip(
+                path, 2000, 1, (0, 0), (1, 0), render.PHASES,
+            )
+            message = SimpleNamespace(edit=AsyncMock())
+            sender = SimpleNamespace(send=AsyncMock(return_value=message))
+            calls = iter((first, OSError("corrupt sprite")))
+            def make(*args, **kwargs):
+                item = next(calls)
+                if isinstance(item, Exception):
+                    raise item
+                return item
+            sleeps = []
+            async def fake_sleep(value):
+                sleeps.append(value)
+            with patch.object(live, "ASSET_ROOT", root), \
+                 patch.object(live, "render_live_pass", side_effect=make), \
+                 patch.object(live, "_final_image", new_callable=AsyncMock,
+                              return_value=None):
+                done = await live.play_live_match(
+                    sender, saved_bout(), prepared(), pause=.5, sleep=fake_sleep,
+                )
+            self.assertTrue(done)
+            sender.send.assert_awaited_once()
+            message.edit.assert_awaited_once()  # final, no duplicate stages
+            self.assertEqual(message.edit.await_args.kwargs["embed"].title,
+                             "🏆 The Grand Lists — Final Result")
+            self.assertEqual(len(sleeps), 1)  # no double wait on failed pass
+
+
+
 if __name__ == "__main__":
     unittest.main()
