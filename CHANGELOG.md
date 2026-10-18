@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.9.2a — Dynamic Sprite Animation Engine
+
+- Integrated real-time sprite composition into the existing recorded-once v0.9.2 match broadcast. Tactical combat, tournaments, injuries, rewards and logs are unchanged.
+- Added layered arena, crowd, horse, directional knight, lance, shield, particle and foreground barrier graphics with true pass-driven motion.
+- Reads numbered transparent PNG frames from the `assets/jousting` art overlay. Detects the red/blue knight left/right sprite sets and five coat-colour horse sets. Preview sheets are excluded.
+- Implements cinematic Approach, Charge, Impact and Aftermath, including horse refusals/slips, lance breaks, heavy hits, falls and appropriate crowd reactions.
+- Renders GIF animations on demand from PNG frames; small bouts fit in one clip, longer bouts use sequential pass clips to respect the Discord upload limit.
+- Graphics are presentation only, executed off the Discord event loop. The existing final match scorecard is always sent; missing art and failed sprite uploads fall back to the v0.9.2 stage broadcaster.
+- Added editable visual breed-to-coat mapping, configurable `JOUST_SPRITE_ENABLED` switch and offline regression tests for sprite path selection, deterministic source results and replay fallbacks.
+- The 581 original PNG files are delivered in a separate art overlay ZIP rather than GitHub code commits. The old local installer is no longer needed for GitHub main.
+
+---
+
 ## v0.9.2 — Cinematic Matchday Broadcast
 
 - Added a separate, deterministic broadcast planner that reads saved combat results without ever rerolling RNG or awarding duplicate match rewards.
