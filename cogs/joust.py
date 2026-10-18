@@ -23,7 +23,7 @@ from services.injuries import (
 )
 
 
-VERSION_LABEL = "JoustingBot v0.9.2a — Dynamic Sprite Matchday Broadcast"
+VERSION_LABEL = "JoustingBot v0.9.2b — Live Match Broadcast Flow"
 CHALLENGE_TIMEOUT_SECONDS = 240
 
 
@@ -808,7 +808,10 @@ class JoustCog(commands.Cog):
         sprite_sent = False
         try:
             from services.sprite_broadcast_adapter import send_sprite_broadcast
-            sprite_sent = await send_sprite_broadcast(sender, result, prepared)
+            sprite_sent = await send_sprite_broadcast(
+                sender, result, prepared, final_embed=result_embed,
+                home_view=ChallengeHomeView(),
+            )
         except Exception:
             display.exception("Sprite replay failed for recorded match %s", match_id)
 
@@ -829,9 +832,12 @@ class JoustCog(commands.Cog):
             except Exception:
                 display.exception("Broadcast-off introduction failed for match %s", match_id)
 
-        await broadcast.send_final(
-            sender, result_embed, result, prepared, home_view=ChallengeHomeView()
-        )
+        # The v0.9.2b live graphic ends with the final scorecard IN the
+        # same message; only a text-broadcast fallback posts its own final.
+        if not sprite_sent:
+            await broadcast.send_final(
+                sender, result_embed, result, prepared, home_view=ChallengeHomeView()
+            )
         return result
 
     @joust_group.command(name="duel", description="Run a cinematic single joust match immediately.")
