@@ -153,6 +153,7 @@ class MainMenuView(OwnedView):
             ("Equipment", "🛡️", lambda it: navigate(it, EquipmentPage(it.user.id, it.guild_id))),
             ("Arenas", "🏟️", lambda it: navigate(it, ArenaPage(it.user.id))),
             ("Challenge", "🎯", lambda it: navigate(it, DuelPage(it.user.id))),
+            ("Training Yard", "🏇", lambda it: navigate(it, TrainingPage(it.user.id, it.guild_id))),
             ("Profile", "📜", lambda it: navigate(it, ProfilePage(it.user.id))),
             ("Leaderboards", "🏆", lambda it: navigate(it, LeaderboardPage(it.user.id, it.guild_id))),
             ("Titles", "🏅", lambda it: navigate(it, TitlePage(it.user.id, it.guild_id))),
@@ -174,7 +175,8 @@ class MainMenuView(OwnedView):
                      "challenge another player, and earn your way up the lists.\n\n"
                      "**Every section below opens usable controls.**\n"
                      "⚔️ Knight · 🐎 Horse · 🛡️ Equipment · 🏟️ Arenas\n"
-                     "🎯 Challenge · 📜 Profile · 🏆 Leaderboards · 🏅 Titles\n"
+                     "🎯 Challenge · 🏇 Training Yard · 📜 Profile · 🏆 Leaderboards\n"
+                     "🏅 Titles · 🪙 Progression · 🩹 Injuries · 🏆 Tournaments\n"
                      "🪙 Progression & Gold · 🩹 Injuries & Recovery\n\n"
                      "Only authorised members see the ⚙️ Admin controls.")
 
@@ -787,6 +789,81 @@ class OpponentSelect(discord.ui.UserSelect):
     async def callback(self, interaction):
         self.screen.opponent_id = self.values[0].id
         await interaction.response.edit_message(embed=self.screen.make_embed(), view=self.screen)
+
+
+class TrainingOpponentSelect(discord.ui.Select):
+    def __init__(self, page):
+        from services.training import OPPONENTS
+        self.page = page
+        super().__init__(
+            placeholder="Choose one of twelve training knights",
+            row=0,
+            options=[
+                discord.SelectOption(
+                    label=f"Level {npc.level:02d} · {npc.name}"[:100],
+                    description=npc.title[:100],
+                    value=npc.key,
+                    default=npc.key == page.npc_key,
+                )
+                for npc in OPPONENTS
+            ],
+        )
+
+    async def callback(self, interaction):
+        self.page.npc_key = self.values[0]
+        await interaction.response.edit_message(embed=self.page.make_embed(), view=self.page)
+
+
+class TrainingPage(OwnedView):
+    def __init__(self, user_id: int, guild_id: int | None = None):
+        super().__init__(user_id)
+        self.guild_id = guild_id
+        self.npc_key = "osric"
+        self.add_item(TrainingOpponentSelect(self))
+        self.button("Start Training Joust", self.ride, row=1,
+                    style=STYLE.primary, emoji="🏇")
+        self.button("Training Stats", self.stats, row=1, emoji="📊")
+        self.home()
+
+    def make_embed(self):
+        from services.training import opponent, earned_training, TRAIN_COOLDOWN_SECONDS
+        npc = opponent(self.npc_key)
+        if not npc or self.guild_id is None:
+            return embed("🏇 The Training Yard", "Open the Training Yard in a Discord server.")
+        stats = earned_training(self.guild_id, self.owner_id)
+        return embed(
+            "🏇 The Training Yard — v0.9.2c",
+            f"**{npc.name}** · Level {npc.level}/12 · {npc.title}\n"
+            f"Mount: **{npc.horse_name}** ({npc.breed.title()})\n"
+            f"_{npc.personality}_\n\n"
+            f"**Reward:** 3 Training XP (first 10 sessions each UTC day)\n"
+            f"**Gold:** 0 · **Ranked records:** 0\n"
+            f"**Risk:** Real injuries, with ordinary healing time/cost.\n"
+            f"**Cooldown:** {TRAIN_COOLDOWN_SECONDS} seconds\n\n"
+            f"**Your training:** {stats['sessions']} bouts · {stats['xp']} XP "
+            f"· Yard level {stats['level']}\n\n"
+            "Choose an NPC and press **Start Training Joust**. "
+            "Training runs as a public live animated match.",
+        )
+
+    async def stats(self, interaction):
+        from services.training import earned_training, TRAIN_DAILY_XP_CAP
+        if interaction.guild_id is None:
+            return await interaction.response.send_message("Server only.", ephemeral=True)
+        data = earned_training(interaction.guild_id, interaction.user.id)
+        await interaction.response.send_message(
+            f"🏇 {data['sessions']} sessions · {data['xp']} yard XP · "
+            f"Level {data['level']} · Today {data['today_xp']}/{TRAIN_DAILY_XP_CAP} XP",
+            ephemeral=True,
+        )
+
+    async def ride(self, interaction):
+        if interaction.guild_id is None:
+            return await interaction.response.send_message("❌ Server only.", ephemeral=True)
+        cog = interaction.client.get_cog("JoustCog")
+        if cog is None:
+            return await interaction.response.send_message("❌ Training yard unavailable.", ephemeral=True)
+        await cog.start_training(interaction, self.npc_key)
 
 
 class DuelPage(OwnedView):
