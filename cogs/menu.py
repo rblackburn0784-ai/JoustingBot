@@ -133,12 +133,13 @@ class VersionPage(OwnedView):
 
     def make_embed(self):
         return embed(
-            "⚙️ JoustingBot v0.9.2a",
-            "**Stability & Admin Tools**\n"
-            "Reliable atomic saves, checksum-verified local backups, safe repair previews, "
-            "confirmed restores, challenge locks and cooldowns, and clearer errors.\n\n"
-            "Both riders choose private tactics and lock plans before a challenge is accepted. "
-            "Admin tools remain Manage Server restricted."
+            f"⚙️ JoustingBot {VERSION}",
+            "**Live Match Broadcast & Admin Tools**\n"
+            "One live Discord graphic animates each pass: Prep, Gallop, Lance Ready, "
+            "Collision and Outcome, before the final scorecard.\n\n"
+            "Private tactics, seeded combat, tournaments, atomic saves, verified backups, "
+            "challenge locks and cooldowns remain available. "
+            "Admin tools require Manage Server permission."
         )
 
 
