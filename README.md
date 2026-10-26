@@ -2,7 +2,7 @@
 
 A lightweight medieval jousting Discord game bot built with `discord.py`.
 
-**Current version:** `v0.9.2b — Live Match Broadcast Flow`
+**Current version:** `v0.9.2c — Training Yard & Tournament Controls`
 
 Players create a knight, build and bind a horse, equip both rider and horse, choose an arena, and challenge other Discord users to cinematic jousts with accept/decline buttons.
 
@@ -10,6 +10,21 @@ This version adds cinematic stage-by-stage Discord commentary and generated entr
 
 ---
 
+## v0.9.2c — Training Yard & Tournament Controls
+
+Training jousts have returned, now with **12 named NPC riders** of increasing difficulty (levels 1–12). The four original coaches — Osric, Beren, Elis and Maud — are retained. The Training Yard uses the same seeded combat and one-screen, pass-by-pass sprite animation as a player match.
+
+**Commands and menus:** `/joust trainers` displays all 12 trainers; `/joust train trainer:<key>` plays a bout with Discord autocomplete; `/joust training_stats` shows earned XP and yard levels. Or choose **Training Yard** from `/menu`, pick a knight in the drop-down, and press **Start Training Joust**.
+
+**Training economy:** Each of the first ten completed sessions per UTC day awards **3 Training XP** (max 30 per day), with a 120-second cooldown per player/server. Training XP and yard levels are non-combat mastery recognition derived from recorded matches (no independent mutable reward counters). Training earns **zero gold**, competitive wins, ranks, titles or tournament progress, whether you win or lose. Training cannot be used to boost horse or knight combat statistics.
+
+**Injury risk:** Training uses the actual combat result and existing deterministic injury rules. The human player can sustain a real injury and must recover/heal normally; NPC riders are never assigned stored injuries. Training results are stored as `mode=training` in the normal match journal, separate from ranked challenges; training matches never receive PvP rewards. Historical records remain unmodified.
+
+**Tournaments:** Creating a four/eight-player tournament now explicitly requires **Manage Server** permissions across the `/tournament create` command, the menu, the modal and the backend interaction action. Regular players can still join, view standings, and see the results; start/next-match administration remains restricted.
+
+**Installation:** Update from a clean GitHub working tree, preserve `.env`, `storage/`, `backups/`, and your `assets/jousting/` sprite files. Run `python -m unittest discover -s tests -v` before starting. No old sprite installer or separate training JSON is needed.
+
+---
 ## v0.9.2b — Live Match Broadcast Flow
 
 The sprite broadcast now behaves like the Bowling Bot's **single live screen** instead of posting a dump of completed clips. Each recorded pass plays its five moments as one short animated image, and **the same Discord message** changes when the next pass begins. The final scoreboard replaces that screen **only after the last pass has finished**. The accessible result embed, injuries, match ID and tactical recap appear on the final message.
