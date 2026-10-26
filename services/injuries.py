@@ -169,7 +169,7 @@ def make_events(match: dict) -> list[dict]:
     The highest-risk impact *received* in a match is used; a refusal/miss cannot
     hurt the opponent. Results are saved to the match journal rather than rerolled.
     """
-    if match.get("mode") != "challenge" or match.get("guild_id") is None:
+    if match.get("mode") not in ("challenge", "training") or match.get("guild_id") is None:
         return []
     try:
         started = utc(match["timestamp"])
@@ -177,7 +177,11 @@ def make_events(match: dict) -> list[dict]:
     except (ValueError, KeyError, TypeError):
         return []
     events = []
-    for side, other in (("a", "b"), ("b", "a")):
+    # NPC opponents never receive persisted injuries. Training exposes the
+    # human rider to the same deterministic risk from genuine impacts.
+    participants = (("a", "b"),) if match.get("mode") == "training" else (
+        ("a", "b"), ("b", "a"))
+    for side, other in participants:
         strongest = None
         for event in match.get("passes", []):
             category = event.get("category")
@@ -233,7 +237,7 @@ def injuries(guild_id: int | None, user_id: int, history=None, data=None, now=No
     paid = data.get("guilds", {}).get(str(guild_id), {}).get(str(user_id), {}).get("healing", {})
     result, seen = [], set()
     for match in history.get("matches", []):
-        if match.get("guild_id") != guild_id or match.get("mode") != "challenge":
+        if match.get("guild_id") != guild_id or match.get("mode") not in ("challenge", "training"):
             continue
         for event in match.get("injuries", []):
             try:
