@@ -123,7 +123,10 @@ class SpriteAdapterTests(unittest.IsolatedAsyncioTestCase):
         with tempfile.TemporaryDirectory() as name:
             prepared = SimpleNamespace(arena_key="royal_lists")
             sender = SimpleNamespace(send=AsyncMock())
-            with patch("services.sprite_engine.ASSET_ROOT", Path(name)):
+            # The live broadcaster imports ASSET_ROOT into its own module.
+            # Patch the *lookup site*, not the sprite_engine definition, so
+            # this test also passes on machines with the full PNG pack installed.
+            with patch("services.live_broadcast.ASSET_ROOT", Path(name)):
                 self.assertFalse(await send_sprite_broadcast(sender, match(), prepared))
             sender.send.assert_not_awaited()
 
