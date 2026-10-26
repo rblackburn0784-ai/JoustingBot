@@ -133,20 +133,28 @@ class MaintenancePage(OwnedView):
         )
 
     async def validate(self, interaction):
-        await interaction.response.edit_message(embed=health_embed(), view=self)
+        await interaction.response.defer()
+        report = await asyncio.to_thread(health_embed)
+        await interaction.edit_original_response(embed=report, view=self)
 
     async def backup(self, interaction):
         cog = interaction.client.get_cog("MaintenanceCog")
+        if cog is None:
+            return await interaction.response.send_message("Maintenance unavailable.", ephemeral=True)
+        await interaction.response.defer()
         async with cog.lock:
             if not idle(interaction.client):
-                return await interaction.response.send_message("❌ Wait for matches to finish.", ephemeral=True)
+                return await interaction.followup.send(
+                    "❌ Wait for matches to finish.", ephemeral=True)
             try:
-                name = store.create_backup()
+                name = await asyncio.to_thread(store.create_backup)
             except (store.MaintenanceError, OSError) as error:
-                return await interaction.response.send_message(
+                return await interaction.followup.send(
                     f"❌ Backup rejected: {error}", ephemeral=True)
-        await navigate(interaction, MaintenancePage(interaction.user.id, name),
-                       f"✅ Verified snapshot saved: {name}")
+        view = MaintenancePage(interaction.user.id, name)
+        await interaction.edit_original_response(
+            content=f"✅ Verified snapshot saved: {name}",
+            embed=view.make_embed(), view=view)
 
     async def repair(self, interaction):
         await interaction.response.defer()
@@ -164,11 +172,15 @@ class MaintenancePage(OwnedView):
     async def restore(self, interaction):
         if not self.selected:
             return await interaction.response.send_message("❌ No snapshot selected.", ephemeral=True)
+        await interaction.response.defer()
         try:
-            store.verify_backup(self.selected)
+            await asyncio.to_thread(store.verify_backup, self.selected)
         except store.MaintenanceError as error:
-            return await interaction.response.send_message(f"❌ Backup failed verification: {error}", ephemeral=True)
-        await navigate(interaction, ConfirmPage(interaction.user.id, "restore", self.selected))
+            return await interaction.followup.send(
+                f"❌ Backup failed verification: {error}", ephemeral=True)
+        view = ConfirmPage(interaction.user.id, "restore", self.selected)
+        await interaction.edit_original_response(
+            content=None, embed=view.make_embed(), view=view)
 
     async def reset_user(self, interaction):
         await navigate(interaction, ResetUserPage(interaction.user.id, interaction.guild_id))
@@ -320,8 +332,10 @@ class MaintenanceCog(commands.Cog):
     async def admin_health(self, interaction: discord.Interaction):
         if not is_admin(interaction):
             return await interaction.response.send_message("Manage Server required.", ephemeral=True)
+        await interaction.response.defer(thinking=True, ephemeral=True)
+        report = await asyncio.to_thread(health_embed)
         view = MaintenancePage(interaction.user.id)
-        await interaction.response.send_message(embed=health_embed(), view=view, ephemeral=True)
+        await interaction.edit_original_response(embed=report, view=view)
 
     @admin_group.command(name="backup", description="Create a verified local JSON backup.")
     @app_commands.default_permissions(manage_guild=True)
@@ -329,19 +343,21 @@ class MaintenanceCog(commands.Cog):
     async def admin_backup(self, interaction: discord.Interaction):
         if not is_admin(interaction):
             return await interaction.response.send_message("Manage Server required.", ephemeral=True)
+        await interaction.response.defer(thinking=True, ephemeral=True)
         async with self.lock:
             if not idle(interaction.client):
-                return await interaction.response.send_message("Matches are active. Backup blocked.", ephemeral=True)
+                return await interaction.edit_original_response(
+                    content="Matches are active. Backup blocked.")
             try:
-                name = store.create_backup()
+                name = await asyncio.to_thread(store.create_backup)
             except (store.MaintenanceError, OSError) as exc:
                 LOG.exception("Admin backup failed")
-                return await interaction.response.send_message(
-                    f"Backup blocked: {str(exc)[:300]}", ephemeral=True)
+                return await interaction.edit_original_response(
+                    content=f"Backup blocked: {str(exc)[:300]}")
         view = MaintenancePage(interaction.user.id, name)
-        await interaction.response.send_message(
+        await interaction.edit_original_response(
             content=f"Verified local backup created: {name}.",
-            embed=view.make_embed(), view=view, ephemeral=True)
+            embed=view.make_embed(), view=view)
 
     @admin_group.command(name="repair", description="Preview safe repairs requiring confirmation.")
     @app_commands.default_permissions(manage_guild=True)
