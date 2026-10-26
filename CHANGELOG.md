@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.9.2c — Training Yard & Tournament Controls
+
+- Restored `/joust train`, expanding the original four character-driven NPCs (Osric, Beren, Elis and Maud) into a twelve-level roster with distinct mounted statistics, tactics, horses and gear.
+- Added `/joust trainers`, `/joust training_stats` and an accessible Training Yard menu/drop-down so players can choose their training opponent.
+- Training battles use the v0.9.2b one-screen live sprite broadcast and deterministic combat, with independently selectable player style and standard arena selection.
+- Each completed training bout grants three cosmetic Training XP, up to 30 XP per UTC day and with a per-user/server 120-second cooldown. Training grants **no gold, competitive record, titles, prestige or tournament credit**; XP is derived from saved, unique training match IDs.
+- Real player injuries now also arise from recorded training impacts and are visible in existing injury/healing screens; NPCs cannot receive stored injuries.
+- Clarified and enforced tournament creation as Manage Server-only at the slash command, menu, modal and interaction handler; public tournament registration remains open.
+- Added release regression tests covering NPC tiers, rewards, daily cap, guild isolation, risks, menu visibility and tournament admin permissions.
+
+---
+
 ## v0.9.2b — Live Match Broadcast Flow
 
 - Replaced the multi-attachment sprite recap with **one evolving Discord broadcast message**: one chronological animation per real jousting pass, changed in place between rounds.
