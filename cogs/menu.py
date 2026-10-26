@@ -26,7 +26,7 @@ from services.competition import (
 from services.equipment import items_by_slot, get_item
 from services.records import load_history
 
-VERSION = "v0.9.2b"
+VERSION = "v0.9.2c"
 STYLE = discord.ButtonStyle
 
 
