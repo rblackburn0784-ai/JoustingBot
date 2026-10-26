@@ -12,6 +12,13 @@ from services.competition import TITLE_RULES, title_progress
 
 
 class UIReleaseTests(unittest.TestCase):
+    def test_version_page_matches_current_release_and_broadcast(self):
+        self.assertEqual(menu.VERSION, "v0.9.2b")
+        overview = menu.VersionPage(123).make_embed()
+        self.assertIn(menu.VERSION, overview.title)
+        self.assertIn("Gallop", overview.description)
+        self.assertIn("final scorecard", overview.description)
+
     def test_original_eighteen_titles_preserved_and_twelve_tournament_added(self):
         self.assertEqual(len(TITLE_RULES), 30)
         self.assertEqual(len(set(TITLE_RULES)), 30)
