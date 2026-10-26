@@ -285,8 +285,12 @@ class TournamentCog(commands.Cog):
         self.bot.add_view(TournamentPanel())
 
     async def do_create(self, interaction, name, size):
-        if not is_admin(interaction):
-            return await interaction.response.send_message("⛔ Manage Server permission required.", ephemeral=True)
+        # Permission checks are REQUIRED here as well as on the slash command
+        # and creation modal; a manually triggered component cannot bypass them.
+        if not interaction.guild_id or not is_admin(interaction):
+            return await interaction.response.send_message(
+                "⛔ Only server admins with Manage Server may create tournaments.",
+                ephemeral=True)
         async with self.locks[interaction.guild_id]:
             try:
                 engine.create(interaction.guild_id, interaction.user.id, name, size)
