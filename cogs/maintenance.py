@@ -49,10 +49,14 @@ class BackupSelect(discord.ui.Select):
 
 
 class ConfirmPage(OwnedView):
-    def __init__(self, uid, action: str, backup: str | None = None):
+    def __init__(self, uid, action: str, backup: str | None = None,
+                 steps: list[str] | None = None):
         super().__init__(uid, admin=True)
         self.action = action
         self.backup = backup
+        # Keep the already-reviewed plan so displaying confirmation never
+        # scans storage synchronously on the Discord event loop.
+        self.steps = steps
         self.button("Confirm " + action.title(), self.execute, row=0,
                     style=discord.ButtonStyle.danger)
         self.button("Cancel", self.cancel, row=0)
@@ -64,7 +68,7 @@ class ConfirmPage(OwnedView):
                       + str(self.backup) + "? A pre-restore backup is created first. "
                       "This is a potentially destructive operation.")
         else:
-            steps = store.repair()["changes"]
+            steps = self.steps if self.steps is not None else store.repair()["changes"]
             detail = "Apply conservative JSON repairs: " + "; ".join(steps)
         return embed("⚠️ Confirm " + self.action.title(), detail)
 
@@ -77,24 +81,28 @@ class ConfirmPage(OwnedView):
         cog = interaction.client.get_cog("MaintenanceCog")
         if cog is None:
             return await interaction.response.send_message("Maintenance unavailable.", ephemeral=True)
+        # Acknowledge the button before waiting for a lock or doing disk IO.
+        # Deferred component responses edit this same private maintenance card.
+        await interaction.response.defer()
         async with cog.lock:
             if not idle(interaction.client):
-                return await interaction.response.send_message(
+                return await interaction.followup.send(
                     "❌ An active challenge or tournament match is running.", ephemeral=True)
             try:
                 if self.action == "restore":
-                    safety = store.restore_backup(self.backup or "")
+                    safety = await asyncio.to_thread(store.restore_backup, self.backup or "")
                     message = f"✅ Snapshot restored. Pre-restore safety backup: {safety}"
                 else:
-                    info = store.repair(apply=True)
+                    info = await asyncio.to_thread(store.repair, apply=True)
                     message = ("✅ Repaired: " + "; ".join(info["changes"])
                                + f" · Safety backup: {info['backup']}" if info["applied"]
                                else "✅ No repairs needed.")
             except (store.MaintenanceError, ValueError, OSError) as error:
                 LOG.exception("Maintenance %s failed", self.action)
-                return await interaction.response.send_message(
+                return await interaction.followup.send(
                     f"❌ Maintenance blocked: {str(error)[:400]}", ephemeral=True)
-        await navigate(interaction, MaintenancePage(interaction.user.id), message)
+        view = MaintenancePage(interaction.user.id)
+        await interaction.edit_original_response(content=message, embed=view.make_embed(), view=view)
 
 
 class MaintenancePage(OwnedView):
@@ -141,13 +149,17 @@ class MaintenancePage(OwnedView):
                        f"✅ Verified snapshot saved: {name}")
 
     async def repair(self, interaction):
+        await interaction.response.defer()
         try:
-            steps = store.repair()["changes"]
+            steps = (await asyncio.to_thread(store.repair))["changes"]
         except store.MaintenanceError as error:
-            return await interaction.response.send_message(f"❌ Repair refused: {error}", ephemeral=True)
+            return await interaction.followup.send(
+                f"❌ Repair refused: {error}", ephemeral=True)
         if not steps:
-            return await interaction.response.send_message("✅ No repairs needed.", ephemeral=True)
-        await navigate(interaction, ConfirmPage(interaction.user.id, "repair"))
+            return await interaction.followup.send("✅ No repairs needed.", ephemeral=True)
+        view = ConfirmPage(interaction.user.id, "repair", steps=steps)
+        await interaction.edit_original_response(
+            content=None, embed=view.make_embed(), view=view)
 
     async def restore(self, interaction):
         if not self.selected:
@@ -337,17 +349,20 @@ class MaintenanceCog(commands.Cog):
     async def admin_repair(self, interaction: discord.Interaction):
         if not is_admin(interaction):
             return await interaction.response.send_message("Manage Server required.", ephemeral=True)
+        # Slash commands must acknowledge within Discord's initial deadline.
+        # Reading JSON files and calculating repair plans can take longer.
+        await interaction.response.defer(thinking=True, ephemeral=True)
         try:
-            plan = store.repair()
-        except store.MaintenanceError as exc:
-            return await interaction.response.send_message(
-                f"Repair blocked: {str(exc)[:300]}", ephemeral=True)
+            plan = await asyncio.to_thread(store.repair)
+        except (store.MaintenanceError, OSError, ValueError) as exc:
+            return await interaction.edit_original_response(
+                content=f"Repair blocked: {str(exc)[:300]}")
         if not plan["changes"]:
             view = MaintenancePage(interaction.user.id)
-            return await interaction.response.send_message(
-                content="No safe repairs required.", embed=view.make_embed(), view=view, ephemeral=True)
-        view = ConfirmPage(interaction.user.id, "repair")
-        await interaction.response.send_message(embed=view.make_embed(), view=view, ephemeral=True)
+            return await interaction.edit_original_response(
+                content="No safe repairs required.", embed=view.make_embed(), view=view)
+        view = ConfirmPage(interaction.user.id, "repair", steps=plan["changes"])
+        await interaction.edit_original_response(embed=view.make_embed(), view=view)
 
     @admin_group.command(name="reset_user", description="Safely reset server settings or gear inventory.")
     @app_commands.default_permissions(manage_guild=True)
