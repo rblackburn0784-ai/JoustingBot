@@ -3,7 +3,8 @@ from __future__ import annotations
 import random
 import time
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Optional, Literal
+from types import SimpleNamespace
 
 import discord
 from discord import app_commands
@@ -16,6 +17,10 @@ from services.combat import Fighter, MatchResult, PassLog, run_single_match
 from services.tactics import TacticPlan, STYLES, TARGETS, MOVES, label as tactic_label
 from services.equipment import get_item
 from services.records import record_match
+from services.training import (
+    OPPONENTS, opponent as find_trainer, TRAIN_COOLDOWN_SECONDS,
+    TRAIN_XP_PER_BOUT, TRAIN_DAILY_XP_CAP, earned_training,
+)
 from services.progression import loadout, equipped_standard
 from services.injuries import (
     apply_penalty, active as active_injuries, duration as injury_duration,
@@ -23,7 +28,7 @@ from services.injuries import (
 )
 
 
-VERSION_LABEL = "JoustingBot v0.9.2b — Live Match Broadcast Flow"
+VERSION_LABEL = "JoustingBot v0.9.2c — Training Yard & Tournament Controls"
 CHALLENGE_TIMEOUT_SECONDS = 240
 
 
@@ -605,6 +610,7 @@ class JoustCog(commands.Cog):
         self.active_challenge_players: set[int] = set()
         self.last_challenge_at: dict[tuple[int, int], float] = {}
         self.challenge_cooldown_seconds = 30
+        self.last_training_at: dict[tuple[int, int], float] = {}
 
     joust_group = app_commands.Group(name="joust", description="Single joust matches")
 
@@ -743,10 +749,14 @@ class JoustCog(commands.Cog):
         # Re-check at acceptance, not at challenge creation; time-based healing
         # and last-minute treatment might have changed the knight's condition.
         if prepared.guild_id is not None:
-            for side, user_id, fighter, knight in (
-                ("a", prepared.challenger.id, prepared.fighter_a, prepared.knight_a),
-                ("b", prepared.opponent.id, prepared.fighter_b, prepared.knight_b),
-            ):
+            participants = (
+                (("a", prepared.challenger.id, prepared.fighter_a, prepared.knight_a),)
+                if prepared.mode == "training" else (
+                    ("a", prepared.challenger.id, prepared.fighter_a, prepared.knight_a),
+                    ("b", prepared.opponent.id, prepared.fighter_b, prepared.knight_b),
+                )
+            )
+            for side, user_id, fighter, knight in participants:
                 injured = bool(active_injuries(prepared.guild_id, user_id))
                 assistance = (support_for_next_bout(prepared.guild_id, user_id)
                               if prepared.mode == "challenge" else None)
@@ -768,7 +778,7 @@ class JoustCog(commands.Cog):
                                   tactics_b=prepared.tactics_b)
         result_embed = make_result_embed(result, prepared.arena_key)
         match_id = record_match(prepared, result, match_id=record_id, tournament_id=tournament_id)
-        if prepared.guild_id is not None and prepared.mode == "challenge":
+        if prepared.guild_id is not None and prepared.mode in ("challenge", "training"):
             from services.records import load_history
             entry = next(
                 (m for m in reversed(load_history()["matches"]) if m.get("id") == match_id), {}
@@ -841,6 +851,166 @@ class JoustCog(commands.Cog):
                 sender, result_embed, result, prepared, home_view=ChallengeHomeView()
             )
         return result
+
+    def training_cooldown(self, guild_id: int, user_id: int) -> int:
+        elapsed = time.monotonic() - self.last_training_at.get((guild_id, user_id), -1e12)
+        return max(0, int(TRAIN_COOLDOWN_SECONDS - elapsed + 0.999))
+
+    def prepare_training(self, player, guild_id: int, npc, *, arena_key="royal_lists",
+                         style="balanced") -> tuple[Optional[str], Optional[PreparedDuel]]:
+        """The registered player needs a real linked horse; the NPC is not a user."""
+        if guild_id is None:
+            return "❌ Training is available in a Discord server.", None
+        if arena_key not in ARENAS:
+            return "❌ Unknown arena. Select one from /arena list.", None
+        knights_db = load_knights()
+        horses_db = load_horses()
+        knight = get_knight(knights_db, player.id)
+        if knight is None:
+            return "❌ Create a knight first with /knight create.", None
+        if not knight.bound_horse_id:
+            return "❌ Bind a horse first with /horse bind.", None
+        raw_horse = horses_db.get("horses", {}).get(knight.bound_horse_id)
+        if not raw_horse:
+            return "❌ Your bound horse was not found.", None
+        horse = Horse.from_dict(raw_horse)
+        knight.equipped_lance_key = loadout(guild_id, player.id, "lance", knight.equipped_lance_key)
+        knight.equipped_armour_key = loadout(guild_id, player.id, "armour", knight.equipped_armour_key)
+        horse.equipped_barding_key = loadout(guild_id, player.id, "barding",
+                                            horse.equipped_barding_key, horse.horse_id)
+        player_fighter = Fighter(
+            user_id=player.id, knight_name=knight.name, horse_name=horse.name,
+            knight_stats=apply_penalty(knight.stats, guild_id, player.id),
+            horse_stats=horse.stats, lance_key=knight.equipped_lance_key,
+            armour_key=knight.equipped_armour_key,
+            barding_key=horse.equipped_barding_key, horse_breed=horse.breed,
+        )
+        npc_knight = SimpleNamespace(
+            name=npc.name, stats=npc.knight_map,
+            equipped_lance_key=npc.lance, equipped_armour_key=npc.armour,
+        )
+        npc_horse = SimpleNamespace(
+            horse_id=f"npc-{npc.key}", name=npc.horse_name, breed=npc.breed,
+            stats=npc.horse_map, equipped_barding_key=npc.barding,
+        )
+        npc_player = SimpleNamespace(
+            id=npc.player_id, mention=f"**{npc.name}**", bot=True,
+        )
+        return None, PreparedDuel(
+            challenger=player, opponent=npc_player, arena_key=arena_key,
+            knight_a=knight, knight_b=npc_knight, horse_a=horse,
+            horse_b=npc_horse, fighter_a=player_fighter,
+            fighter_b=npc.fighter(), guild_id=guild_id, mode="training",
+            tactics_a=TacticPlan(style=style), tactics_b=npc.tactics,
+        )
+
+    async def start_training(self, interaction: discord.Interaction, npc_key: str,
+                             *, style: str = "balanced", arena_key: str = "royal_lists"):
+        """One human rider, one NPC, one saved result, no competitive rewards."""
+        if not interaction.guild_id or interaction.channel is None:
+            return await interaction.response.send_message("❌ Train in a server channel.", ephemeral=True)
+        npc = find_trainer(npc_key)
+        if npc is None:
+            return await interaction.response.send_message(
+                "❌ Trainer not recognised. See /joust trainers.", ephemeral=True)
+        if style not in STYLES:
+            return await interaction.response.send_message("❌ Unknown tactics style.", ephemeral=True)
+        if self.is_player_busy(interaction.user.id):
+            return await interaction.response.send_message(
+                "❌ You are already in a challenge or training match.", ephemeral=True)
+        remaining = self.training_cooldown(interaction.guild_id, interaction.user.id)
+        if remaining:
+            return await interaction.response.send_message(
+                f"⌛ Training cooldown: {remaining} seconds remaining.", ephemeral=True)
+        error, prepared = self.prepare_training(
+            interaction.user, interaction.guild_id, npc,
+            arena_key=arena_key, style=style,
+        )
+        if error or prepared is None:
+            return await interaction.response.send_message(error or "❌ Rider not ready.", ephemeral=True)
+        # Lock only the human. NPCs can train independent players concurrently.
+        # No coroutine awaits between testing and claiming this player lock.
+        if self.is_player_busy(interaction.user.id):
+            return await interaction.response.send_message("❌ Rider busy.", ephemeral=True)
+        self.active_challenge_players.add(interaction.user.id)
+        try:
+            await interaction.response.defer(ephemeral=True)
+            # Charge cooldown before combat so failed Discord uploads cannot
+            # cause multiple recorded bouts or duplicate training XP.
+            self.last_training_at[(interaction.guild_id, interaction.user.id)] = time.monotonic()
+            from services.records import load_history
+            before = earned_training(interaction.guild_id, interaction.user.id)
+            result = await self.send_match(interaction.channel, prepared)
+            after = earned_training(interaction.guild_id, interaction.user.id)
+            gained = after["xp"] - before["xp"]
+            injury_list = active_injuries(interaction.guild_id, interaction.user.id)
+            injury_note = (
+                f"\n🩹 Active injuries: {len(injury_list)} — view /menu → Injuries."
+                if injury_list else "\n🛡️ No active injuries."
+            )
+            await interaction.followup.send(
+                f"🏇 **Training completed** against **{npc.name}** (level {npc.level}). "
+                f"Score **{result.score_a}–{result.score_b}**.\n"
+                f"**+{gained} Training XP** · **0 gold** · **0 competitive wins**.\n"
+                f"Yard level **{after['level']}** · Total XP **{after['xp']}**. "
+                f"Daily XP cap: {TRAIN_DAILY_XP_CAP}."
+                + injury_note, ephemeral=True)
+        except Exception:
+            import logging
+            logging.getLogger(__name__).exception("Training joust failed for %s", interaction.user.id)
+            await interaction.followup.send(
+                "⚠️ Training could not finish displaying. Check /joust training_stats "
+                "before retrying: a match may already have been saved.", ephemeral=True)
+        finally:
+            self.active_challenge_players.discard(interaction.user.id)
+
+    @joust_group.command(name="train", description="Train with a named NPC; 3 XP, no gold, real injury risk.")
+    @app_commands.guild_only()
+    @app_commands.describe(trainer="Select a training knight", style="Your approach for the bout",
+                           arena_key="Arena for the training match")
+    async def train(self, interaction: discord.Interaction, trainer: str = "osric",
+                    style: Literal["balanced", "cautious", "aggressive"] = "balanced",
+                    arena_key: str = "royal_lists"):
+        await self.start_training(interaction, trainer, style=style, arena_key=arena_key)
+
+    @train.autocomplete("trainer")
+    async def trainer_autocomplete(self, interaction: discord.Interaction, current: str):
+        needle = current.lower().strip()
+        options = [npc for npc in OPPONENTS
+                   if needle in npc.key or needle in npc.name.lower() or needle in npc.title.lower()]
+        return [
+            app_commands.Choice(name=f"Lv {npc.level:02d} · {npc.name}"[:100], value=npc.key)
+            for npc in options[:25]
+        ]
+
+    @joust_group.command(name="trainers", description="View the 12 NPC trainers and their difficulty levels.")
+    @app_commands.guild_only()
+    async def trainers(self, interaction: discord.Interaction):
+        lines = [
+            f"**{npc.level:02d}. {npc.name}** — {npc.title} · /joust train trainer:{npc.key}"
+            for npc in OPPONENTS
+        ]
+        stats = earned_training(interaction.guild_id, interaction.user.id)
+        card = discord.Embed(
+            title="🏇 The Training Yard — Twelve NPC Knights",
+            description="\n".join(lines)
+                        + "\n\n**Rewards:** 3 yard XP per match (first 10 per UTC day), "
+                          "no gold, no ranking, real injury risk. 120-second cooldown.",
+        )
+        card.set_footer(text=f"Your Training XP: {stats['xp']} · Yard Level: {stats['level']}")
+        await interaction.response.send_message(embed=card, ephemeral=True)
+
+    @joust_group.command(name="training_stats", description="Show your training XP and sessions.")
+    @app_commands.guild_only()
+    async def training_stats(self, interaction: discord.Interaction):
+        stats = earned_training(interaction.guild_id, interaction.user.id)
+        await interaction.response.send_message(
+            f"🏇 **Training Yard** — {stats['sessions']} sessions · {stats['xp']} XP "
+            f"· Yard level {stats['level']} · {stats['towards_next']}/30 to the next level\n"
+            f"Earned today: **{stats['today_xp']}/{TRAIN_DAILY_XP_CAP} XP**. "
+            "Training earns no gold or competitive progress, but injuries are real.",
+            ephemeral=True,
+        )
 
     @joust_group.command(name="duel", description="Run a cinematic single joust match immediately.")
     @app_commands.default_permissions(manage_guild=True)
