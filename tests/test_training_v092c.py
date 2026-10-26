@@ -112,7 +112,7 @@ class TrainingBalanceTests(unittest.TestCase):
         self.assertIn("Training Yard", [getattr(x, "label", None) for x in view.children])
         with patch.object(training, "load_history", return_value={"matches": []}):
             page = TrainingPage(101, 88)
-            self.assertIn("0 gold", page.make_embed().description.lower())
+            self.assertIn("**gold:** 0", page.make_embed().description.lower())
 
 
 class TrainingCommandTests(unittest.IsolatedAsyncioTestCase):
