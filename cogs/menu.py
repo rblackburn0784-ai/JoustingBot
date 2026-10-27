@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import random
 import shutil
+import asyncio
+import io
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -25,8 +27,9 @@ from services.competition import (
 )
 from services.equipment import items_by_slot, get_item
 from services.records import load_history
+from services import ui_art
 
-VERSION = "v0.9.2c"
+VERSION = "v0.9.2d"
 STYLE = discord.ButtonStyle
 
 
@@ -80,8 +83,29 @@ class OwnedView(discord.ui.View):
             component.disabled = True
 
 
-async def navigate(interaction: discord.Interaction, view: "OwnedView", message: str | None = None):
-    await interaction.response.edit_message(content=message, embed=view.make_embed(), view=view)
+async def navigate(interaction: discord.Interaction, view: "OwnedView",
+                   message: str | None = None, *, embed_override=None):
+    """Replace the SAME private menu graphic. Never post an extra art message."""
+    if hasattr(view, "art_kwargs"):
+        await interaction.response.defer()
+        art = await asyncio.to_thread(ui_art.render, **view.art_kwargs())
+        display = embed_override if embed_override is not None else view.make_embed()
+        if art:
+            display.set_image(url="attachment://joust_ui.jpg")
+            attachment = discord.File(io.BytesIO(art), filename="joust_ui.jpg")
+            try:
+                await interaction.edit_original_response(
+                    content=message, embed=display, view=view,
+                    attachments=[attachment])
+            finally:
+                attachment.close()
+        else:
+            await interaction.edit_original_response(
+                content=message, embed=display, view=view, attachments=[])
+        return
+    await interaction.response.edit_message(
+        content=message, embed=embed_override if embed_override is not None
+        else view.make_embed(), view=view, attachments=[])
 
 
 class HomeOnlyView(OwnedView):
@@ -151,6 +175,7 @@ class MainMenuView(OwnedView):
             ("Knight", "⚔️", lambda it: navigate(it, KnightPage(it.user.id))),
             ("Horse", "🐎", lambda it: navigate(it, HorsePage(it.user.id))),
             ("Equipment", "🛡️", lambda it: navigate(it, EquipmentPage(it.user.id, it.guild_id))),
+            ("Shop", "🪙", lambda it: navigate(it, ShopHome(it.user.id, it.guild_id))),
             ("Arenas", "🏟️", lambda it: navigate(it, ArenaPage(it.user.id))),
             ("Challenge", "🎯", lambda it: navigate(it, DuelPage(it.user.id))),
             ("Training Yard", "🏇", lambda it: navigate(it, TrainingPage(it.user.id, it.guild_id))),
@@ -174,10 +199,10 @@ class MainMenuView(OwnedView):
                      "Welcome, rider. Build your knight and mount, choose your equipment, "
                      "challenge another player, and earn your way up the lists.\n\n"
                      "**Every section below opens usable controls.**\n"
-                     "⚔️ Knight · 🐎 Horse · 🛡️ Equipment · 🏟️ Arenas\n"
+                     "⚔️ Knight · 🐎 Horse · 🛡️ Equipment · 🪙 Shop · 🏟️ Arenas\n"
                      "🎯 Challenge · 🏇 Training Yard · 📜 Profile · 🏆 Leaderboards\n"
                      "🏅 Titles · 🪙 Progression · 🩹 Injuries · 🏆 Tournaments\n"
-                     "🪙 Progression & Gold · 🩹 Injuries & Recovery\n\n"
+                     "Buy gear in the Shop, then equip it on your Knight or Horse.\n\n"
                      "Only authorised members see the ⚙️ Admin controls.")
 
 
@@ -239,6 +264,10 @@ class KnightPage(OwnedView):
         self.button("Create", self.create, emoji="➕")
         self.button("View Knight", self.view, emoji="🛡️")
         self.button("Career Stats", self.stats, emoji="📊")
+        self.button("Equip Lance", lambda it: navigate(
+            it, EquipmentPicker(it.user.id, "lance", it.guild_id)), row=1, emoji="🏇")
+        self.button("Equip Armour", lambda it: navigate(
+            it, EquipmentPicker(it.user.id, "armour", it.guild_id)), row=1, emoji="🛡️")
         self.button("Delete", lambda it: navigate(it, ConfirmKnightDelete(it.user.id)), style=STYLE.danger)
         self.home()
 
@@ -246,6 +275,19 @@ class KnightPage(OwnedView):
         knight = get_knight(load_knights(), self.owner_id)
         return embed("⚔️ Knight Hall", f"Current knight: **{knight.name}**" if knight else
                      "No knight created yet. Press **Create** to begin.")
+
+    def art_kwargs(self):
+        from services.progression import loadout
+        knight = get_knight(load_knights(), self.owner_id)
+        items = {}
+        if knight:
+            items = {
+                "lance": get_item(loadout(None, self.owner_id, "lance",
+                        knight.equipped_lance_key)).name,
+                "armour": get_item(loadout(None, self.owner_id, "armour",
+                        knight.equipped_armour_key)).name,
+            }
+        return {"screen": "knight", "equipped": items}
 
     async def create(self, interaction):
         await interaction.response.send_modal(KnightModal())
@@ -258,11 +300,12 @@ class KnightPage(OwnedView):
                                                   "lance", knight.equipped_lance_key)
             knight.equipped_armour_key = loadout(interaction.guild_id, interaction.user.id,
                                                    "armour", knight.equipped_armour_key)
-        await interaction.response.edit_message(
-            embed=knight_embed(knight, interaction.user) if knight else self.make_embed(), view=self)
+        await navigate(interaction, self,
+                       embed_override=knight_embed(knight, interaction.user)
+                       if knight else self.make_embed())
 
     async def stats(self, interaction):
-        await interaction.response.edit_message(embed=knight_stats_embed(interaction.user), view=self)
+        await navigate(interaction, self, embed_override=knight_stats_embed(interaction.user))
 
 
 class HorseModal(discord.ui.Modal, title="Create Your Horse"):
@@ -284,7 +327,20 @@ class HorsePage(OwnedView):
         super().__init__(user_id)
         self.button("Create Horse", lambda it: it.response.send_modal(HorseModal()), emoji="➕")
         self.button("Manage Stable", lambda it: navigate(it, StableView(it.user.id, guild_id=it.guild_id)), emoji="📋")
+        self.button("Equip Barding", lambda it: navigate(
+            it, EquipmentPicker(it.user.id, "barding", it.guild_id)), row=1, emoji="🛡️")
         self.home()
+
+    def art_kwargs(self):
+        knights = load_knights().get("knights", {})
+        bound = (knights.get(str(self.owner_id)) or {}).get("bound_horse_id")
+        horses = load_horses().get("horses", {})
+        current = horses.get(bound) if bound else None
+        if current is None or current.get("owner_id") != self.owner_id:
+            current = next((h for h in horses.values()
+                            if h.get("owner_id") == self.owner_id), None)
+        return {"screen": "horse", "coat": ui_art.selected_coat(
+            current.get("breed") if current else None, self.owner_id)}
 
     def make_embed(self):
         all_horses = load_horses().get("horses", {}).values()
@@ -305,7 +361,7 @@ class HorsePicker(discord.ui.Select):
 
     async def callback(self, interaction):
         self.screen.selected_id = self.values[0]
-        await interaction.response.edit_message(embed=self.screen.make_embed(), view=self.screen)
+        await navigate(interaction, self.screen)
 
 
 class StableView(OwnedView):
@@ -325,6 +381,9 @@ class StableView(OwnedView):
         self.button("View", self.show, row=1, disabled=not choices)
         self.button("Stats", self.stats, row=1, disabled=not choices)
         self.button("Bind", self.bind, row=1, style=STYLE.primary, disabled=not choices)
+        self.button("Barding", lambda it: navigate(
+            it, EquipmentPicker(it.user.id, "barding", it.guild_id)),
+            row=3, disabled=not choices)
         self.button("Delete", self.delete, row=1, style=STYLE.danger, disabled=not choices)
         self.button("◀", lambda it: navigate(it, StableView(it.user.id, self.page - 1, it.guild_id)),
                     row=2, disabled=self.page == 0)
@@ -338,6 +397,19 @@ class StableView(OwnedView):
         if raw and raw.get("owner_id") == self.owner_id:
             return Horse.from_dict(raw)
         return None
+
+    def art_kwargs(self):
+        from services.progression import loadout
+        h = self.horse()
+        gear = {}
+        if h:
+            key = loadout(self.guild_id, self.owner_id, "barding",
+                          h.equipped_barding_key, h.horse_id)
+            item = get_item(key)
+            if item:
+                gear["barding"] = item.name
+        return {"screen": "horse", "coat": ui_art.selected_coat(
+            h.breed if h else None, self.owner_id), "equipped": gear}
 
     def make_embed(self):
         h = self.horse()
@@ -356,11 +428,14 @@ class StableView(OwnedView):
             from services.progression import loadout
             h.equipped_barding_key = loadout(interaction.guild_id, interaction.user.id,
                                                 "barding", h.equipped_barding_key, h.horse_id)
-        await interaction.response.edit_message(embed=horse_embed(h, interaction.user) if h else self.make_embed(), view=self)
+        await navigate(interaction, self,
+                       embed_override=horse_embed(h, interaction.user)
+                       if h else self.make_embed())
 
     async def stats(self, interaction):
         h = self.horse()
-        await interaction.response.edit_message(embed=horse_stats_embed(h) if h else self.make_embed(), view=self)
+        await navigate(interaction, self,
+                       embed_override=horse_stats_embed(h) if h else self.make_embed())
 
     async def bind(self, interaction):
         h = self.horse()
@@ -426,7 +501,7 @@ class InjurySelect(discord.ui.Select):
 
     async def callback(self, interaction):
         self.screen.selected = self.values[0]
-        await interaction.response.edit_message(embed=self.screen.make_embed(), view=self.screen)
+        await navigate(interaction, self.screen)
 
 
 class TreatmentSelect(discord.ui.Select):
@@ -532,6 +607,85 @@ class InjuryPage(OwnedView):
         ))
 
 
+class ShopHome(OwnedView):
+    def __init__(self, user_id: int, guild_id: int | None = None):
+        super().__init__(user_id)
+        self.guild_id = guild_id
+        for slot, title in (("lance", "Lances"), ("armour", "Armour"), ("barding", "Horse Gear")):
+            self.button(title, lambda it, key=slot: navigate(
+                it, ShopPicker(it.user.id, key, it.guild_id)), row=0, emoji="🛒")
+        self.button("Equip Owned Gear", lambda it: navigate(
+            it, EquipmentPage(it.user.id, it.guild_id)), row=1, emoji="🛡️")
+        self.home()
+
+    def art_kwargs(self):
+        return {"screen": "shop"}
+
+    def make_embed(self):
+        from services.progression import wallet
+        money = wallet(self.guild_id, self.owner_id) if self.guild_id else 0
+        return embed(
+            "🪙 The Royal Armourer's Shop",
+            f"**Your purse:** {money} gold\n\n"
+            "Browse equipment and unlock new items across the counter. "
+            "Your purchase remains in your inventory until you equip it "
+            "in the Knight or Horse screens. The shopkeeper doesn't change "
+            "your loadout without permission.",
+        )
+
+
+class ShopPicker(OwnedView):
+    """Only venue allowed to spend gold; all eligibility uses progression.buy."""
+    def __init__(self, user_id: int, slot: str, guild_id: int | None = None,
+                 selected: str | None = None):
+        super().__init__(user_id)
+        self.slot = slot
+        self.guild_id = guild_id
+        self.selected = selected if selected in items_by_slot(slot) else next(iter(items_by_slot(slot)))
+        self.add_item(GearSelect(self))
+        self.button("Purchase Selected", self.purchase, row=1,
+                    style=STYLE.primary, emoji="🪙")
+        self.button("Equip Owned Gear", lambda it: navigate(
+            it, EquipmentPicker(it.user.id, self.slot, it.guild_id, self.selected)),
+            row=1, emoji="🛡️")
+        self.button("Back to Shop", lambda it: navigate(
+            it, ShopHome(it.user.id, it.guild_id)), row=2)
+        self.home()
+
+    def art_kwargs(self):
+        return {"screen": "shop"}
+
+    def make_embed(self):
+        from services.progression import wallet, unlock_info
+        item = get_item(self.selected)
+        state = unlock_info(self.guild_id, self.owner_id, self.selected)
+        cost = state["cost"]
+        status = ("✅ Already owned" if state["owned"] else
+                  "🔓 Eligible to buy" if state["eligible"] else
+                  f"🔒 Requires {state['requirement']} "
+                  f"({state['progress']}/{state['required']})")
+        balance = wallet(self.guild_id, self.owner_id) if self.guild_id else 0
+        return embed(
+            f"🛍️ Royal Shop — {item.name}",
+            f"{item.description}\n\n"
+            f"**Availability:** {status}\n"
+            f"**Price:** {cost} gold · **Wallet:** {balance} gold\n\n"
+            "Buying unlocks equipment. It does not automatically equip it. "
+            "Use **Equip Owned Gear** to fit it to your knight or horse.",
+        )
+
+    async def purchase(self, interaction):
+        from services.progression import buy
+        try:
+            new_balance = buy(interaction.guild_id, interaction.user.id, self.selected)
+        except ValueError as exc:
+            return await interaction.response.send_message(f"❌ {exc}", ephemeral=True)
+        item = get_item(self.selected)
+        await navigate(interaction, ShopPicker(
+            interaction.user.id, self.slot, interaction.guild_id, self.selected),
+            f"🔓 Purchased {item.name}. {new_balance} gold remaining.")
+
+
 class EquipmentPage(OwnedView):
     def __init__(self, user_id: int, guild_id: int | None = None):
         super().__init__(user_id)
@@ -541,9 +695,24 @@ class EquipmentPage(OwnedView):
                 it, EquipmentPicker(it.user.id, s, it.guild_id)), row=0)
         self.button("Progression & Gold", lambda it: navigate(it, ProgressionPage(it.user.id, it.guild_id)),
                     row=1, emoji="🪙")
+        self.button("Visit Shop", lambda it: navigate(it, ShopHome(it.user.id, it.guild_id)),
+                    row=2, emoji="🛍️")
         self.button("Standards", lambda it: navigate(it, StandardPage(it.user.id, it.guild_id)),
                     row=1, emoji="🚩")
         self.home()
+
+    def art_kwargs(self):
+        from services.progression import loadout
+        knight = get_knight(load_knights(), self.owner_id)
+        items = {}
+        if knight:
+            for slot in ("lance", "armour"):
+                key = loadout(self.guild_id, self.owner_id, slot,
+                              getattr(knight, "equipped_"+("lance" if slot=="lance" else "armour")+"_key"))
+                item = get_item(key)
+                if item:
+                    items[slot] = item.name
+        return {"screen": "knight", "equipped": items}
 
     def make_embed(self):
         from services.progression import loadout, wallet
@@ -589,9 +758,37 @@ class EquipmentPicker(OwnedView):
         self.selected = selected or next(iter(items_by_slot(slot)))
         self.add_item(GearSelect(self))
         self.button("Equip Selected", self.equip, row=1, style=STYLE.primary)
-        self.button("Unlock Selected", self.unlock, row=1, emoji="🔓")
+        self.button("Visit Shop", lambda it: navigate(
+            it, ShopPicker(it.user.id, self.slot, it.guild_id, self.selected)),
+            row=1, emoji="🛍️")
         self.button("Back", lambda it: navigate(it, EquipmentPage(it.user.id, it.guild_id)), row=2)
         self.home()
+
+    def art_kwargs(self):
+        from services.progression import loadout
+        knight = get_knight(load_knights(), self.owner_id)
+        current = {}
+        if knight:
+            for slot in ("lance", "armour"):
+                default = getattr(knight, "equipped_" + slot + "_key")
+                item = get_item(loadout(self.guild_id, self.owner_id, slot, default))
+                if item:
+                    current[slot] = item.name
+        if self.slot == "barding":
+            horses = load_horses().get("horses", {})
+            raw = horses.get(knight.bound_horse_id) if knight else None
+            if raw and raw.get("owner_id") == self.owner_id:
+                from services.progression import loadout
+                key = loadout(self.guild_id, self.owner_id, "barding",
+                              raw.get("equipped_barding_key"), raw["horse_id"])
+                current["barding"] = get_item(key).name
+            return {"screen": "horse",
+                    "coat": ui_art.selected_coat(
+                        raw.get("breed") if raw else None, self.owner_id),
+                    "equipped": {"barding": get_item(self.selected).name},
+                    "focus": "barding"}
+        current[self.slot] = get_item(self.selected).name
+        return {"screen": "knight", "equipped": current, "focus": self.slot}
 
     def make_embed(self):
         from services.progression import unlock_info, wallet, loadout
@@ -635,15 +832,8 @@ class EquipmentPicker(OwnedView):
                        interaction.guild_id, self.selected), f"✅ Equipped {gear.name}.")
 
     async def unlock(self, interaction):
-        from services.progression import buy
-        try:
-            balance = buy(interaction.guild_id, interaction.user.id, self.selected)
-        except ValueError as exc:
-            return await interaction.response.send_message(f"❌ {exc}", ephemeral=True)
-        item = get_item(self.selected)
-        await navigate(interaction, EquipmentPicker(interaction.user.id, self.slot,
-                       interaction.guild_id, self.selected),
-                       f"🔓 Unlocked **{item.name}**! {balance} gold remaining.")
+        await navigate(interaction, ShopPicker(
+            interaction.user.id, self.slot, interaction.guild_id, self.selected))
 
 
 class ProgressionPage(OwnedView):
