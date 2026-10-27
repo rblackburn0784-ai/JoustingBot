@@ -191,7 +191,7 @@ class MainMenuView(OwnedView):
             self.button(label, action, row=i // 5, emoji=icon)
         if allow_admin:
             self.button("Admin", lambda it: navigate(it, AdminPage(it.user.id)),
-                        row=2, style=STYLE.danger, emoji="⚙️")
+                        row=3, style=STYLE.danger, emoji="⚙️")
         self.home()
 
     def make_embed(self):
