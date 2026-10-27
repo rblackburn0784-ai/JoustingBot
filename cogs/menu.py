@@ -172,7 +172,7 @@ class MainMenuView(OwnedView):
         super().__init__(user_id)
         pages = [
             ("Getting Started", "📜", lambda it: navigate(it, StartView(it.user.id))),
-            ("Knight", "⚔️", lambda it: navigate(it, KnightPage(it.user.id))),
+            ("Knight", "⚔️", lambda it: navigate(it, KnightPage(it.user.id, it.guild_id))),
             ("Horse", "🐎", lambda it: navigate(it, HorsePage(it.user.id))),
             ("Equipment", "🛡️", lambda it: navigate(it, EquipmentPage(it.user.id, it.guild_id))),
             ("Shop", "🪙", lambda it: navigate(it, ShopHome(it.user.id, it.guild_id))),
@@ -259,8 +259,9 @@ class ConfirmKnightDelete(OwnedView):
 
 
 class KnightPage(OwnedView):
-    def __init__(self, user_id: int):
+    def __init__(self, user_id: int, guild_id: int | None = None):
         super().__init__(user_id)
+        self.guild_id = guild_id
         self.button("Create", self.create, emoji="➕")
         self.button("View Knight", self.view, emoji="🛡️")
         self.button("Career Stats", self.stats, emoji="📊")
@@ -282,9 +283,9 @@ class KnightPage(OwnedView):
         items = {}
         if knight:
             items = {
-                "lance": get_item(loadout(None, self.owner_id, "lance",
+                "lance": get_item(loadout(self.guild_id, self.owner_id, "lance",
                         knight.equipped_lance_key)).name,
-                "armour": get_item(loadout(None, self.owner_id, "armour",
+                "armour": get_item(loadout(self.guild_id, self.owner_id, "armour",
                         knight.equipped_armour_key)).name,
             }
         return {"screen": "knight", "equipped": items}
