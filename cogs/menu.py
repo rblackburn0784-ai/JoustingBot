@@ -87,7 +87,9 @@ async def navigate(interaction: discord.Interaction, view: "OwnedView",
                    message: str | None = None, *, embed_override=None):
     """Replace the SAME private menu graphic. Never post an extra art message."""
     if hasattr(view, "art_kwargs"):
-        await interaction.response.defer()
+        # A purchasing action may already have deferred before disk IO.
+        if not getattr(interaction.response, "is_done", lambda: False)():
+            await interaction.response.defer()
         art = await asyncio.to_thread(ui_art.render, **view.art_kwargs())
         display = embed_override if embed_override is not None else view.make_embed()
         if art:
@@ -747,10 +749,14 @@ class ShopPicker(OwnedView):
 
     async def purchase(self, interaction):
         from services.progression import buy
+        # Gold accounting may read a large journal. Acknowledge before disk IO
+        # and use progression.buy's atomic ownership/cost checks unchanged.
+        await interaction.response.defer()
         try:
-            new_balance = buy(interaction.guild_id, interaction.user.id, self.selected)
+            new_balance = await asyncio.to_thread(
+                buy, interaction.guild_id, interaction.user.id, self.selected)
         except ValueError as exc:
-            return await interaction.response.send_message(f"❌ {exc}", ephemeral=True)
+            return await interaction.followup.send(f"❌ {exc}", ephemeral=True)
         item = get_item(self.selected)
         await navigate(interaction, ShopPicker(
             interaction.user.id, self.slot, interaction.guild_id, self.selected),
