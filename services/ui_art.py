@@ -67,6 +67,15 @@ def selected_coat(breed: str | None, owner_id: int | None = None) -> str:
     return coat if coat in COATS else "chestnut"
 
 
+def horse_coat(raw: dict | None, owner_id: int | None = None) -> str:
+    """Horse-specific chosen appearance wins over user-level breed defaults."""
+    horse = raw or {}
+    chosen = str(horse.get("visual_coat", "")).lower()
+    if chosen in COATS:
+        return chosen
+    return selected_coat(horse.get("breed"), owner_id)
+
+
 def screen_path(screen: str, coat: str = "chestnut") -> Path | None:
     if screen not in SCREENS:
         return None
