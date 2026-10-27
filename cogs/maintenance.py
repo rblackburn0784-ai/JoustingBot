@@ -399,7 +399,7 @@ class MaintenanceCog(commands.Cog):
     async def version(self, interaction: discord.Interaction):
         view = MainMenuView(interaction.user.id, is_admin(interaction))
         await interaction.response.send_message(
-            embed=embed("⚙️ JoustingBot v0.9.2c",
+            embed=embed("⚙️ JoustingBot v0.9.2d",
                         "Training Yard & Tournament Controls\n"
                         "✅ Atomic JSON saves · verified local backups · safe repairs\n"
                         "✅ Private tactics · one-screen Prep / Gallop / Lance / Collision / Outcome\n"
