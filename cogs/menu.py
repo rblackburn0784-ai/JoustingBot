@@ -340,8 +340,7 @@ class HorsePage(OwnedView):
         if current is None or current.get("owner_id") != self.owner_id:
             current = next((h for h in horses.values()
                             if h.get("owner_id") == self.owner_id), None)
-        return {"screen": "horse", "coat": ui_art.selected_coat(
-            current.get("visual_coat") or current.get("breed") if current else None, self.owner_id)}
+        return {"screen": "horse", "coat": ui_art.horse_coat(current, self.owner_id)}
 
     def make_embed(self):
         all_horses = load_horses().get("horses", {}).values()
@@ -414,10 +413,9 @@ class StableView(OwnedView):
             item = get_item(key)
             if item:
                 gear["barding"] = item.name
-        return {"screen": "horse", "coat": ui_art.selected_coat(
-            (
-                load_horses().get("horses", {}).get(h.horse_id, {}).get("visual_coat")
-                or h.breed) if h else None, self.owner_id), "equipped": gear}
+        return {"screen": "horse", "coat": ui_art.horse_coat(
+            load_horses().get("horses", {}).get(h.horse_id) if h else None,
+            self.owner_id), "equipped": gear}
 
     def make_embed(self):
         h = self.horse()
@@ -856,8 +854,7 @@ class EquipmentPicker(OwnedView):
                               raw.get("equipped_barding_key"), raw["horse_id"])
                 current["barding"] = get_item(key).name
             return {"screen": "horse",
-                    "coat": ui_art.selected_coat(
-                        (raw.get("visual_coat") or raw.get("breed")) if raw else None, self.owner_id),
+                    "coat": ui_art.horse_coat(raw, self.owner_id),
                     "equipped": {"barding": get_item(self.selected).name},
                     "focus": "barding"}
         current[self.slot] = get_item(self.selected).name
