@@ -45,6 +45,8 @@ class Horse:
     stats: Dict[str, int]
 
     equipped_barding_key: str = "barding_none"
+    # Purely cosmetic, optional; does not change breed or horse statistics.
+    visual_coat: Optional[str] = None
     created_at: str = field(default_factory=utc_now)
     updated_at: str = field(default_factory=utc_now)
 
@@ -60,6 +62,8 @@ class Horse:
             breed=str(data["breed"]),
             stats=dict(data["stats"]),
             equipped_barding_key=data.get("equipped_barding_key", "barding_none"),
+            visual_coat=data.get("visual_coat") if str(data.get("visual_coat", "")).lower()
+                        in {"bay", "black", "chestnut", "grey", "white"} else None,
             created_at=data.get("created_at", utc_now()),
             updated_at=data.get("updated_at", utc_now()),
         )
