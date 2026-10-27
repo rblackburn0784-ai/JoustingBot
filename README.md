@@ -2,7 +2,7 @@
 
 A lightweight medieval jousting Discord game bot built with `discord.py`.
 
-**Current version:** `v0.9.2c — Training Yard & Tournament Controls`
+**Current version:** `v0.9.2d — Interactive Knight, Horse & Shop Screens`
 
 Players create a knight, build and bind a horse, equip both rider and horse, choose an arena, and challenge other Discord users to cinematic jousts with accept/decline buttons.
 
@@ -10,6 +10,19 @@ This version adds cinematic stage-by-stage Discord commentary and generated entr
 
 ---
 
+## v0.9.2d — Interactive Knight, Horse & Shop Screens
+
+Added illustrated Discord menus using the seven player-supplied 16:9 backgrounds: one **Shop** scene with the medieval shopkeeper, one white-plated **Knight** equipment screen and five individually coloured **Horse** screens (Bay/Black/Chestnut/Grey/White). The menus edit **one private message**, so changing a horse or selected gear updates the large picture instead of sending multiple screenshots.
+
+**New UI paths:** `/menu` → Shop → choose Lances/Armour/Horse Gear → **Purchase Selected**. Purchases use the original progression rules and never auto-equip. `/menu` → Knight → Equip Lance/Equip Armour, or `/menu` → Horse → Manage Stable → Equip Barding. The horse picture follows the selected mount. Stable **Coat Colour** lets each horse save its cosmetic illustrated coat independently of its breed or stats.
+
+The black equipment panels show the currently supported items (lance, armour, barding) or **COMING SOON** for future categories. No extra purchasable gear, stat adjustments or individual equipment PNG layers have been added yet; those are reserved for the next release.
+
+**Install images:** These seven high-resolution PNG files are distributed separately and must be saved to `assets/ui/`. See [the precise asset naming and install guide](assets/ui/README.md) and optional `python tools/install_ui_art_v092d.py --source PATH`. GitHub does not contain the binary PNG backgrounds. If they're absent, all menus fall back to the original fully usable text controls.
+
+v0.9.2c Training Yard, v0.9.2b single-screen joust animation, scoring, economy, existing graphics and saved data remain unchanged. Run `python -m unittest discover -s tests -v` after updating a clean Git checkout.
+
+---
 ## v0.9.2c — Training Yard & Tournament Controls
 
 Training jousts have returned, now with **12 named NPC riders** of increasing difficulty (levels 1–12). The four original coaches — Osric, Beren, Elis and Maud — are retained. The Training Yard uses the same seeded combat and one-screen, pass-by-pass sprite animation as a player match.
