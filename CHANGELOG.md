@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.9.2d — Interactive Knight, Horse & Shop Screens
+
+- Added a full-screen 1280×720 illustrated menu renderer for seven player-supplied backgrounds: Shop, Knight, Horse (White, Bay, Black, Grey, Chestnut). Local art is loaded from `assets/ui/` and resized only in-memory for Discord.
+- Added a separate Shop browsing/purchase flow; buying still uses the existing eligibility, wallet, gold balance and unlock functions and **never auto-equips**.
+- Knight and Horse equipment pickers now show the correct illustrated base screen with current or selected equipment labels in empty gear panels. Unsupported equipment categories remain clearly marked coming soon.
+- All illustrated screens edit the same private Discord message after a fast initial defer. Selecting a different horse or item refreshes the picture without posting duplicate images; missing images revert safely to text.
+- Added player-accessible, persistent cosmetic horse coat selection independent of horse breed, bond, stats, progression, combat or purchased gear.
+- Added seven-image installer with integrity checks, asset naming guide and offline tests covering five coat mappings, ownership separation, fallbacks and shop purchases.
+- Kept v0.9.2c training, tournament permission checks, v0.9.2b live match animations, and all existing save formats. No new equipment stat models or gear overlays in this release.
+
+---
+
 ## v0.9.2c — Training Yard & Tournament Controls
 
 - Restored `/joust train`, expanding the original four character-driven NPCs (Osric, Beren, Elis and Maud) into a twelve-level roster with distinct mounted statistics, tactics, horses and gear.
