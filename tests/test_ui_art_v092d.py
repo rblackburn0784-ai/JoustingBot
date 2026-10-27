@@ -64,6 +64,21 @@ class ArtworkRouting(unittest.TestCase):
                 self.assertEqual(ui_art.selected_coat("courser", 101), "bay")
                 self.assertEqual(ui_art.selected_coat("unknown"), "chestnut")
 
+    def test_explicit_horse_coat_wins_and_survives_serializer(self):
+        from cogs.horse import Horse
+        horse = Horse(
+            horse_id="h-101-test", owner_id=101, name="Starlight",
+            breed="courser",
+            stats={"speed": 5, "stamina": 5, "power": 5,
+                   "obedience": 5, "courage": 4},
+            visual_coat="white",
+        )
+        raw = horse.to_dict()
+        restored = Horse.from_dict(raw)
+        self.assertEqual(restored.visual_coat, "white")
+        self.assertEqual(ui_art.horse_coat(restored.to_dict(), 101), "white")
+        self.assertEqual(restored.breed, "courser")
+
     def test_screen_file_paths_are_whitelisted(self):
         self.assertIsNone(ui_art.screen_path("../secrets"))
         self.assertEqual(ui_art.screen_path("horse", "../../foo").name,
@@ -128,6 +143,8 @@ class MenuFlows(unittest.IsolatedAsyncioTestCase):
             await page.purchase(intr)
         buying.assert_called_once_with(1, 22, "lance_oakbreaker")
         equipping.assert_not_called()
+        # The first acknowledgement happens before any balance/journal IO.
+        self.assertGreaterEqual(intr.response.defer.await_count, 1)
         self.assertIn("Purchased", intr.edit_original_response.await_args.kwargs["content"])
 
     async def test_horse_picker_changes_breed_with_selected_horse(self):
