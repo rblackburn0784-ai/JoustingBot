@@ -341,7 +341,7 @@ class HorsePage(OwnedView):
             current = next((h for h in horses.values()
                             if h.get("owner_id") == self.owner_id), None)
         return {"screen": "horse", "coat": ui_art.selected_coat(
-            current.get("breed") if current else None, self.owner_id)}
+            current.get("visual_coat") or current.get("breed") if current else None, self.owner_id)}
 
     def make_embed(self):
         all_horses = load_horses().get("horses", {}).values()
@@ -368,7 +368,8 @@ class HorsePicker(discord.ui.Select):
 class StableView(OwnedView):
     PAGE_SIZE = 20
 
-    def __init__(self, user_id: int, page: int = 0, guild_id: int | None = None):
+    def __init__(self, user_id: int, page: int = 0, guild_id: int | None = None,
+                 selected_id: str | None = None):
         super().__init__(user_id)
         self.guild_id = guild_id
         self.page = page
@@ -376,7 +377,10 @@ class StableView(OwnedView):
         self.raws.sort(key=lambda x: (x.get("name", "").lower(), x.get("horse_id", "")))
         self.page = min(self.page, max(0, (len(self.raws) - 1) // self.PAGE_SIZE))
         choices = self.raws[self.page * self.PAGE_SIZE:(self.page + 1) * self.PAGE_SIZE]
-        self.selected_id = choices[0].get("horse_id") if choices else None
+        self.selected_id = (
+            selected_id if any(h.get("horse_id") == selected_id for h in choices)
+            else choices[0].get("horse_id") if choices else None
+        )
         if choices:
             self.add_item(HorsePicker(self, choices))
         self.button("View", self.show, row=1, disabled=not choices)
@@ -386,6 +390,7 @@ class StableView(OwnedView):
             it, EquipmentPicker(it.user.id, "barding", it.guild_id)),
             row=3, disabled=not choices)
         self.button("Delete", self.delete, row=1, style=STYLE.danger, disabled=not choices)
+        self.button("Coat Colour", self.coat_colour, row=1, disabled=not choices)
         self.button("◀", lambda it: navigate(it, StableView(it.user.id, self.page - 1, it.guild_id)),
                     row=2, disabled=self.page == 0)
         self.button("▶", lambda it: navigate(it, StableView(it.user.id, self.page + 1, it.guild_id)),
@@ -410,7 +415,9 @@ class StableView(OwnedView):
             if item:
                 gear["barding"] = item.name
         return {"screen": "horse", "coat": ui_art.selected_coat(
-            h.breed if h else None, self.owner_id), "equipped": gear}
+            (
+                load_horses().get("horses", {}).get(h.horse_id, {}).get("visual_coat")
+                or h.breed) if h else None, self.owner_id), "equipped": gear}
 
     def make_embed(self):
         h = self.horse()
@@ -450,12 +457,77 @@ class StableView(OwnedView):
         save_knights(db)
         await navigate(interaction, StableView(interaction.user.id, self.page, interaction.guild_id), f"✅ {h.name} is now your mount.")
 
+    async def coat_colour(self, interaction):
+        h = self.horse()
+        if h is None:
+            return await interaction.response.send_message("❌ Horse not found.", ephemeral=True)
+        await navigate(interaction, HorseCoatView(interaction.user.id, h.horse_id,
+                                                   interaction.guild_id))
+
     async def delete(self, interaction):
         h = self.horse()
         if h:
             await navigate(interaction, ConfirmHorseDelete(interaction.user.id, h.horse_id))
         else:
             await interaction.response.send_message("❌ Horse not found.", ephemeral=True)
+
+
+class HorseCoatSelect(discord.ui.Select):
+    def __init__(self, screen):
+        self.screen = screen
+        super().__init__(
+            placeholder="Choose this horse's illustrated coat colour",
+            options=[
+                discord.SelectOption(label=name.title(), value=name,
+                                     default=screen.coat == name)
+                for name in ("bay", "black", "chestnut", "grey", "white")
+            ],
+            row=0,
+        )
+
+    async def callback(self, interaction):
+        selected = self.values[0]
+        db = load_horses()
+        raw = db.get("horses", {}).get(self.screen.horse_id)
+        if raw is None or raw.get("owner_id") != interaction.user.id:
+            return await interaction.response.send_message("❌ This horse is not yours.", ephemeral=True)
+        # Cosmetic metadata only; no horse stat, ownership or breed mutation.
+        raw["visual_coat"] = selected
+        save_horses(db)
+        await navigate(interaction, HorseCoatView(
+            interaction.user.id, self.screen.horse_id, interaction.guild_id),
+            f"✅ {raw.get('name','Horse')} appearance set to {selected.title()}.")
+
+
+class HorseCoatView(OwnedView):
+    def __init__(self, user_id, horse_id, guild_id):
+        super().__init__(user_id)
+        self.horse_id = horse_id
+        self.guild_id = guild_id
+        raw = load_horses().get("horses", {}).get(horse_id)
+        if raw and raw.get("owner_id") == user_id:
+            self.coat = (
+                str(raw["visual_coat"]).lower()
+                if str(raw.get("visual_coat", "")).lower() in ui_art.COATS
+                else ui_art.selected_coat(raw.get("breed"), user_id)
+            )
+        else:
+            self.coat = "chestnut"
+        self.add_item(HorseCoatSelect(self))
+        self.button("Return to Stables", lambda it: navigate(
+            it, StableView(it.user.id, guild_id=it.guild_id,
+                           selected_id=self.horse_id)), row=1)
+        self.home()
+
+    def art_kwargs(self):
+        return {"screen": "horse", "coat": self.coat}
+
+    def make_embed(self):
+        return embed("🐎 Horse Appearance",
+                     f"**Illustrated coat:** {self.coat.title()}\n"
+                     "Choose Bay, Black, Chestnut, Grey or White to match "
+                     "the horse graphic to your mount. This changes its "
+                     "visual appearance only, not its breed or statistics.")
 
 
 class ConfirmHorseDelete(OwnedView):
@@ -785,7 +857,7 @@ class EquipmentPicker(OwnedView):
                 current["barding"] = get_item(key).name
             return {"screen": "horse",
                     "coat": ui_art.selected_coat(
-                        raw.get("breed") if raw else None, self.owner_id),
+                        (raw.get("visual_coat") or raw.get("breed")) if raw else None, self.owner_id),
                     "equipped": {"barding": get_item(self.selected).name},
                     "focus": "barding"}
         current[self.slot] = get_item(self.selected).name
