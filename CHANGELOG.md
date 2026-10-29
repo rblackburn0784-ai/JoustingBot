@@ -1,5 +1,14 @@
 # Changelog
 
+## v2.9.2f — Equipped Title Banners
+
+- Added safe explicit mapping from all 30 saved title IDs to original transparent title-banner PNGs, including the marshal_favourite filename exception.
+- Reused the already persisted, earned-only per-guild/title selection so equipped banner visuals cannot unlock unearned titles or drift from the equipped title.
+- Added illustrated Your Title Collection display: equipped standard, selected unlocked candidate preview, locked candidate state and immediate refresh after dropdown/equip/unequip.
+- Added a small far-end standard overlay to all six arena menu previews and challenge selection screens. Arena scoring, effects and live animations remain unchanged.
+- Added a generated neutral royal-blue standard for unequipped titles or missing PNGs; menu remains usable without the optional art files.
+- Added v2.9.2f banner art distribution as a separate ZIP with validated 30 original PNGs, installation instructions and regression tests.
+
 ## v2.9.2e — Tournament Hall, History & Trophy Cabinet Visuals
 
 - Added the user-supplied Tournament Hall (`tournament.png`), Tournament History (`tournament_history.png`) and Trophy Cabinet (`trophy_cabinet.png`) as image-backed private Discord menu screens.
