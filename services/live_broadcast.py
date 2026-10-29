@@ -55,7 +55,7 @@ def _screen_embed(result, clip, *, arena_key):
         colour=discord.Colour(0xB4874C),
     )
     e.set_image(url=f"attachment://{clip.path.name}")
-    e.set_footer(text=f"JoustingBot v0.9.2d · {clip.pass_no} of {len(result.passes)} passes")
+    e.set_footer(text=f"JoustingBot v2.9.3 · {clip.pass_no} of {len(result.passes)} passes")
     return e
 
 
