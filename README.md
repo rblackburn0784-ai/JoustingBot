@@ -18,7 +18,7 @@ Added illustrated Discord menus using the seven player-supplied 16:9 backgrounds
 
 The black equipment panels show the currently supported items (lance, armour, barding) or **COMING SOON** for future categories. No extra purchasable gear, stat adjustments or individual equipment PNG layers have been added yet; those are reserved for the next release.
 
-**Install images:** These seven high-resolution PNG files are distributed separately and must be saved to `assets/ui/`. See [the precise asset naming and install guide](assets/ui/README.md) and optional `python tools/install_ui_art_v092d.py --source PATH`. GitHub does not contain the binary PNG backgrounds. If they're absent, all menus fall back to the original fully usable text controls.
+**Install images:** The seven original PNG backgrounds are supplied separately, not committed as GitHub binaries. You can now install them **directly from `Jousting_Bot_Setup_PNG_Pack_v2.zip` or `Jousting_Bot_v2.9.2d.zip`**, with no manual unpacking or renaming: `python tools/install_ui_art_v092d.py --source "C:\\path\\to\\Jousting_Bot_v2.9.2d.zip"`. See [the full artwork installation guide](assets/ui/README.md). If artwork is absent, all menus remain playable using text controls.
 
 v0.9.2c Training Yard, v0.9.2b single-screen joust animation, scoring, economy, existing graphics and saved data remain unchanged. Run `python -m unittest discover -s tests -v` after updating a clean Git checkout.
 
