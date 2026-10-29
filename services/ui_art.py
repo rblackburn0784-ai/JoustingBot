@@ -13,6 +13,8 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
+from services.arenas import ARENAS
+
 BASE = Path(__file__).resolve().parent.parent
 ROOT = BASE / "assets" / "ui"
 MAPPING = BASE / "assets" / "jousting" / "visual_mapping.json"
@@ -21,6 +23,7 @@ SCREENS = {
     "shop": "shop.png",
     "knight": "knight.png",
     "horse": "horse_{coat}.png",
+    "injury": "injury_ward.png",
 }
 COATS = {"bay", "black", "chestnut", "grey", "white"}
 HORSE_SLOTS = (
@@ -76,7 +79,26 @@ def horse_coat(raw: dict | None, owner_id: int | None = None) -> str:
     return selected_coat(horse.get("breed"), owner_id)
 
 
-def screen_path(screen: str, coat: str = "chestnut") -> Path | None:
+def screen_path(screen: str, coat: str = "chestnut",
+                arena: str = "royal_lists") -> Path | None:
+    """Find whitelisted scene art without ever treating a UI value as a path.
+
+    Existing jousting arena art is accepted in several historical asset folders.
+    Prefer assets/ui/arenas/ for all new installations.
+    """
+    if screen == "arena":
+        if arena not in ARENAS:
+            return None
+        filename = f"{arena}.png"
+        candidates = (
+            ROOT / "arenas" / filename,
+            BASE / "assets" / "arenas" / filename,
+            BASE / "assets" / "jousting" / "arenas" / filename,
+            BASE / "assets" / "jousting" / "arena" / filename,
+            BASE / "assets" / "jousting" / filename,
+            ROOT / filename,
+        )
+        return next((p for p in candidates if p.is_file()), candidates[0])
     if screen not in SCREENS:
         return None
     if screen == "horse":
@@ -147,13 +169,14 @@ def _slots(canvas: Image.Image, screen: str, equipped: dict | None, focus: str |
 
 
 def render(screen: str, *, coat: str = "chestnut",
-           equipped: dict | None = None, focus: str | None = None) -> bytes | None:
+           equipped: dict | None = None, focus: str | None = None,
+           arena: str = "royal_lists") -> bytes | None:
     """Return JPEG bytes to attach to the SAME private menu message.
 
     Do not construct mock-ups from the joust battle sprites when the user-provided
     PNGs are absent. The embed/controls work without art.
     """
-    path = screen_path(screen, coat)
+    path = screen_path(screen, coat, arena)
     if path is None or not path.is_file():
         return None
     try:
