@@ -593,8 +593,9 @@ class TreatmentSelect(discord.ui.Select):
         )
 
     async def callback(self, interaction):
-        self.screen.provider = self.values[0]
-        await interaction.response.edit_message(embed=self.screen.make_embed(), view=self.screen)
+        await navigate(interaction, InjuryPage(
+            interaction.user.id, interaction.guild_id,
+            selected=self.screen.selected, provider=self.values[0]))
 
 
 class InjuryPage(OwnedView):
@@ -618,6 +619,9 @@ class InjuryPage(OwnedView):
         self.button("Refresh", self.refresh, row=2)
         self.button("Career Profile", lambda it: navigate(it, ProfilePage(it.user.id)), row=3)
         self.home()
+
+    def art_kwargs(self):
+        return {"screen": "injury"}
 
     def make_embed(self):
         from services.injuries import TREATMENTS, PENALTY_CAP, MIN_RECOVERY_HOURS, support_for_next_bout
@@ -655,12 +659,13 @@ class InjuryPage(OwnedView):
         if not self.selected:
             return await interaction.response.send_message("✅ No injury needs treatment.", ephemeral=True)
         from services.injuries import heal
+        await interaction.response.defer()  # Acknowledge before treatment/wallet IO.
         try:
             balance, result = heal(
                 interaction.guild_id, interaction.user.id, self.selected, provider=self.provider
             )
         except ValueError as exc:
-            return await interaction.response.send_message(f"❌ {exc}", ephemeral=True)
+            return await interaction.followup.send(f"❌ {exc}", ephemeral=True)
         if result["success"]:
             outcome = (f"✅ **{result['provider']}** helped {result['name']}: "
                        f"recovery shortened by {result['hours_reduced']:.1f} hours.")
@@ -1009,19 +1014,21 @@ class ArenaSelect(discord.ui.Select):
         ])
 
     async def callback(self, interaction):
-        self.screen.selected = self.values[0]
-        await interaction.response.edit_message(embed=self.screen.make_embed(), view=self.screen)
+        await navigate(interaction, ArenaPage(interaction.user.id, selected=self.values[0]))
 
 
 class ArenaPage(OwnedView):
-    def __init__(self, user_id: int):
+    def __init__(self, user_id: int, selected: str = "royal_lists"):
         super().__init__(user_id)
-        self.selected = "royal_lists"
+        self.selected = selected if selected in ARENAS else "royal_lists"
         self.add_item(ArenaSelect(self))
         self.button("Random Arena", self.random, row=1)
         self.button("Challenge Here", lambda it: navigate(it, DuelPage(it.user.id, arena_key=self.selected)),
                     row=1, style=STYLE.primary)
         self.home()
+
+    def art_kwargs(self):
+        return {"screen": "arena", "arena": self.selected}
 
     def make_embed(self):
         a = ARENAS[self.selected]
@@ -1030,8 +1037,8 @@ class ArenaPage(OwnedView):
                      f"Slip {a.slip_mod:+} · Panic {a.panic_mod:+} · Impact x{a.impact_mult:.2f}")
 
     async def random(self, interaction):
-        self.selected = random.choice(list(ARENAS))
-        await interaction.response.edit_message(embed=self.make_embed(), view=self)
+        await navigate(interaction, ArenaPage(
+            interaction.user.id, selected=random.choice(list(ARENAS))))
 
 
 class ArenaForDuel(discord.ui.Select):
@@ -1044,7 +1051,7 @@ class ArenaForDuel(discord.ui.Select):
 
     async def callback(self, interaction):
         self.screen.arena_key = self.values[0]
-        await interaction.response.edit_message(embed=self.screen.make_embed(), view=self.screen)
+        await navigate(interaction, self.screen)
 
 
 class OpponentSelect(discord.ui.UserSelect):
@@ -1054,7 +1061,7 @@ class OpponentSelect(discord.ui.UserSelect):
 
     async def callback(self, interaction):
         self.screen.opponent_id = self.values[0].id
-        await interaction.response.edit_message(embed=self.screen.make_embed(), view=self.screen)
+        await navigate(interaction, self.screen)
 
 
 class TrainingOpponentSelect(discord.ui.Select):
@@ -1145,6 +1152,9 @@ class DuelPage(OwnedView):
         self.button("Random Arena", self.random, row=2)
         self.home()
 
+    def art_kwargs(self):
+        return {"screen": "arena", "arena": self.arena_key}
+
     def make_embed(self):
         mode = "**ADMIN-ONLY instant test**" if self.instant else "Opponent must accept before the joust runs."
         opponent = f"<@{self.opponent_id}>" if self.opponent_id else "Not yet selected"
@@ -1155,7 +1165,7 @@ class DuelPage(OwnedView):
 
     async def random(self, interaction):
         self.arena_key = random.choice(list(ARENAS))
-        await interaction.response.edit_message(embed=self.make_embed(), view=self)
+        await navigate(interaction, self)
 
     async def start(self, interaction):
         from cogs.joust import ChallengeView, make_challenge_embed
