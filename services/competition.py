@@ -255,12 +255,26 @@ def title_progress(guild_id: int, user_id: int, history: dict | None = None,
             for key, (name, desc, field, target) in TITLE_RULES.items()}
 
 
-def equipped_title(guild_id: int, user_id: int, history: dict | None = None) -> str | None:
+def equipped_title_key(guild_id: int, user_id: int, history: dict | None = None) -> str | None:
+    """Return the selected earned title key, also used by v2.9.2f banner art.
+
+    One existing guild-scoped saved selection is authoritative for both text and
+    cosmetic PNGs. Nothing in the artwork system can unlock or equip a title.
+    """
     data = load_json(TITLES_PATH, {"guilds": {}})
-    key = str(data.get("guilds", {}).get(str(guild_id), {}).get(str(user_id), ""))
-    if key and title_progress(guild_id, user_id, history).get(key, {}).get("earned"):
-        return TITLE_RULES[key][0]
-    return None
+    if not isinstance(data, dict):
+        return None
+    key = data.get("guilds", {}).get(str(guild_id), {}).get(str(user_id))
+    if not isinstance(key, str) or key not in TITLE_RULES:
+        return None
+    if not title_progress(guild_id, user_id, history).get(key, {}).get("earned"):
+        return None
+    return key
+
+
+def equipped_title(guild_id: int, user_id: int, history: dict | None = None) -> str | None:
+    key = equipped_title_key(guild_id, user_id, history)
+    return TITLE_RULES[key][0] if key is not None else None
 
 
 def set_title(guild_id: int, user_id: int, key: str | None, history: dict | None = None) -> None:
