@@ -108,8 +108,11 @@ class LayerTests(unittest.TestCase):
         self.assertNotEqual(canvas.getpixel((440, 28))[:3], (40, 60, 80))
 
     def test_crowd_is_present_in_three_pavilions_not_across_walkways(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            canvas = scene(tmp)
+        # Inspect the crowd layer *before* riders and raised lances overlap it.
+        # Actors legitimately occlude the grandstands during a joust.
+        canvas = opaque((40, 60, 80, 255), engine.SIZE)
+        stage.fill_crowd_stands(canvas, opaque((220, 30, 200, 255), (940, 98)),
+                                stage.SceneLayout().crowd_stands)
         for x in (280, 460, 700):
             self.assertEqual(canvas.getpixel((x, 155))[:3], (220, 30, 200))
         for x in (321, 640):
