@@ -2,11 +2,21 @@
 
 A lightweight medieval jousting Discord game bot built with `discord.py`.
 
-**Current version:** `v0.9.2d — Interactive Knight, Horse & Shop Screens`
+**Current version:** `v2.9.2e — Tournament Hall, History & Trophy Cabinet Visuals`
 
 Players create a knight, build and bind a horse, equip both rider and horse, choose an arena, and challenge other Discord users to cinematic jousts with accept/decline buttons.
 
 This version adds cinematic stage-by-stage Discord commentary and generated entrance/final scoreboard PNGs. All v0.9.1 tactics, seeded combat, history, tournaments, progression, injuries and admin safeguards remain intact.
+
+---
+
+## v2.9.2e — Tournament Hall, History & Trophy Cabinet Visuals
+
+The Tournament menu under `/menu` now uses `assets/ui/tournament.png`, with separate illustrated pages for **History** (`assets/ui/tournament_history.png`) and the **Trophy Cabinet** (`assets/ui/trophy_cabinet.png`). The original user-supplied images are packaged in the downloadable v2.9.2e tournament visual update ZIP. Extract that ZIP into the project root after pulling `main`, preserving the `assets/ui/` folders.
+
+The **History** button opens a proper History page with its ten most recently completed tournaments, Refresh, Tournament Menu and Main Menu controls. The **Trophy Cabinet** retains Achievements, Tournament Titles, Career Medals, Equip Title and Tournament Menu controls with the correct trophy background. Selection and navigation update the same private Discord message; slash commands `/tournament history`, `/tournament cabinet`, `/tournament achievements` and public tournament History/Trophy buttons also open the illustrated private pages.
+
+All tournament records, brackets, eligibility, achievements, rewards, Match simulation and admin-only Create/Start/Next controls are unchanged. Artwork is optional; missing images fall back to usable text screens. See `assets/ui/README.md` for installation. Run `python -m unittest discover -s tests -v` after updating.
 
 ---
 
