@@ -24,6 +24,9 @@ SCREENS = {
     "knight": "knight.png",
     "horse": "horse_{coat}.png",
     "injury": "injury_ward.png",
+    "tournament": "tournament.png",
+    "tournament_history": "tournament_history.png",
+    "trophy_cabinet": "trophy_cabinet.png",
 }
 COATS = {"bay", "black", "chestnut", "grey", "white"}
 HORSE_SLOTS = (
