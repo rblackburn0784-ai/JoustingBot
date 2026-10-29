@@ -65,7 +65,7 @@ class SceneMenus(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(page.art_kwargs(), {"screen": "arena", "arena": "frozen_ground", "banner_key": None})
         dropdown = next(x for x in page.children if isinstance(x, menu.ArenaSelect))
         dropdown._values = ["muddy_field"]
-        intr = SimpleNamespace(user=SimpleNamespace(id=22))
+        intr = SimpleNamespace(user=SimpleNamespace(id=22), guild_id=None)
         with patch.object(menu, "navigate", new_callable=AsyncMock) as nav:
             await dropdown.callback(intr)
         new_page = nav.await_args.args[1]
