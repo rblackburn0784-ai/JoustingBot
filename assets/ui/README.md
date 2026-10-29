@@ -1,5 +1,26 @@
 # v0.9.2d — illustrated Discord screens
 
+## v2.9.2f — Earned title standards and arena banners
+
+Download `Jousting_Bot_v2.9.2f_Banner_Art_Pack.zip`. From the root of your updated GitHub checkout, extract it so it creates:
+
+```text
+assets/title_banners/01_the_unhorsed.png
+assets/title_banners/02_shield_splitter.png
+...
+assets/title_banners/27_marshals_favourite.png
+...
+assets/title_banners/30_arena_conqueror.png
+```
+
+All 30 original transparent PNGs are included in the separate artwork ZIP; they are not pushed to GitHub automatically. The renderer also accepts the original archive's `title_banners/` subfolder at the project root if you've already extracted it.
+
+The **Your Title Collection** page automatically renders a 1280×720 royal-blue title gallery with the saved equipped banner on the left and currently browsed title on the right. Locked candidates are labelled locked. **Equip Selected** and **Unequip** update `storage/titles.json` using the existing earned-only `set_title()` API; a separate `equipped_banner_key` is deliberately *not* added because it could conflict with the player's real equipped title.
+
+The **Arena** and **Challenge** preview artwork places a small equipped banner at the far end of each of six arenas. Positions can be tuned in `services/banner_art.py → ARENA_ANCHORS`; these do not affect joust animation sprites or combat physics. No chosen title, a missing banner PNG, or a removed/unearned title selection produces a **neutral plain blue-and-gold** fallback. Never substitute a locked title reward as the default.
+
+For Railway or other cloud deployment, commit the 30 PNGs into your deployment checkout after extracting. Local PyCharm artwork does not transfer to Railway on its own.
+
 ## v2.9.2e — Tournament Hall, History & Trophy Cabinet
 
 The ZIP `Jousting_Bot_v2.9.2e_Tournament_Visual_Pack.zip` contains the three user-supplied tournament backgrounds, with correct filenames and installation paths:
