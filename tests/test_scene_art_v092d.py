@@ -62,14 +62,14 @@ class SceneAssets(unittest.TestCase):
 class SceneMenus(unittest.IsolatedAsyncioTestCase):
     async def test_arena_selected_by_dropdown_rebuilds_defaults_and_image(self):
         page = menu.ArenaPage(22, "frozen_ground")
-        self.assertEqual(page.art_kwargs(), {"screen": "arena", "arena": "frozen_ground"})
+        self.assertEqual(page.art_kwargs(), {"screen": "arena", "arena": "frozen_ground", "banner_key": None})
         dropdown = next(x for x in page.children if isinstance(x, menu.ArenaSelect))
         dropdown._values = ["muddy_field"]
         intr = SimpleNamespace(user=SimpleNamespace(id=22))
         with patch.object(menu, "navigate", new_callable=AsyncMock) as nav:
             await dropdown.callback(intr)
         new_page = nav.await_args.args[1]
-        self.assertEqual(new_page.art_kwargs(), {"screen": "arena", "arena": "muddy_field"})
+        self.assertEqual(new_page.art_kwargs(), {"screen": "arena", "arena": "muddy_field", "banner_key": None})
         self.assertEqual(new_page.make_embed().title, "🏟️ Muddy Field")
         opts = next(x for x in new_page.children if isinstance(x, menu.ArenaSelect)).options
         self.assertTrue(next(o for o in opts if o.value == "muddy_field").default)
