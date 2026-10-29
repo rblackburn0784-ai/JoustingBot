@@ -23,13 +23,13 @@ from cogs.horse import (
 from cogs.profile import knight_stats_embed, horse_stats_embed, history_lines
 from services.arenas import ARENAS
 from services.competition import (
-    CATEGORIES, TITLE_RULES, equipped_title, ranked, set_title, title_progress,
+    CATEGORIES, TITLE_RULES, equipped_title, equipped_title_key, ranked, set_title, title_progress,
 )
 from services.equipment import items_by_slot, get_item
 from services.records import load_history
 from services import ui_art
 
-VERSION = "v2.9.2e"
+VERSION = "v2.9.2f"
 STYLE = discord.ButtonStyle
 
 
@@ -178,8 +178,8 @@ class MainMenuView(OwnedView):
             ("Horse", "🐎", lambda it: navigate(it, HorsePage(it.user.id))),
             ("Equipment", "🛡️", lambda it: navigate(it, EquipmentPage(it.user.id, it.guild_id))),
             ("Shop", "🪙", lambda it: navigate(it, ShopHome(it.user.id, it.guild_id))),
-            ("Arenas", "🏟️", lambda it: navigate(it, ArenaPage(it.user.id))),
-            ("Challenge", "🎯", lambda it: navigate(it, DuelPage(it.user.id))),
+            ("Arenas", "🏟️", lambda it: navigate(it, ArenaPage(it.user.id, guild_id=it.guild_id))),
+            ("Challenge", "🎯", lambda it: navigate(it, DuelPage(it.user.id, guild_id=it.guild_id))),
             ("Training Yard", "🏇", lambda it: navigate(it, TrainingPage(it.user.id, it.guild_id))),
             ("Profile", "📜", lambda it: navigate(it, ProfilePage(it.user.id))),
             ("Leaderboards", "🏆", lambda it: navigate(it, LeaderboardPage(it.user.id, it.guild_id))),
@@ -214,7 +214,7 @@ class StartView(OwnedView):
         self.button("Create Knight", lambda it: navigate(it, KnightPage(it.user.id)), emoji="⚔️")
         self.button("Build Horse", lambda it: navigate(it, HorsePage(it.user.id)), emoji="🐎")
         self.button("Choose Equipment", lambda it: navigate(it, EquipmentPage(it.user.id, it.guild_id)), row=1, emoji="🛡️")
-        self.button("Challenge", lambda it: navigate(it, DuelPage(it.user.id)), row=1, emoji="🎯")
+        self.button("Challenge", lambda it: navigate(it, DuelPage(it.user.id, guild_id=it.guild_id)), row=1, emoji="🎯")
         self.button("Earn Gold", lambda it: navigate(it, ProgressionPage(it.user.id, it.guild_id)), row=2, emoji="🪙")
         self.button("Recover", lambda it: navigate(it, InjuryPage(it.user.id, it.guild_id)), row=2, emoji="🩹")
         self.home()
@@ -1015,21 +1015,25 @@ class ArenaSelect(discord.ui.Select):
         ])
 
     async def callback(self, interaction):
-        await navigate(interaction, ArenaPage(interaction.user.id, selected=self.values[0]))
+        await navigate(interaction, ArenaPage(interaction.user.id, selected=self.values[0], guild_id=interaction.guild_id))
 
 
 class ArenaPage(OwnedView):
-    def __init__(self, user_id: int, selected: str = "royal_lists"):
+    def __init__(self, user_id: int, selected: str = "royal_lists",
+                 guild_id: int | None = None):
         super().__init__(user_id)
+        self.guild_id = guild_id
         self.selected = selected if selected in ARENAS else "royal_lists"
         self.add_item(ArenaSelect(self))
         self.button("Random Arena", self.random, row=1)
-        self.button("Challenge Here", lambda it: navigate(it, DuelPage(it.user.id, arena_key=self.selected)),
+        self.button("Challenge Here", lambda it: navigate(it, DuelPage(it.user.id, arena_key=self.selected, guild_id=it.guild_id)),
                     row=1, style=STYLE.primary)
         self.home()
 
     def art_kwargs(self):
-        return {"screen": "arena", "arena": self.selected}
+        key = (equipped_title_key(self.guild_id, self.owner_id)
+               if self.guild_id is not None else None)
+        return {"screen": "arena", "arena": self.selected, "banner_key": key}
 
     def make_embed(self):
         a = ARENAS[self.selected]
@@ -1039,7 +1043,8 @@ class ArenaPage(OwnedView):
 
     async def random(self, interaction):
         await navigate(interaction, ArenaPage(
-            interaction.user.id, selected=random.choice(list(ARENAS))))
+            interaction.user.id, selected=random.choice(list(ARENAS)),
+            guild_id=interaction.guild_id))
 
 
 class ArenaForDuel(discord.ui.Select):
@@ -1053,7 +1058,8 @@ class ArenaForDuel(discord.ui.Select):
     async def callback(self, interaction):
         await navigate(interaction, DuelPage(
             interaction.user.id, arena_key=self.values[0],
-            instant=self.screen.instant, opponent_id=self.screen.opponent_id))
+            instant=self.screen.instant, opponent_id=self.screen.opponent_id,
+            guild_id=interaction.guild_id))
 
 
 class OpponentSelect(discord.ui.UserSelect):
@@ -1143,8 +1149,10 @@ class TrainingPage(OwnedView):
 
 class DuelPage(OwnedView):
     def __init__(self, user_id: int, arena_key: str = "royal_lists", *,
-                 instant: bool = False, opponent_id: int | None = None):
+                 instant: bool = False, opponent_id: int | None = None,
+                 guild_id: int | None = None):
         super().__init__(user_id, admin=instant)
+        self.guild_id = guild_id
         self.arena_key = arena_key if arena_key in ARENAS else "royal_lists"
         self.opponent_id = opponent_id
         self.instant = instant
@@ -1156,7 +1164,9 @@ class DuelPage(OwnedView):
         self.home()
 
     def art_kwargs(self):
-        return {"screen": "arena", "arena": self.arena_key}
+        key = (equipped_title_key(self.guild_id, self.owner_id)
+               if self.guild_id is not None else None)
+        return {"screen": "arena", "arena": self.arena_key, "banner_key": key}
 
     def make_embed(self):
         mode = "**ADMIN-ONLY instant test**" if self.instant else "Opponent must accept before the joust runs."
@@ -1169,7 +1179,8 @@ class DuelPage(OwnedView):
     async def random(self, interaction):
         await navigate(interaction, DuelPage(
             interaction.user.id, arena_key=random.choice(list(ARENAS)),
-            instant=self.instant, opponent_id=self.opponent_id))
+            instant=self.instant, opponent_id=self.opponent_id,
+            guild_id=interaction.guild_id))
 
     async def start(self, interaction):
         from cogs.joust import ChallengeView, make_challenge_embed
@@ -1333,8 +1344,8 @@ class TitleSelect(discord.ui.Select):
         super().__init__(placeholder="Choose title to equip (must be earned)", options=options, row=0)
 
     async def callback(self, interaction):
-        self.screen.selected = self.values[0]
-        await interaction.response.edit_message(embed=self.screen.make_embed(), view=self.screen)
+        await navigate(interaction, TitlePage(
+            interaction.user.id, interaction.guild_id, self.screen.page, self.values[0]))
 
 
 class TitlePage(OwnedView):
@@ -1353,6 +1364,17 @@ class TitlePage(OwnedView):
         self.button("Next ▶", self.next, row=2, disabled=(page + 1) * self.PER_PAGE >= len(TITLE_RULES))
         self.home()
 
+    def art_kwargs(self):
+        if self.guild_id is None:
+            return {"screen": "title_collection"}
+        progress = title_progress(self.guild_id, self.owner_id)
+        return {
+            "screen": "title_collection",
+            "banner_key": equipped_title_key(self.guild_id, self.owner_id),
+            "preview_key": self.selected if progress[self.selected]["earned"] else None,
+            "preview_locked": not progress[self.selected]["earned"],
+        }
+
     def make_embed(self):
         if self.guild_id is None:
             return embed("🏅 Titles", "Titles are earned separately in each Discord server.")
@@ -1363,7 +1385,7 @@ class TitlePage(OwnedView):
         lines = [f"{'✅' if val['earned'] else '🔒'} **{val['name']}** — {val['progress']}/{val['required']}\n"
                  f"    {val['description']}" for _, val in chunks]
         e = embed("🏅 Your Title Collection",
-                  f"**Equipped:** {equipped or 'None'}\n**Earned:** {sum(p['earned'] for p in status.values())}/{len(status)}\n\n"
+                  f"**Equipped title & banner:** {equipped or 'Default standard'}\n**Earned:** {sum(p['earned'] for p in status.values())}/{len(status)}\n\n"
                   + "\n".join(lines))
         e.add_field(name="Browsing", value=f"Page {self.page + 1} of {(len(entries) + self.PER_PAGE - 1) // self.PER_PAGE}\n"
                     f"Selected: **{status[self.selected]['name']}**", inline=False)
@@ -1378,17 +1400,23 @@ class TitlePage(OwnedView):
     async def equip(self, interaction):
         if self.guild_id is None:
             return await interaction.response.send_message("❌ Use this in a server.", ephemeral=True)
+        await interaction.response.defer()
         try:
-            set_title(self.guild_id, interaction.user.id, self.selected)
+            await asyncio.to_thread(set_title, self.guild_id, interaction.user.id, self.selected)
         except ValueError as exc:
-            return await interaction.response.send_message(f"🔒 {exc}", ephemeral=True)
-        await interaction.response.edit_message(content="✅ Title equipped.", embed=self.make_embed(), view=self)
+            return await interaction.followup.send(f"🔒 {exc}", ephemeral=True)
+        await navigate(interaction, TitlePage(
+            interaction.user.id, interaction.guild_id, self.page, self.selected),
+            "✅ Title and matching banner equipped.")
 
     async def unequip(self, interaction):
         if self.guild_id is None:
             return await interaction.response.send_message("❌ Use this in a server.", ephemeral=True)
-        set_title(self.guild_id, interaction.user.id, None)
-        await interaction.response.edit_message(content="✅ Title unequipped.", embed=self.make_embed(), view=self)
+        await interaction.response.defer()
+        await asyncio.to_thread(set_title, self.guild_id, interaction.user.id, None)
+        await navigate(interaction, TitlePage(
+            interaction.user.id, interaction.guild_id, self.page, self.selected),
+            "✅ Title unequipped. Default banner restored.")
 
 
 class AdminPage(OwnedView):
@@ -1397,7 +1425,7 @@ class AdminPage(OwnedView):
         self.button("System Health", self.health, row=0, emoji="💚")
         self.button("Server Summary", self.summary, row=0, emoji="📊")
         self.button("Maintenance Tools", open_maintenance, row=1, style=STYLE.primary, emoji="🛠️")
-        self.button("Instant Test Duel", lambda it: navigate(it, DuelPage(it.user.id, instant=True)), row=1)
+        self.button("Instant Test Duel", lambda it: navigate(it, DuelPage(it.user.id, instant=True, guild_id=it.guild_id)), row=1)
         self.button("Tournament Director", open_tournaments, row=2, emoji="🏆")
         self.button("Reset User", open_user_reset, row=2, style=STYLE.danger, emoji="🧹")
         self.home()
