@@ -1,5 +1,14 @@
 # Changelog
 
+## v2.9.2e — Tournament Hall, History & Trophy Cabinet Visuals
+
+- Added the user-supplied Tournament Hall (`tournament.png`), Tournament History (`tournament_history.png`) and Trophy Cabinet (`trophy_cabinet.png`) as image-backed private Discord menu screens.
+- Fixed `/menu → Tournaments → History` to navigate to a dedicated History page rather than keeping Tournament Hub buttons under history results.
+- Added image-aware Refresh History, Tournament Menu and Main Menu navigation. All cabinet achievements, tournament titles, career medals and equip-title controls remain intact.
+- Updated `/tournament history`, `/tournament cabinet`, `/tournament achievements` and persistent public tournament History/Trophy buttons to show private illustrated menus.
+- Deferred public-panel/slash interactions before image rendering to avoid Discord interaction expiry; reused the existing threaded renderer and graceful text-only fallback.
+- Left the tournament engine, brackets, player records, equipment, gold, match simulations and admin permissions unchanged; added regression tests.
+
 ## v0.9.2d — Interactive Knight, Horse & Shop Screens
 
 - Added a full-screen 1280×720 illustrated menu renderer for seven player-supplied backgrounds: Shop, Knight, Horse (White, Bay, Black, Grey, Chestnut). Local art is loaded from `assets/ui/` and resized only in-memory for Discord.
