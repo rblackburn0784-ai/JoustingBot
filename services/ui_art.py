@@ -14,6 +14,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
 from services.arenas import ARENAS
+from services import banner_art
 
 BASE = Path(__file__).resolve().parent.parent
 ROOT = BASE / "assets" / "ui"
@@ -173,17 +174,32 @@ def _slots(canvas: Image.Image, screen: str, equipped: dict | None, focus: str |
 
 def render(screen: str, *, coat: str = "chestnut",
            equipped: dict | None = None, focus: str | None = None,
-           arena: str = "royal_lists") -> bytes | None:
+           arena: str = "royal_lists", banner_key: str | None = None,
+           preview_key: str | None = None, preview_locked: bool = False) -> bytes | None:
     """Return JPEG bytes to attach to the SAME private menu message.
 
     Do not construct mock-ups from the joust battle sprites when the user-provided
     PNGs are absent. The embed/controls work without art.
     """
+    if screen == "title_collection":
+        try:
+            picture = banner_art.collection_image(
+                banner_key=banner_key, preview_key=preview_key,
+                preview_locked=preview_locked)
+            stream = io.BytesIO()
+            picture.save(stream, format="JPEG", quality=87, optimize=True)
+            return stream.getvalue()
+        except (OSError, ValueError):
+            return None
+
     path = screen_path(screen, coat, arena)
     if path is None or not path.is_file():
         return None
     try:
         picture = _background(str(path), path.stat().st_mtime_ns).copy()
+        if screen == "arena":
+            picture = banner_art.arena_image(
+                picture, arena=arena, banner_key=banner_key)
         if screen in ("horse", "knight"):
             _slots(picture, screen, equipped, focus)
         stream = io.BytesIO()
