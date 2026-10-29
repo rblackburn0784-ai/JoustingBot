@@ -1,5 +1,15 @@
 # Changelog
 
+## v2.9.3 — Graphical Fine Tuning
+
+- Raised mounts ~36px relative to original background, scaled knights to 90% while retaining a consistent seated foot anchor.
+- Raised the centre barrier and changed layering to blue/far → barrier → red/near.
+- Split original supplied crowd strip into three clipped grandstand positions.
+- Anchored raised and lowered lance sprites to each rider's grip point with correct handed orientation.
+- Removed the central PASS/phase plaque, retained score strip and lower commentary strip.
+- Introduced optional scene_layout.json to fine-tune visuals to locally installed art without Python edits, with safe validated fallbacks.
+- Updated broadcast version label to v2.9.3. Combat outcomes, points and pass playback logic unaffected; added synthetic visual regression tests.
+
 ## v2.9.2f — Equipped Title Banners
 
 - Added safe explicit mapping from all 30 saved title IDs to original transparent title-banner PNGs, including the marshal_favourite filename exception.

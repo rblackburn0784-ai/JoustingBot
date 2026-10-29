@@ -2,11 +2,21 @@
 
 A lightweight medieval jousting Discord game bot built with `discord.py`.
 
-**Current version:** `v2.9.2f — Equipped Title Banners on Collection and Arena Previews`
+**Current version:** `v2.9.3 — Graphical Fine Tuning`
 
 Players create a knight, build and bind a horse, equip both rider and horse, choose an arena, and challenge other Discord users to cinematic jousts with accept/decline buttons.
 
 This version adds cinematic stage-by-stage Discord commentary and generated entrance/final scoreboard PNGs. All v0.9.1 tactics, seeded combat, history, tournaments, progression, injuries and admin safeguards remain intact.
+
+---
+
+## v2.9.3 — Graphical Fine Tuning
+
+The side-on **live joust** renderer has updated positioning and depth. Horses are raised onto the turf/mud, knights are scaled to 90% with their seated position recalculated, and a raised central barrier now separates the red/near and blue/far lanes. The centre **PASS 1 · PREP** plaque has been removed while keeping the main score strip and commentary ticker. Crowd strips are divided across three stands instead of a single stretched row. Lance sprites are rotated about their grip, keeping raised lances in each knight's hands before lowering them for the collision.
+
+The artist-editable calibration file is `assets/jousting/scene_layout.json`. Its coordinates use the existing 960x540 sprite canvas, and changes apply to the **live broadcast** and offline replay. Copy/use your own existing local PNGs under `assets/jousting/`; no art files are required from GitHub. See `assets/jousting/README.md` for exact knobs and testing.
+
+Gameplay, combat scores, RNG, injuries, XP, tournaments, all v2.9.2f title banners and Discord one-GIF-per-pass delivery are unchanged. Run `python -m unittest discover -s tests -v`. Test `/joust` in Discord after pulling, then tune the calibration JSON to your specific artwork.
 
 ---
 

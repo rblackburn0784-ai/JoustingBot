@@ -15,6 +15,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 from services.arenas import ARENAS
+from services.sprite_staging import SceneLayout, load_layout, fill_crowd_stands, attach_lance
 
 LOG = logging.getLogger(__name__)
 ROOT = Path(__file__).resolve().parent.parent
@@ -66,6 +67,7 @@ class AssetCatalog:
 
     def __init__(self, root: Path = ASSET_ROOT):
         self.root = Path(root)
+        self.scene_layout = load_layout(self.root)
         self._cache = {}
         self.missing = set()
         self.use_counts = {group: 0 for group in
@@ -143,18 +145,20 @@ class AssetCatalog:
             return self.horse(coat, "idle", face_right)
         return self._load("horse", (coat, state), files, (285, 285), not face_right)
 
-    def knight(self, colour, state, face_right=True):
+    def knight(self, colour, state, face_right=True, *, scale=1.0):
         colour = "red" if str(colour).lower() == "red" else "blue"
         state = state if state in KNIGHT_STATES else "idle"
         side = "right" if face_right else "left"
+        scale = max(.70, min(1.10, float(scale)))
+        dims = (round(170 * scale), round(272 * scale))
         files = self._numbered(
             self.root / "knights" / (colour + "_knight") / state,
             f"{colour}_knight_{state}", side,
         )
         if not files and state != "idle":
-            return self.knight(colour, "idle", face_right)
-        # Knight art has TWO separately authored directions; never mirror it.
-        return self._load("knight", (colour, state, side), files, (170, 272))
+            return self.knight(colour, "idle", face_right, scale=scale)
+        # The knight art is authored in two directions; do not mirror it.
+        return self._load("knight", (colour, state, side), files, dims)
 
     def arena(self, key):
         path = self.root / "arenas" / (key + ".png")
@@ -228,8 +232,6 @@ def _hud(canvas, a, b, scores, number, phase, message=""):
     n_width = d.textbbox((0, 0), name, font=_font(24))[2]
     d.text((930-n_width, 27), name, font=_font(24), fill=(208, 226, 255))
     d.text((414, 24), f"{scores[0]} : {scores[1]}", font=_font(32), fill="white")
-    d.rounded_rectangle((310, 83, 650, 124), radius=10, fill=(12, 19, 27, 200))
-    d.text((327, 92), f"PASS {number}  •  {phase}", font=_font(22), fill=(248, 210, 148))
     if message:
         d.rounded_rectangle((28, 473, 932, 530), radius=12, fill=(8, 14, 22, 218))
         d.text((42, 492), _fit_text(d, message, 860, 23),
@@ -237,36 +239,43 @@ def _hud(canvas, a, b, scores, number, phase, message=""):
 
 
 def _rider(canvas, atlas, coat, face_right, state, mount_state, x, step,
-           lowered, fallen, broken):
+           lowered, fallen, broken, layout: SceneLayout):
+    """Draw aligned horse, smaller knight, hand-pivot lance and shield."""
     horse = atlas.horse(coat, mount_state, face_right)
-    rider = atlas.knight("red" if face_right else "blue", state, face_right)
-    hy = 195
-    _place(canvas, horse[step % len(horse)], x - 142, hy)
+    rider = atlas.knight("red" if face_right else "blue", state, face_right,
+                        scale=layout.knight_scale)
+    hy = layout.horse_top
+    mount = horse[step % len(horse)]
+    _place(canvas, mount, x - mount.width // 2, hy)
     knight = rider[step % len(rider)]
+    knight_x = round(x - knight.width / 2)
+    knight_y = hy + mount.height - layout.rider_foot_clearance - knight.height
     if fallen:
-        # Progress a falling rider towards the ground over successive frames.
         progress = min(1.0, max(0.0, step / 4))
         angle = 20 + round(60 * progress)
         knight = knight.rotate(-angle if face_right else angle, expand=True,
                                resample=Image.Resampling.BICUBIC)
-        _place(canvas, knight, x-82 + (round(74 * progress) if face_right else -round(74 * progress)),
-               hy-40 + round(130 * progress))
+        _place(canvas, knight, knight_x +
+               (round(74 * progress) if face_right else -round(74 * progress)),
+               knight_y + round(130 * progress))
+        return
+
+    _place(canvas, knight, knight_x, knight_y)
+    grip = (round(x + (layout.lance_hand_offset_x if face_right else
+                       -layout.lance_hand_offset_x)),
+            round(knight_y + knight.height * layout.lance_hand_fraction_y))
+    lance = atlas.prop("broken_lance" if broken else "lance", (196, 33),
+                       flip=not face_right)
+    attach_lance(canvas, lance, hand=grip, face_right=face_right,
+                 raised=not lowered, layout=layout)
+    shield_name = "shield_red" if face_right else "shield_blue"
+    variant = atlas.root / "props" / "variants" / (shield_name + ".png")
+    if variant.is_file():
+        shield = atlas._load("prop", (shield_name,), [variant],
+                             (50, 70), trim=True)[0]
     else:
-        _place(canvas, knight, x-85, hy-55)
-        shield_name = "shield_red" if face_right else "shield_blue"
-        variant = atlas.root / "props" / "variants" / (shield_name + ".png")
-        if variant.is_file():
-            shield = atlas._load("prop", (shield_name,), [variant],
-                                 (50, 70), trim=True)[0]
-        else:
-            shield = atlas.prop("shield", (50, 70))
-        _place(canvas, shield, x+(47 if face_right else -92), hy+60)
-        lance = atlas.prop("broken_lance" if broken else "lance",
-                           (196, 33), flip=not face_right)
-        if not lowered:
-            lance = lance.rotate(-51 if face_right else 51, expand=True)
-        _place(canvas, lance, x+(38 if face_right else -229),
-               hy+91 if lowered else hy-42)
+        shield = atlas.prop("shield", (50, 70))
+    _place(canvas, shield, x + (47 if face_right else -92), grip[1] + 3)
 
 
 def _scene(background, atlas, fa, fb, coat_a, coat_b, log, phase, step, pos,
@@ -276,7 +285,8 @@ def _scene(background, atlas, fa, fb, coat_a, coat_b, log, phase, step, pos,
             "applause" if kind == "unhorsed" else
             "boo" if kind in ("refusal", "slip") else
             "cheer" if kind in ("heavy_hit", "lance_break") else "idle_2")
-    _place(picture, atlas.crowd(mood), 10, 139)
+    layout = getattr(atlas, "scene_layout", SceneLayout())
+    fill_crowd_stands(picture, atlas.crowd(mood), layout.crowd_stands)
     xa, xb = round(95 + 260 * pos), round(865 - 260 * pos)
     mount_a = "idle" if phase == "PREP" else "gallop"
     mount_b = "idle" if phase == "PREP" else "gallop"
@@ -293,16 +303,21 @@ def _scene(background, atlas, fa, fb, coat_a, coat_b, log, phase, step, pos,
     if phase in ("AFTERMATH", "OUTCOME") and kind == "unhorsed":
         if "a" in affected: rider_a = "unhorsed"
         if "b" in affected: rider_b = "unhorsed"
-    _rider(picture, atlas, coat_a, True, rider_a, mount_a, xa, step,
-           phase not in ("PREP", "APPROACH", "GALLOP"), rider_a == "unhorsed",
-           phase in ("AFTERMATH", "OUTCOME") and kind == "lance_break" and winner == "a")
+    # Depth order: far blue -> central barrier -> near red.
     _rider(picture, atlas, coat_b, False, rider_b, mount_b, xb, step,
            phase not in ("PREP", "APPROACH", "GALLOP"), rider_b == "unhorsed",
-           phase in ("AFTERMATH", "OUTCOME") and kind == "lance_break" and winner == "b")
+           phase in ("AFTERMATH", "OUTCOME") and kind == "lance_break" and winner == "b",
+           layout)
+    _place(picture, atlas.prop("barrier", (layout.barrier_width, layout.barrier_height)),
+           layout.barrier_left, layout.barrier_top)
+    _rider(picture, atlas, coat_a, True, rider_a, mount_a, xa, step,
+           phase not in ("PREP", "APPROACH", "GALLOP"), rider_a == "unhorsed",
+           phase in ("AFTERMATH", "OUTCOME") and kind == "lance_break" and winner == "a",
+           layout)
     if phase in ("APPROACH", "CHARGE", "GALLOP", "LANCE READY"):
         dust = atlas.effect("dust_1", (105, 72))
-        _place(picture, dust[step % len(dust)], xa-70, 393)
-        _place(picture, dust[(step+2) % len(dust)], xb+10, 393)
+        _place(picture, dust[step % len(dust)], xa-70, layout.horse_top + 198)
+        _place(picture, dust[(step+2) % len(dust)], xb+10, layout.horse_top + 198)
     elif phase in ("IMPACT", "COLLISION") and kind in ("heavy_hit", "lance_break", "unhorsed"):
         effects = ["impact_flash"]
         if kind in ("lance_break", "unhorsed"): effects.append("splinter")
@@ -310,7 +325,6 @@ def _scene(background, atlas, fa, fb, coat_a, coat_b, log, phase, step, pos,
         for i, effect in enumerate(effects):
             sprites = atlas.effect(effect)
             _place(picture, sprites[step % len(sprites)], 435+22*i, 225+12*i)
-    _place(picture, atlas.prop("barrier", (875, 115)), 43, 408)
     detail = (str(log.result) if phase in ("IMPACT", "AFTERMATH", "COLLISION", "OUTCOME")
               else "") if commentary is None else commentary
     _hud(picture, fa.knight_name, fb.knight_name, scores, log.pass_no, phase, detail)
@@ -362,7 +376,7 @@ def render_match_media(result, fighter_a, fighter_b, arena_key,
     if scores != (result.score_a, result.score_b):
         raise ValueError("Pass totals do not match authoritative result")
     final = background.copy()
-    _place(final, atlas.crowd("applause"), 10, 139)
+    fill_crowd_stands(final, atlas.crowd("applause"), atlas.scene_layout.crowd_stands)
     d = ImageDraw.Draw(final)
     d.rounded_rectangle((65, 103, 894, 448), radius=26,
                         fill=(12, 21, 34, 228), outline=(217, 177, 100), width=3)
