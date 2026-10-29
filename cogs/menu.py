@@ -573,8 +573,9 @@ class InjurySelect(discord.ui.Select):
         )
 
     async def callback(self, interaction):
-        self.screen.selected = self.values[0]
-        await navigate(interaction, self.screen)
+        await navigate(interaction, InjuryPage(
+            interaction.user.id, interaction.guild_id,
+            selected=self.values[0], provider=self.screen.provider))
 
 
 class TreatmentSelect(discord.ui.Select):
@@ -1050,8 +1051,9 @@ class ArenaForDuel(discord.ui.Select):
         ])
 
     async def callback(self, interaction):
-        self.screen.arena_key = self.values[0]
-        await navigate(interaction, self.screen)
+        await navigate(interaction, DuelPage(
+            interaction.user.id, arena_key=self.values[0],
+            instant=self.screen.instant, opponent_id=self.screen.opponent_id))
 
 
 class OpponentSelect(discord.ui.UserSelect):
@@ -1140,10 +1142,11 @@ class TrainingPage(OwnedView):
 
 
 class DuelPage(OwnedView):
-    def __init__(self, user_id: int, arena_key: str = "royal_lists", *, instant: bool = False):
+    def __init__(self, user_id: int, arena_key: str = "royal_lists", *,
+                 instant: bool = False, opponent_id: int | None = None):
         super().__init__(user_id, admin=instant)
-        self.arena_key = arena_key
-        self.opponent_id = None
+        self.arena_key = arena_key if arena_key in ARENAS else "royal_lists"
+        self.opponent_id = opponent_id
         self.instant = instant
         self.add_item(OpponentSelect(self))
         self.add_item(ArenaForDuel(self))
@@ -1164,8 +1167,9 @@ class DuelPage(OwnedView):
                      f"press **Choose Tactics** on the public challenge and privately lock their plans.")
 
     async def random(self, interaction):
-        self.arena_key = random.choice(list(ARENAS))
-        await navigate(interaction, self)
+        await navigate(interaction, DuelPage(
+            interaction.user.id, arena_key=random.choice(list(ARENAS)),
+            instant=self.instant, opponent_id=self.opponent_id))
 
     async def start(self, interaction):
         from cogs.joust import ChallengeView, make_challenge_embed
