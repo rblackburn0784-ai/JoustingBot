@@ -1,5 +1,24 @@
 # v0.9.2d — illustrated Discord screens
 
+## v2.9.2e — Tournament Hall, History & Trophy Cabinet
+
+The ZIP `Jousting_Bot_v2.9.2e_Tournament_Visual_Pack.zip` contains the three user-supplied tournament backgrounds, with correct filenames and installation paths:
+
+```text
+assets/ui/tournament.png
+assets/ui/tournament_history.png
+assets/ui/trophy_cabinet.png
+```
+
+Extract it into the root of your checked-out GitHub project after `git pull origin main`. Do not put the three files under `assets/jousting/` or `assets/ui/arenas/`; these tournament screens look directly in `assets/ui/`.
+
+- `/menu → Tournaments`: Tournament Hall scene, including when no tournament is active
+- `/menu → Tournaments → History`: History scene with ten recent completed events, Refresh History and return buttons
+- `/menu → Tournaments → Trophy Cabinet`: Trophy room scene across Achievements, Titles and Career Medals tabs
+- `/tournament history`, `/tournament cabinet`, `/tournament achievements` and the public tournament History/Cabinet buttons: private illustrated views
+
+Screens keep their existing interactive Discord components and database-driven information. When the art is not installed, the renderer safely produces text-only embeds. If running the bot on Railway, commit and push these PNGs so they are included in the deployed checkout; files present only on your desktop will not appear on Railway.
+
 The seven original full-resolution PNG backgrounds are distributed separately, rather than embedded in the Python source. The updated installer accepts **either of the ZIP files supplied with v2.9.2d**, including artwork nested in subfolders:
 
 - `Jousting_Bot_Setup_PNG_Pack_v2.zip` (original standalone artwork)
