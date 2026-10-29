@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import io
 from collections import defaultdict
 
 import discord
@@ -11,7 +12,7 @@ from discord.ext import commands
 from cogs.knight import get_knight, load_knights
 from cogs.horse import load_horses
 from cogs.menu import MainMenuView, is_admin, OwnedView, navigate
-from services import tournaments as engine
+from services import tournaments as engine, ui_art
 from services.records import load_history
 from services.tournament_awards import (
     achievement_progress, tournament_stats, TOURNAMENT_TITLES,
@@ -104,6 +105,52 @@ class HomeView(OwnedView):
         return discord.Embed(title="Return to the Main Menu")
 
 
+class TournamentHistory(OwnedView):
+    """Dedicated illustrated view of completed tournament results."""
+    def __init__(self, viewer_id: int, guild_id: int | None):
+        super().__init__(viewer_id)
+        self.gid = guild_id
+        self.button("Refresh History", self.refresh, row=0, emoji="🔄")
+        self.button("Tournament Menu", self.back, row=0, emoji="🏆")
+        self.home()
+
+    def art_kwargs(self):
+        return {"screen": "tournament_history"}
+
+    def make_embed(self):
+        if self.gid is None:
+            return discord.Embed(title="📜 Tournament History",
+                                 description="Open this screen inside a server.")
+        return history_embed(self.gid)
+
+    async def refresh(self, interaction):
+        await navigate(interaction, TournamentHistory(interaction.user.id, interaction.guild_id))
+
+    async def back(self, interaction):
+        await navigate(interaction, TournamentHub(
+            interaction.user.id, interaction.guild_id, is_admin(interaction)))
+
+
+async def send_private_screen(interaction: discord.Interaction, view: OwnedView) -> None:
+    """Open an illustrated PRIVATE page from a command or a public announcement.
+
+    This creates a new menu, unlike navigate(), which edits the current one.
+    The defer happens before artwork generation or database reads.
+    """
+    await interaction.response.defer(thinking=True, ephemeral=True)
+    art = await asyncio.to_thread(ui_art.render, **view.art_kwargs())
+    page = view.make_embed()
+    if art:
+        page.set_image(url="attachment://joust_ui.jpg")
+        picture = discord.File(io.BytesIO(art), filename="joust_ui.jpg")
+        try:
+            await interaction.followup.send(embed=page, view=view, file=picture, ephemeral=True)
+        finally:
+            picture.close()
+    else:
+        await interaction.followup.send(embed=page, view=view, ephemeral=True)
+
+
 class TournamentCabinet(OwnedView):
     """Player-locked tournament trophies, milestones and titles."""
     def __init__(self, viewer_id: int, guild_id: int | None,
@@ -123,6 +170,9 @@ class TournamentCabinet(OwnedView):
         self.button("Equip Title", self.equip, row=1, emoji="⚔️")
         self.button("Tournament Menu", self.back, row=1)
         self.home()
+
+    def art_kwargs(self):
+        return {"screen": "trophy_cabinet"}
 
     def make_embed(self):
         e = discord.Embed(title="🏆 Tournament Trophy Cabinet", colour=discord.Colour.gold())
@@ -202,14 +252,14 @@ class TournamentPanel(discord.ui.View):
     async def history(self, interaction, button):
         if interaction.guild_id is None:
             return await interaction.response.send_message("Server only.", ephemeral=True)
-        await interaction.response.send_message(embed=history_embed(interaction.guild_id),
-                                                view=HomeView(interaction.user.id), ephemeral=True)
+        await send_private_screen(
+            interaction, TournamentHistory(interaction.user.id, interaction.guild_id))
 
     @discord.ui.button(label="Trophy Cabinet", emoji="🎖️", style=discord.ButtonStyle.secondary,
                        custom_id="tournament:cabinet", row=1)
     async def cabinet(self, interaction, button):
         view = TournamentCabinet(interaction.user.id, interaction.guild_id)
-        await interaction.response.send_message(embed=view.make_embed(), view=view, ephemeral=True)
+        await send_private_screen(interaction, view)
 
     @discord.ui.button(label="Refresh", emoji="🔄", style=discord.ButtonStyle.secondary,
                        custom_id="tournament:refresh", row=1)
@@ -251,6 +301,9 @@ class TournamentHub(OwnedView):
             self.button("Start Next Match", self.next, row=1)
         self.home()
 
+    def art_kwargs(self):
+        return {"screen": "tournament"}
+
     def make_embed(self):
         return status_embed(self.gid) if self.gid else discord.Embed(
             title="Tournaments", description="Use the tournament menu in your server."
@@ -261,7 +314,7 @@ class TournamentHub(OwnedView):
     async def join(self, it):
         await it.client.get_cog("TournamentCog").do_join(it)
     async def history(self, it):
-        await it.response.edit_message(embed=history_embed(it.guild_id), view=self)
+        await navigate(it, TournamentHistory(it.user.id, it.guild_id))
     async def cabinet(self, it):
         await navigate(it, TournamentCabinet(it.user.id, it.guild_id))
     async def create(self, it):
@@ -493,20 +546,20 @@ class TournamentCog(commands.Cog):
     async def achievements(self, interaction: discord.Interaction, player: discord.Member | None = None):
         view = TournamentCabinet(interaction.user.id, interaction.guild_id,
                                  player.id if player else interaction.user.id)
-        await interaction.response.send_message(embed=view.make_embed(), view=view, ephemeral=True)
+        await send_private_screen(interaction, view)
 
     @group.command(name="cabinet", description="View tournament medals and lifetime progress.")
     @app_commands.guild_only()
     async def cabinet(self, interaction: discord.Interaction):
         view = TournamentCabinet(interaction.user.id, interaction.guild_id,
                                  tab="records")
-        await interaction.response.send_message(embed=view.make_embed(), view=view, ephemeral=True)
+        await send_private_screen(interaction, view)
 
     @group.command(name="history", description="Show recent tournament champions.")
     @app_commands.guild_only()
     async def history(self, interaction: discord.Interaction):
-        await interaction.response.send_message(embed=history_embed(interaction.guild_id),
-                                                view=HomeView(interaction.user.id), ephemeral=True)
+        await send_private_screen(
+            interaction, TournamentHistory(interaction.user.id, interaction.guild_id))
 
 
 async def setup(bot):
