@@ -2,11 +2,28 @@
 
 A lightweight medieval jousting Discord game bot built with `discord.py`.
 
-**Current version:** `v2.9.2e — Tournament Hall, History & Trophy Cabinet Visuals`
+**Current version:** `v2.9.2f — Equipped Title Banners on Collection and Arena Previews`
 
 Players create a knight, build and bind a horse, equip both rider and horse, choose an arena, and challenge other Discord users to cinematic jousts with accept/decline buttons.
 
 This version adds cinematic stage-by-stage Discord commentary and generated entrance/final scoreboard PNGs. All v0.9.1 tactics, seeded combat, history, tournaments, progression, injuries and admin safeguards remain intact.
+
+---
+
+## v2.9.2f — Equipped Title Banners
+
+The 30 original transparent PNG title standards are mapped to their existing stable title keys (including `marshal_favourite` → `27_marshals_favourite.png`).
+
+**The equipped banner follows your saved title**: `/menu → Titles → Equip Selected` continues to enforce earned-only requirements and save to `storage/titles.json`, scoped by Discord server and player. No second, potentially divergent cosmetic save field is introduced. `Unequip` restores a neutral blue-and-gold unmarked standard.
+
+- **Your Title Collection:** an illustrated card shows your currently equipped banner and the title being browsed. Unearned titles display a locked preview. Dropdown selection and equip/unequip immediately refresh the image.
+- **Arenas and Challenge previews:** the equipped title standard appears on the far-end backdrop, scaled to a small distant banner. All six arena backgrounds are supported with individually configurable anchor points; Random Arena and dropdown selection preserve the banner.
+- **Fallbacks:** no equipped title or a missing PNG uses an unbranded generated blue-and-gold standard; missing arena backgrounds still allow text-only menu controls.
+- **Safety:** no combat, tournament, scoring, unlocking, gold, injury or progression adjustments; live joust animations are unchanged.
+
+**Install the artwork:** download `Jousting_Bot_v2.9.2f_Banner_Art_Pack.zip`, run `git pull origin main`, then extract the ZIP into your project root. It installs **30 PNGs** to `assets/title_banners/`. This is a separate art pack; the GitHub source does not embed binary images. For Railway, include the PNGs in the deployed checkout (commit and push them). The original `title_banners/` ZIP folder also works without moving files.
+
+Run `python -m unittest discover -s tests -v` to check title unlock restrictions, persistent selection, artwork rendering and screen callbacks.
 
 ---
 
