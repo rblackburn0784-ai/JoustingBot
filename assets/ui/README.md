@@ -1,25 +1,22 @@
 # v0.9.2d — illustrated Discord screens
 
-**The seven PNG backgrounds are intentionally installed on the player's machine, rather than being embedded in the Python source.** Keep the original artwork at full resolution. Save the seven images supplied in chat into a folder with these exact names:
+The seven original full-resolution PNG backgrounds are distributed separately, rather than embedded in the Python source. The updated installer accepts **either of the ZIP files supplied with v2.9.2d**, including artwork nested in subfolders:
 
-```text
-shop.png
-knight.png
-horse_white.png
-horse_bay.png
-horse_black.png
-horse_grey.png
-horse_chestnut.png
-```
+- `Jousting_Bot_Setup_PNG_Pack_v2.zip` (original standalone artwork)
+- `Jousting_Bot_v2.9.2d.zip` (complete release package)
 
-Copy them to `assets/ui/` OR use:
+From your GitHub checkout, check and then install the backgrounds directly from the downloaded ZIP:
 
 ```powershell
-python tools/install_ui_art_v092d.py --source "C:\\path\\to\\downloaded-screens" --check
-python tools/install_ui_art_v092d.py --source "C:\\path\\to\\downloaded-screens"
+python tools/install_ui_art_v092d.py --source "C:\Downloads\Jousting_Bot_v2.9.2d.zip" --check
+python tools/install_ui_art_v092d.py --source "C:\Downloads\Jousting_Bot_v2.9.2d.zip"
 ```
 
-Because GitHub's source connector handles UTF-8 text files rather than these binary images, the separate images are **not** included in this repository. Until the PNG files have been copied locally, the Shop/Knight/Horse menus gracefully fall back to text controls (no broken placeholders).
+The installer automatically maps `equipment_setup.png` to `shop.png` and `knight_setup.png` to `knight.png`, preserves all five horse-colour filenames, validates each image, and writes **only** the seven artwork files under `assets/ui/`. It never overwrites `.env` or any `storage/` records.
+
+You can also pass a folder containing these files (including nested folders), or install already-renamed `shop.png` / `knight.png` assets. Missing PNGs do not stop gameplay; the Shop, Knight and Horse menus fall back to functional text controls.
+
+The binary artwork is not checked into GitHub, so a fresh Git checkout requires this one-time installation.
 
 ## Which image appears?
 
