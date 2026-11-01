@@ -33,8 +33,8 @@ class SceneLayout:
     barrier_height: int = 92
     lance_raised_degrees: float = 46.0
     lance_lowered_degrees: float = 0.0
-    lance_hand_offset_x: int = 28        # local x offset from rider/horse centre
-    lance_hand_fraction_y: float = 0.53 # fraction down knight PNG, near the grip
+    lance_hand_offset_x: int = 20        # local x offset from rider/horse centre
+    lance_hand_fraction_y: float = 0.48 # fraction down knight PNG, near the grip
     shield_forward_offset_x: int = 8    # off-hand shield near rider's chest
     shield_offhand_lift: int = 49       # lift shield above lance grip
     collision_closure_px: int = 18     # each horse travels slightly further at contact
