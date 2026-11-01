@@ -62,3 +62,16 @@ White/opaque reveals spectators; black/transparent hides them. The masks are res
 The one-pass animation is now approximately 6.95 seconds instead of ~4.36 seconds. All phases and result timings remain in the original single self-contained GIF; the next pass still edits the same Discord message.
 
 Run tests with `python -m unittest discover -s tests -v`.
+
+## v2.9.3d — Fine-tuning shields, gauntlets and the collision gap
+
+The renderer uses the 960×540 stage coordinates. All local artwork remains intact. The `scene_layout.json` adds three visual-only controls and adjusts two original lance anchors:
+
+- `shield_forward_offset_x: 8` — distance forward from each knight's centre to the near edge of the off-hand shield (mirrored for red/blue)
+- `shield_offhand_lift: 49` — how many pixels above the lance grip the shield top is placed
+- `lance_hand_offset_x: 20` — horizontal grip offset from the knight centre (was 28)
+- `lance_hand_fraction_y: 0.48` — vertical fraction down the knight sprite for the lance grip (was 0.53)
+- `collision_closure_px: 18` — additional pixels **per rider** at full contact; smoothly interpolated only after the last 40% of the approach
+
+Lances remain high in the PREP and GALLOP frames and lower during LANCE READY/COLLISION. This alignment places both tips within the opponent's default 50×70 shield area at the collision frame, while not forcing missed/refused/slipped jousts to visibly hit. The values can be changed locally to match different original PNGs. The collision drawing layers and saved stats are unchanged.
+
