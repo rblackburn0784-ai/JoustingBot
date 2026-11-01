@@ -15,7 +15,10 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 from services.arenas import ARENAS
-from services.sprite_staging import SceneLayout, load_layout, fill_crowd_stands, attach_lance
+from services.sprite_staging import (
+    SceneLayout, load_layout, fill_crowd_stands, attach_lance,
+    shield_position, rider_centres,
+)
 from services.live_banner_art import draw_side_banners, entrant_banner_key, NPC_BY_ID
 
 LOG = logging.getLogger(__name__)
@@ -276,7 +279,10 @@ def _rider(canvas, atlas, coat, face_right, state, mount_state, x, step,
                              (50, 70), trim=True)[0]
     else:
         shield = atlas.prop("shield", (50, 70))
-    _place(canvas, shield, x + (47 if face_right else -92), grip[1] + 3)
+    sx, sy = shield_position(
+        rider_centre_x=x, lance_grip_y=grip[1], face_right=face_right,
+        shield_size=shield.size, layout=layout)
+    _place(canvas, shield, sx, sy)
 
 
 def _scene(background, atlas, fa, fb, coat_a, coat_b, log, phase, step, pos,
@@ -294,7 +300,7 @@ def _scene(background, atlas, fa, fb, coat_a, coat_b, log, phase, step, pos,
         picture, left_key=banner_a, right_key=banner_b,
         left_npc=npc_a, right_npc=npc_b,
         left_rect=layout.left_banner_rect, right_rect=layout.right_banner_rect)
-    xa, xb = round(95 + 260 * pos), round(865 - 260 * pos)
+    xa, xb = rider_centres(pos, kind, layout)
     mount_a = "idle" if phase == "PREP" else "gallop"
     mount_b = "idle" if phase == "PREP" else "gallop"
     if phase in ("IMPACT", "AFTERMATH", "COLLISION", "OUTCOME") and kind in ("refusal", "slip"):
