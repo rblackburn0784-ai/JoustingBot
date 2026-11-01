@@ -29,7 +29,7 @@ from services.equipment import items_by_slot, get_item
 from services.records import load_history
 from services import ui_art
 
-VERSION = "v2.9.3a"
+VERSION = "v2.9.3b"
 STYLE = discord.ButtonStyle
 
 
