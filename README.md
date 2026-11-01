@@ -2,7 +2,7 @@
 
 A lightweight medieval jousting Discord game bot built with `discord.py`.
 
-**Current version:** `v2.9.3b — Red & Blue Final Scorecards`
+**Current version:** `v2.9.3d — Rider Shield & Lance Alignment`
 
 Players create a knight, build and bind a horse, equip both rider and horse, choose an arena, and challenge other Discord users to cinematic jousts with accept/decline buttons.
 
