@@ -1,19 +1,46 @@
 {
-  "_notes": "v2.9.3 pixel calibration for 960x540 side-on joust arena art. Tweak locally and restart the bot. Values are visual-only.",
+  "_notes": "v2.9.3a 960x540: middle divider, three bounded crowd boxes and independent fighter standard anchors; visual only.",
   "horse_top": 159,
   "knight_scale": 0.9,
   "rider_foot_clearance": 69,
-  "barrier_left": 43,
-  "barrier_top": 349,
-  "barrier_width": 875,
-  "barrier_height": 115,
+  "barrier_left": 56,
+  "barrier_top": 301,
+  "barrier_width": 845,
+  "barrier_height": 92,
   "lance_raised_degrees": 46,
   "lance_lowered_degrees": 0,
   "lance_hand_offset_x": 28,
   "lance_hand_fraction_y": 0.53,
   "crowd_stands": [
-    [22, 135, 290, 83],
-    [339, 135, 282, 83],
-    [651, 135, 288, 83]
+    [
+      35,
+      132,
+      250,
+      62
+    ],
+    [
+      356,
+      132,
+      248,
+      62
+    ],
+    [
+      675,
+      132,
+      250,
+      62
+    ]
+  ],
+  "left_banner_rect": [
+    30,
+    144,
+    69,
+    133
+  ],
+  "right_banner_rect": [
+    862,
+    144,
+    69,
+    133
   ]
 }
