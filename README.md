@@ -10,6 +10,18 @@ This version adds cinematic stage-by-stage Discord commentary and generated entr
 
 ---
 
+## v2.9.3d — Rider Shield and Lance Alignment
+
+This graphics-only patch adjusts the **existing live joust sprites** in `services/sprite_engine.py`: shields now sit close to the knight's off-hand and higher by the torso, while the lance grip moves inward/up toward the gauntlet. The riders close an additional **18 pixels each near genuine contact**, making both horizontal lance tips meet the opponent's shield. PREP and GALLOP distances are unchanged, as are miss/refusal/slip spacing and all battle logic.
+
+The 960×540 sprite calibration lives in `assets/jousting/scene_layout.json` and can be fine-tuned to your **local PNGs**, with no asset replacements: `shield_forward_offset_x=8`, `shield_offhand_lift=49`, `lance_hand_offset_x=20`, `lance_hand_fraction_y=0.48`, `collision_closure_px=18`. All values have safe validation and defaults.
+
+This applies to both the current one-pass Discord GIF and saved-match sprite replay. The existing blue/far → centre barrier → red/near rendering order remains intact; crowd, flags, scorecards and combat outcomes are unaffected. The stage's precise fit against local sprite art still requires a live screenshot check after updating.
+
+Run `git pull origin main`, `python -m unittest discover -s tests -v`, restart the bot and inspect LANCE READY/COLLISION frames.
+
+---
+
 ## v2.9.3b — Red & Blue Final Scorecards
 
 The final match screen automatically uses one of two supplied medieval tournament scorecards: `assets/broadcast/final_blue_win.png` when the **blue knight wins** and `assets/broadcast/final_red_win.png` when the **red knight wins**. Both are native **1672×941 PNGs**; the original design and pre-drawn WINNER banner are preserved. This affects both the one-message live joust finale and the classic broadcast's final screen.
