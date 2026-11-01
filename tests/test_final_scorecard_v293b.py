@@ -57,12 +57,11 @@ class Templates(unittest.TestCase):
                 self.assertIn(("TRAINING", final_scorecard.BOTTOM_RECTS["format"]), args)
                 self.assertIn((415723, final_scorecard.BOTTOM_RECTS["seed"]), args)
                 # Blue is fighter B: 3 awarded points, 1 unhorsing and 0 injuries.
-                self.assertIn((3, final_scorecard.BOTTOM_RECTS["seed"])
-                              if False else (3, (
-                                  final_scorecard.STAT_X["blue"]-56,
-                                  final_scorecard.STAT_Y["impact_score"]-22,
-                                  final_scorecard.STAT_X["blue"]+56,
-                                  final_scorecard.STAT_Y["impact_score"]+28)), args)
+                self.assertIn((3, (
+                    final_scorecard.STAT_X["blue"]-56,
+                    final_scorecard.STAT_Y["impact_score"]-22,
+                    final_scorecard.STAT_X["blue"]+56,
+                    final_scorecard.STAT_Y["impact_score"]+28)), args)
                 self.assertIn((1, (
                     final_scorecard.STAT_X["red"]-56,
                     final_scorecard.STAT_Y["injuries"]-22,
