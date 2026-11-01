@@ -9,8 +9,8 @@
   "barrier_height": 92,
   "lance_raised_degrees": 46,
   "lance_lowered_degrees": 0,
-  "lance_hand_offset_x": 28,
-  "lance_hand_fraction_y": 0.53,
+  "lance_hand_offset_x": 20,
+  "lance_hand_fraction_y": 0.48,
   "crowd_stands": [
     [
       35,
