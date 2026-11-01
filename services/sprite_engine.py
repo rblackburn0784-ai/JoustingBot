@@ -16,6 +16,7 @@ from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 from services.arenas import ARENAS
 from services.sprite_staging import SceneLayout, load_layout, fill_crowd_stands, attach_lance
+from services.live_banner_art import draw_side_banners, entrant_banner_key, NPC_BY_ID
 
 LOG = logging.getLogger(__name__)
 ROOT = Path(__file__).resolve().parent.parent
@@ -279,14 +280,20 @@ def _rider(canvas, atlas, coat, face_right, state, mount_state, x, step,
 
 
 def _scene(background, atlas, fa, fb, coat_a, coat_b, log, phase, step, pos,
-           scores, kind, affected, winner, commentary=None):
+           scores, kind, affected, winner, commentary=None, *,
+           banner_a=None, banner_b=None, npc_a=False, npc_b=False):
     picture = background.copy()
     mood = ("idle_1" if phase in ("PREP", "APPROACH", "CHARGE", "GALLOP", "LANCE READY") else
             "applause" if kind == "unhorsed" else
             "boo" if kind in ("refusal", "slip") else
             "cheer" if kind in ("heavy_hit", "lance_break") else "idle_2")
     layout = getattr(atlas, "scene_layout", SceneLayout())
-    fill_crowd_stands(picture, atlas.crowd(mood), layout.crowd_stands)
+    fill_crowd_stands(picture, atlas.crowd(mood), layout.crowd_stands,
+                      mask_root=atlas.root / "crowd_masks")
+    draw_side_banners(
+        picture, left_key=banner_a, right_key=banner_b,
+        left_npc=npc_a, right_npc=npc_b,
+        left_rect=layout.left_banner_rect, right_rect=layout.right_banner_rect)
     xa, xb = round(95 + 260 * pos), round(865 - 260 * pos)
     mount_a = "idle" if phase == "PREP" else "gallop"
     mount_b = "idle" if phase == "PREP" else "gallop"
@@ -333,7 +340,7 @@ def _scene(background, atlas, fa, fb, coat_a, coat_b, log, phase, step, pos,
 
 def render_match_media(result, fighter_a, fighter_b, arena_key,
                        out_stem=None, *, catalog=None, coat_a=None, coat_b=None,
-                       max_kib=7500):
+                       max_kib=7500, guild_id=None):
     """Generate a chronological sprite replay from logged passes, without combat calls."""
     atlas = catalog or AssetCatalog()
     background = atlas.arena(arena_key)
@@ -348,9 +355,14 @@ def render_match_media(result, fighter_a, fighter_b, arena_key,
     else:
         coat_b = atlas.horse_coat(fighter_b)
     frames, durations, seen = [], [], set()
+    banner_a = entrant_banner_key(fighter_a, guild_id)
+    banner_b = entrant_banner_key(fighter_b, guild_id)
+    npc_a = getattr(fighter_a, "user_id", None) in NPC_BY_ID
+    npc_b = getattr(fighter_b, "user_id", None) in NPC_BY_ID
     start = type("Intro", (), {"pass_no": 1, "result": ""})()
     frames.append(_scene(background, atlas, fighter_a, fighter_b, coat_a, coat_b,
-                         start, "APPROACH", 0, .15, (0, 0), "clash", set(), "none"))
+                         start, "APPROACH", 0, .15, (0, 0), "clash", set(), "none",
+                         banner_a=banner_a, banner_b=banner_b, npc_a=npc_a, npc_b=npc_b))
     durations.append(700)
     scores = (0, 0)
     per_pass = 13
@@ -371,12 +383,15 @@ def render_match_media(result, fighter_a, fighter_b, arena_key,
                 visible = scores if phase in ("IMPACT", "AFTERMATH") else old
                 frames.append(_scene(background, atlas, fighter_a, fighter_b,
                                      coat_a, coat_b, log, phase, step, pos,
-                                     visible, kind, affected, winner))
+                                     visible, kind, affected, winner,
+                                     banner_a=banner_a, banner_b=banner_b,
+                                     npc_a=npc_a, npc_b=npc_b))
                 durations.append(220 if phase == "IMPACT" else 150 if phase == "AFTERMATH" else 120)
     if scores != (result.score_a, result.score_b):
         raise ValueError("Pass totals do not match authoritative result")
     final = background.copy()
-    fill_crowd_stands(final, atlas.crowd("applause"), atlas.scene_layout.crowd_stands)
+    fill_crowd_stands(final, atlas.crowd("applause"), atlas.scene_layout.crowd_stands,
+                      mask_root=atlas.root / "crowd_masks")
     d = ImageDraw.Draw(final)
     d.rounded_rectangle((65, 103, 894, 448), radius=26,
                         fill=(12, 21, 34, 228), outline=(217, 177, 100), width=3)
