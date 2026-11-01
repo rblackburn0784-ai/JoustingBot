@@ -131,6 +131,13 @@ def intro(prepared) -> bytes:
 
 
 def final(result, prepared) -> bytes:
+    # v2.9.3b: prefer the original artist's winner-specific 1672x941 design.
+    # Draws or missing/damaged PNGs retain the previous fully usable card.
+    from services.final_scorecard import render as render_v293b
+    illustrated = render_v293b(result, prepared)
+    if illustrated is not None:
+        return illustrated
+
     arena_key = getattr(prepared, "arena_key", "royal_lists")
     image = background("final", arena_key)
     draw = ImageDraw.Draw(image)

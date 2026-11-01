@@ -109,7 +109,8 @@ class BroadcastModelTests(unittest.TestCase):
     def test_generated_pngs_have_correct_dimensions_with_no_art(self):
         from PIL import Image
         from services.broadcast_art import intro, final
-        with patch("services.broadcast_art.ROOT") as dummy:
+        with patch("services.broadcast_art.ROOT") as dummy, \
+             patch("services.final_scorecard.render", return_value=None):
             dummy.__truediv__.return_value.is_file.return_value = False
             intro_image = Image.open(io.BytesIO(intro(prepared())))
             end_image = Image.open(io.BytesIO(final(make_result(), prepared())))

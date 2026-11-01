@@ -32,3 +32,19 @@ The resolver prioritises an impact-specific clip, then an arena/stage clip, then
 - `JOUST_BROADCAST_REDUCED_MOTION=true` — show one static final-pass summary without repeated live-screen edits, followed by the full final scoreboard.
 
 The graphical card contains all dynamic text; do not burn the knight names or scores into the background PNGs.
+
+
+## v2.9.3b — Winner-specific final scorecards
+
+The final screen now checks for these two **optional** local PNGs:
+
+```text
+assets/broadcast/final_blue_win.png
+assets/broadcast/final_red_win.png
+```
+
+Extract `Jousting_Bot_v2.9.3b_Final_Scorecards.zip` in the project root after pulling the v2.9.3b Python code. The original 1672×941 designs are preserved without the dark overlay used by the older generic illustration.
+
+**Blue left, red right:** fighter B (blue) appears on the left and fighter A (red) on the right. The winner determines which template has its pre-drawn WINNER ribbon. Passes = recorded passes; Lance Breaks and Unhorsings = awarded actions per fighter; Injuries = new injuries sustained in this particular match; Impact Score = final *awarded joust points*, because the match log does not store cumulative raw impact force. Arena, Format and Seed use recorded match metadata.
+
+For draws, missing PNGs or corrupt images, the renderer keeps the existing neutral scorecard. No match calculations or stored statistics are altered. When deployed on Railway, the two art files must be included in the deployed GitHub checkout; downloading them to a local PyCharm project alone will not supply them to Railway.
