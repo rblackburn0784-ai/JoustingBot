@@ -778,12 +778,20 @@ class JoustCog(commands.Cog):
                                   tactics_b=prepared.tactics_b)
         result_embed = make_result_embed(result, prepared.arena_key)
         match_id = record_match(prepared, result, match_id=record_id, tournament_id=tournament_id)
+        # Presentation-only snapshot from the just-saved match journal.
+        # Never count an old ongoing injury as one acquired during this bout.
+        prepared.scorecard_injuries = {"a": 0, "b": 0}
         if prepared.guild_id is not None and prepared.mode in ("challenge", "training"):
             from services.records import load_history
             entry = next(
                 (m for m in reversed(load_history()["matches"]) if m.get("id") == match_id), {}
             )
             events = entry.get("injuries", [])
+            for event in events:
+                if event.get("user_id") == prepared.challenger.id:
+                    prepared.scorecard_injuries["a"] += 1
+                elif event.get("user_id") == prepared.opponent.id:
+                    prepared.scorecard_injuries["b"] += 1
             if events:
                 descriptions = []
                 for event in events:
