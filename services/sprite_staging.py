@@ -11,14 +11,14 @@ from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 
-from PIL import Image
+from PIL import Image, ImageChops
 
 LOG = logging.getLogger(__name__)
 CANVAS = (960, 540)
 DEFAULT_STANDS = (
-    (22, 135, 290, 83),    # left pavilion
-    (339, 135, 282, 83),   # centre pavilion
-    (651, 135, 288, 83),   # right pavilion
+    (35, 132, 250, 62),    # left viewing box, inside original railings
+    (356, 132, 248, 62),   # middle box
+    (675, 132, 250, 62),   # right box
 )
 
 
@@ -28,14 +28,16 @@ class SceneLayout:
     knight_scale: float = 0.90           # was 1.00
     rider_foot_clearance: int = 69      # rider feet relative to full horse canvas bottom
     barrier_left: int = 43
-    barrier_top: int = 349              # was 408, now separates the near/far lanes
-    barrier_width: int = 875
-    barrier_height: int = 115
+    barrier_top: int = 301              # rail now lives in the middle depth plane
+    barrier_width: int = 845
+    barrier_height: int = 92
     lance_raised_degrees: float = 46.0
     lance_lowered_degrees: float = 0.0
     lance_hand_offset_x: int = 28        # local x offset from rider/horse centre
     lance_hand_fraction_y: float = 0.53 # fraction down knight PNG, near the grip
     crowd_stands: tuple[tuple[int, int, int, int], ...] = DEFAULT_STANDS
+    left_banner_rect: tuple[int, int, int, int] = (30, 144, 69, 133)
+    right_banner_rect: tuple[int, int, int, int] = (862, 144, 69, 133)
 
     def __post_init__(self):
         if not (105 <= self.horse_top <= 245):
@@ -63,6 +65,9 @@ class SceneLayout:
         for x, y, width, height in self.crowd_stands:
             if x < 0 or y < 0 or width < 30 or height < 20 or x + width > CANVAS[0] or y + height > CANVAS[1]:
                 raise ValueError("Crowd stand out of image bounds")
+        for x, y, width, height in (self.left_banner_rect, self.right_banner_rect):
+            if x < 0 or y < 78 or width < 30 or height < 40 or x + width > CANVAS[0] or y + height > 460:
+                raise ValueError("Side banner anchor out of image bounds")
 
 
 @lru_cache(maxsize=16)
@@ -74,14 +79,21 @@ def _from_json(path: str, mtime_ns: int) -> SceneLayout:
             raise ValueError("layout root must be an object")
         allowed = set(SceneLayout.__dataclass_fields__)
         overrides = {k: v for k, v in data.items() if k in allowed}
-        if "crowd_stands" in overrides:
-            overrides["crowd_stands"] = tuple(tuple(rect) for rect in overrides["crowd_stands"])
+        for key in ("crowd_stands", "left_banner_rect", "right_banner_rect"):
+            if key in overrides:
+                if key == "crowd_stands":
+                    overrides[key] = tuple(tuple(rect) for rect in overrides[key])
+                else:
+                    overrides[key] = tuple(overrides[key])
         # Require numerical values, not arbitrary strings/paths from config.
         for key, value in overrides.items():
             if key == "crowd_stands":
                 if not all(len(rect) == 4 and all(type(n) is int for n in rect)
                            for rect in value):
                     raise ValueError("crowd_stands entries must be four integers")
+            elif key in ("left_banner_rect", "right_banner_rect"):
+                if len(value) != 4 or not all(type(n) is int for n in value):
+                    raise ValueError(f"{key} must be four integers")
             elif type(value) not in (int, float):
                 raise ValueError(f"{key} must be numeric")
         return SceneLayout(**overrides)
@@ -101,10 +113,12 @@ def load_layout(asset_root: Path) -> SceneLayout:
 
 
 def fill_crowd_stands(canvas: Image.Image, crowd: Image.Image,
-                      stands: tuple[tuple[int, int, int, int], ...]) -> None:
-    """Split the supplied transparent crowd strip across 3 clipped stands.
+                      stands: tuple[tuple[int, int, int, int], ...],
+                      mask_root: Path | None = None) -> None:
+    """Fit three independent crowd sections into the three raised pavilions.
 
-    Never paint on the approach, railing or turf outside the 3 bounding boxes.
+    Regions are hard-clipped to their boxes; optional local PNG alpha masks
+    remove spectators at arches, pillars and grandstand borders.
     """
     image = crowd.convert("RGBA")
     width, height = image.size
@@ -113,6 +127,21 @@ def fill_crowd_stands(canvas: Image.Image, crowd: Image.Image,
         right = round((index + 1) * width / 3)
         portion = image.crop((left, 0, right, height)).resize(
             (target_width, target_height), Image.Resampling.LANCZOS)
+        if mask_root is not None:
+            filename = ("left", "centre", "right")[index] + ".png"
+            mask_file = Path(mask_root) / filename
+            if mask_file.is_file():
+                try:
+                    with Image.open(mask_file) as mask:
+                        # Alpha channel takes priority for transparent PNGs.
+                        active = (mask.getchannel("A") if "A" in mask.getbands()
+                                  else mask.convert("L"))
+                        active = active.resize(
+                            (target_width, target_height), Image.Resampling.LANCZOS)
+                        portion.putalpha(ImageChops.multiply(
+                            portion.getchannel("A"), active))
+                except (OSError, ValueError):
+                    LOG.warning("Ignoring invalid crowd stand mask: %s", mask_file)
         canvas.alpha_composite(portion, (x, y))
 
 
