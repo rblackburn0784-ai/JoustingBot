@@ -1,5 +1,14 @@
 # Changelog
 
+## v2.9.3b — Red and Blue Final Scorecards
+
+- Integrated the supplied 1672×941 blue-victory and red-victory PNG designs into the existing final-scorecard compositor, preserving the original artwork.
+- Correctly mapped blue/fighter B to the left and red/fighter A to the right, regardless of which wins.
+- Overlaid both knight names; passes, lance breaks, unhorsings, current-bout injuries, final points (art labels them Impact Score); arena, match mode and original match seed.
+- Passed true new-injury counts from the already-written match record without double counting ongoing injuries or editing gameplay data.
+- Reused the existing one-message live finale and fallback broadcast. Draws and missing PNGs keep the original neutral graphic.
+- Distributed art as a separate ZIP for local or Railway install and added regression tests for winner selection, field placement, stats and missing-asset fallback.
+
 ## v2.9.3a — Cinematic Timing, Three Grandstands and Fighter Flags
 
 - Lengthened each five-stage live GIF pass to approximately 6.95 seconds, keeping a single editable Discord message and normal final outcome hold.
