@@ -36,7 +36,7 @@ class SceneLayout:
     lance_hand_offset_x: int = 20        # local x offset from rider/horse centre
     lance_hand_fraction_y: float = 0.48 # fraction down knight PNG, near the grip
     shield_forward_offset_x: int = 8    # off-hand shield near rider's chest
-    shield_offhand_lift: int = 49       # lift shield above lance grip
+    shield_offhand_lift: int = 35       # reduced lift; shield sits just below helmet
     collision_closure_px: int = 18     # each horse travels slightly further at contact
     crowd_stands: tuple[tuple[int, int, int, int], ...] = DEFAULT_STANDS
     left_banner_rect: tuple[int, int, int, int] = (30, 144, 69, 133)
