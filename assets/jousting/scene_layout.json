@@ -44,6 +44,6 @@
     133
   ],
   "shield_forward_offset_x": 8,
-  "shield_offhand_lift": 49,
+  "shield_offhand_lift": 35,
   "collision_closure_px": 18
 }

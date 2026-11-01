@@ -18,17 +18,17 @@ class ContactGeometryTests(unittest.TestCase):
     def test_shields_move_up_and_inwards_on_both_riders(self):
         layout = sprite_staging.SceneLayout()
         self.assertEqual(layout.shield_forward_offset_x, 8)
-        self.assertEqual(layout.shield_offhand_lift, 49)
+        self.assertEqual(layout.shield_offhand_lift, 35)
         self.assertEqual(
             sprite_staging.shield_position(
                 rider_centre_x=373, lance_grip_y=260,
                 face_right=True, shield_size=(50, 70), layout=layout),
-            (381, 211))
+            (381, 225))
         self.assertEqual(
             sprite_staging.shield_position(
                 rider_centre_x=587, lance_grip_y=260,
                 face_right=False, shield_size=(50, 70), layout=layout),
-            (529, 211))
+            (529, 225))
 
     def test_collision_lance_tips_land_inside_opponents_shields(self):
         layout = sprite_staging.SceneLayout()
