@@ -17,6 +17,7 @@ import discord
 
 from services.live_sprite_renderer import render_live_pass, validate_result
 from services.sprite_engine import ASSET_ROOT, AssetCatalog
+from services.live_banner_art import entrant_banner_key, NPC_BY_ID
 
 LOG = logging.getLogger(__name__)
 
@@ -55,7 +56,7 @@ def _screen_embed(result, clip, *, arena_key):
         colour=discord.Colour(0xB4874C),
     )
     e.set_image(url=f"attachment://{clip.path.name}")
-    e.set_footer(text=f"JoustingBot v2.9.3 · {clip.pass_no} of {len(result.passes)} passes")
+    e.set_footer(text=f"JoustingBot v2.9.3a · {clip.pass_no} of {len(result.passes)} passes")
     return e
 
 
@@ -157,6 +158,13 @@ async def play_live_match(sender, result, prepared, *,
 
     atlas = catalog or AssetCatalog()
     fa, fb = prepared.fighter_a, prepared.fighter_b
+    # Resolve flags ONCE per bout from the existing guild-scoped equipped
+    # title (or the named training NPC), not once per animation frame.
+    guild_id = getattr(prepared, "guild_id", None)
+    banner_a = entrant_banner_key(fa, guild_id)
+    banner_b = entrant_banner_key(fb, guild_id)
+    npc_a = getattr(fa, "user_id", None) in NPC_BY_ID
+    npc_b = getattr(fb, "user_id", None) in NPC_BY_ID
     visible_ticker = _flag("JOUST_LIVE_TICKER", True)
     reduced = _flag("JOUST_BROADCAST_REDUCED_MOTION")
     limit = _max_kib()
@@ -173,9 +181,11 @@ async def play_live_match(sender, result, prepared, *,
         log, before, after = job
         return render_live_pass(
             result, fa, fb, prepared.arena_key, log, before, after,
-            atlas=atlas, horse_a=prepared.horse_a, horse_b=prepared.horse_b,
+            atlas=atlas, horse_a=getattr(prepared, "horse_a", None),
+            horse_b=getattr(prepared, "horse_b", None),
             max_kib=limit, show_ticker=visible_ticker,
             reduced_motion=reduced, out_stem=stem,
+            banner_a=banner_a, banner_b=banner_b, npc_a=npc_a, npc_b=npc_b,
         )
 
     try:
