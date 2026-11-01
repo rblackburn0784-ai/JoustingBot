@@ -33,8 +33,11 @@ class SceneLayout:
     barrier_height: int = 92
     lance_raised_degrees: float = 46.0
     lance_lowered_degrees: float = 0.0
-    lance_hand_offset_x: int = 28        # local x offset from rider/horse centre
-    lance_hand_fraction_y: float = 0.53 # fraction down knight PNG, near the grip
+    lance_hand_offset_x: int = 20        # local x offset from rider/horse centre
+    lance_hand_fraction_y: float = 0.48 # fraction down knight PNG, near the grip
+    shield_forward_offset_x: int = 8    # off-hand shield near rider's chest
+    shield_offhand_lift: int = 49       # lift shield above lance grip
+    collision_closure_px: int = 18     # each horse travels slightly further at contact
     crowd_stands: tuple[tuple[int, int, int, int], ...] = DEFAULT_STANDS
     left_banner_rect: tuple[int, int, int, int] = (30, 144, 69, 133)
     right_banner_rect: tuple[int, int, int, int] = (862, 144, 69, 133)
@@ -56,6 +59,12 @@ class SceneLayout:
             raise ValueError("lance_hand_offset_x outside safe range")
         if not (.25 <= self.lance_hand_fraction_y <= .80):
             raise ValueError("lance_hand_fraction_y outside safe range")
+        if not (0 <= self.shield_forward_offset_x <= 50):
+            raise ValueError("shield_forward_offset_x outside safe range")
+        if not (10 <= self.shield_offhand_lift <= 85):
+            raise ValueError("shield_offhand_lift outside safe range")
+        if not (0 <= self.collision_closure_px <= 45):
+            raise ValueError("collision_closure_px outside safe stage range")
         if not (0 <= self.barrier_left < CANVAS[0] and
                 400 <= self.barrier_width <= CANVAS[0] and
                 30 <= self.barrier_height <= 180):
@@ -143,6 +152,48 @@ def fill_crowd_stands(canvas: Image.Image, crowd: Image.Image,
                 except (OSError, ValueError):
                     LOG.warning("Ignoring invalid crowd stand mask: %s", mask_file)
         canvas.alpha_composite(portion, (x, y))
+
+
+def shield_position(*, rider_centre_x: int, lance_grip_y: int,
+                    face_right: bool, shield_size: tuple[int, int],
+                    layout: SceneLayout) -> tuple[int, int]:
+    """Place the shield just outside the knight's off-hand, not on the mount.
+
+    Offsets are mirrored for red/right-facing and blue/left-facing riders.
+    This uses the REAL shield dimensions so custom local variants still align.
+    """
+    width, _height = shield_size
+    forward = layout.shield_forward_offset_x
+    left = (rider_centre_x + forward if face_right
+            else rider_centre_x - forward - width)
+    return round(left), round(lance_grip_y - layout.shield_offhand_lift)
+
+
+def rider_centres(position: float, kind: str, layout: SceneLayout) -> tuple[int, int]:
+    """Move the riders nearer at a genuine hit, without premature collisions.
+
+    At PREP/GALLOP the trajectory is unchanged. From the final ready sequence
+    onward it eases in up to collision_closure_px *per rider*.
+    Misses/refusals/slips never receive this extra contact motion.
+    """
+    pos = max(0.0, min(1.0, float(position)))
+    red = round(95 + 260 * pos)
+    blue = round(865 - 260 * pos)
+    if kind in ("miss", "refusal", "slip"):
+        return red, blue
+    fraction = max(0.0, min(1.0, (pos - .60) / .40))
+    extra = round(layout.collision_closure_px * fraction)
+    return red + extra, blue - extra
+
+
+def lance_tip(*, hand: tuple[int, int], face_right: bool,
+              length: int = 196) -> tuple[int, int]:
+    """Projected forward tip of a horizontal lance at the collision stage.
+
+    Matches the pivot percentages in attach_lance; used by alignment tests.
+    """
+    reach = round(length * .81)
+    return (hand[0] + (reach if face_right else -reach), hand[1])
 
 
 def attach_lance(canvas: Image.Image, lance: Image.Image, *,

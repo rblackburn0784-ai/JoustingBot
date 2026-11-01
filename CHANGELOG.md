@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.9.3d — Rider Shield and Lance Alignment
+
+- Moved red and blue shields inward alongside the knight's off-hand and upward to cover the torso instead of appearing near the horse.
+- Raised the lance hand anchor and moved it closer to each rider's gauntlet; preserved the PREP raised and collision lowered lance phases.
+- Gradually brought both fighters up to 18px closer each when entering a real collision, ensuring horizontal lance tips meet the opposing shield silhouette. Misses, refusals and slips keep their existing spacing.
+- Added artist-adjustable, validated `shield_forward_offset_x`, `shield_offhand_lift` and `collision_closure_px` settings to `scene_layout.json`; adjusted `lance_hand_offset_x` and `lance_hand_fraction_y`.
+- Added synthetic tests for both off-hand shields, geometric tip-to-shield contact, missed charges, custom config and actual sprite compositing. Gameplay and saved match data remain unchanged.
+
 ## v2.9.3b — Red and Blue Final Scorecards
 
 - Integrated the supplied 1672×941 blue-victory and red-victory PNG designs into the existing final-scorecard compositor, preserving the original artwork.
