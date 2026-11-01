@@ -40,3 +40,25 @@ The original `PASS 1 · PREP` box is gone. The score/name strip and lower textua
 python -m unittest discover -s tests -v
 ```
 
+## v2.9.3a — Field-side banners and grandstand cropping
+
+Pull the latest source code; **retain your existing local arena, horse, knight, prop, crowd and title banner PNGs**. The bot uses them without rebuilding or overwriting them.
+
+`scene_layout.json` now includes the middle-divider calibration:
+`barrier_left=56`, `barrier_top=301`, `barrier_width=845`, `barrier_height=92`.
+These are 960×540 pixel values, not Discord embed dimensions. Blue riders render behind that rail; red riders render in front.
+
+For the three separate Royal Lists viewing boxes, set:
+`crowd_stands=[[35,132,250,62],[356,132,248,62],[675,132,250,62]]`.
+If people overlap stands' curved arches, create optional **local** black/transparent PNG masks:
+`assets/jousting/crowd_masks/left.png`,
+`assets/jousting/crowd_masks/centre.png`,
+`assets/jousting/crowd_masks/right.png`.
+White/opaque reveals spectators; black/transparent hides them. The masks are resized to their assigned boxes and the crowd is clipped even without masks.
+
+`left_banner_rect=[30,144,69,133]` and
+`right_banner_rect=[862,144,69,133]` place the **player's chosen title** to the red/left and blue/right edges. Players without a current earned/equipped title have **no visible banner**. The 12 training opponents instead have fixed cosmetic personality-matched title-art choices; those do not count as earned achievements or affect XP. Install optional artwork from the previous `assets/title_banners/` ZIP for the illustrated versions.
+
+The one-pass animation is now approximately 6.95 seconds instead of ~4.36 seconds. All phases and result timings remain in the original single self-contained GIF; the next pass still edits the same Discord message.
+
+Run tests with `python -m unittest discover -s tests -v`.

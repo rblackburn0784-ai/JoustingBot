@@ -70,23 +70,23 @@ def timeline(kind="clash"):
     slow = kind in ("refusal", "slip")
     meet = .67 if slow else 1.0
     path = [
-        Moment("PREP", i, .11, 280 if i == 0 else 150)
+        Moment("PREP", i, .11, 400 if i == 0 else 210)
         for i in range(4)
     ]
     path += [
-        Moment("GALLOP", i, .12 + i * .067, 115)
+        Moment("GALLOP", i, .12 + i * .067, 170)
         for i in range(7)
     ]
     path += [
-        Moment("LANCE READY", i, .60 + (meet-.60) * i / 6, 130)
+        Moment("LANCE READY", i, .60 + (meet-.60) * i / 6, 210)
         for i in range(7)
     ]
     path += [
-        Moment("COLLISION", i, meet, 180 if i != 2 else 260)
+        Moment("COLLISION", i, meet, 460 if i == 1 else 300)
         for i in range(3)
     ]
     path += [
-        Moment("OUTCOME", i, max(.55, meet-.04*i), 160 if i != 4 else 650)
+        Moment("OUTCOME", i, max(.55, meet-.04*i), 250 if i != 4 else 1200)
         for i in range(5)
     ]
     return tuple(path)
@@ -153,7 +153,8 @@ def _save_gif(images, moments, destination, max_kib):
 def render_live_pass(result, fighter_a, fighter_b, arena_key, log,
                      score_before, score_after, *, atlas=None, horse_a=None,
                      horse_b=None, max_kib=7500, show_ticker=True,
-                     reduced_motion=False, out_stem=None):
+                     reduced_motion=False, out_stem=None,
+                     banner_a=None, banner_b=None, npc_a=False, npc_b=False):
     """Generate one pass file, never the entire match in a single recap dump."""
     atlas = atlas or AssetCatalog()
     coat_a = _coat(atlas, fighter_a, horse_a)
@@ -173,6 +174,7 @@ def render_live_pass(result, fighter_a, fighter_b, arena_key, log,
             background, atlas, fighter_a, fighter_b, coat_a, coat_b,
             log, item.phase, item.step, item.position, visible_score,
             kind, affected, winner, commentary=ticker,
+            banner_a=banner_a, banner_b=banner_b, npc_a=npc_a, npc_b=npc_b,
         ))
     RENDER_DIR.mkdir(parents=True, exist_ok=True)
     stem = re.sub(r"[^A-Za-z0-9_-]", "_", str(out_stem or "joust"))[:42]

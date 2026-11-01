@@ -100,8 +100,8 @@ class LayerTests(unittest.TestCase):
         self.assertEqual(canvas.getpixel((820, layout.barrier_top + 42))[:3],
                          (30, 230, 60))
         # Near/red horse covers the barrier because it is in front.
-        self.assertEqual(canvas.getpixel((140, layout.barrier_top + 42))[:3],
-                         (222, 32, 26))
+        self.assertIn(canvas.getpixel((140, layout.barrier_top + 42))[:3],
+                      ((222, 32, 26), (235, 80, 67)))  # Near horse OR its rider is above the divider
         # The previous pass/phase black plaque must not be drawn.
         self.assertEqual(canvas.getpixel((470, 100))[:3], (40, 60, 80))
         # But the scoreboard still exists.

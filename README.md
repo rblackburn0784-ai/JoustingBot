@@ -2,11 +2,24 @@
 
 A lightweight medieval jousting Discord game bot built with `discord.py`.
 
-**Current version:** `v2.9.3 — Graphical Fine Tuning`
+**Current version:** `v2.9.3a — Cinematic Jousts and Player Standards`
 
 Players create a knight, build and bind a horse, equip both rider and horse, choose an arena, and challenge other Discord users to cinematic jousts with accept/decline buttons.
 
 This version adds cinematic stage-by-stage Discord commentary and generated entrance/final scoreboard PNGs. All v0.9.1 tactics, seeded combat, history, tournaments, progression, injuries and admin safeguards remain intact.
+
+---
+
+## v2.9.3a — Cinematic Jousts and Player Standards
+
+- **Longer animated pass:** the same five chronological GIF stages now play for approximately **6.95 seconds** (previously roughly 4.36 seconds), holding PREP, lance-ready, collision and outcome moments longer. No extra match passes, messages, RNG or results.
+- **Middle divider:** the barrier is smaller and raised into the middle plane at `[56, 301, 845, 92]` on the 960×540 sprite canvas. Drawing order remains blue/far rider → central barrier → red/near rider.
+- **Crowd stands:** the crowd PNG is divided into three hard-clipped viewing-box regions, rather than spanning the whole grandstand. Optional local `assets/jousting/crowd_masks/{left,centre,right}.png` can trim spectators around arches/pillars; each supplied mask's opacity is multiplied into the local crowd region.
+- **Side standards:** fighters' title flags appear at left/red and right/blue arena edges. A real player is displayed **only when they have an earned, equipped title** in the relevant Discord server; otherwise nothing is drawn, even when a generic title image is available. All 12 named training NPCs receive a distinct personality-matched flag using your existing `assets/title_banners/` PNGs; when NPC artwork is unavailable, a small procedural heraldic standard is used. No NPC is awarded the actual title.
+- **Artist configuration:** `assets/jousting/scene_layout.json` contains independently tunable `crowd_stands`, `barrier_top/height`, `left_banner_rect`, `right_banner_rect` and all v2.9.3 calibration settings. PNGs stay local; no art has been overwritten by these commits.
+- **Compatibility:** both live per-pass GIFs and offline match replays accept flags; reduced-motion still renders a static result. Combat, equipment, tournament, injury, XP and progression rules stay intact.
+
+Run `python -m unittest discover -s tests -v`, restart the bot, and check the Royal Lists PREP and COLLISION frames to fine-tune the art alignment with your specific local sprites.
 
 ---
 
