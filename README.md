@@ -2,11 +2,25 @@
 
 A lightweight medieval jousting Discord game bot built with `discord.py`.
 
-**Current version:** `v2.9.3a — Cinematic Jousts and Player Standards`
+**Current version:** `v2.9.3b — Red & Blue Final Scorecards`
 
 Players create a knight, build and bind a horse, equip both rider and horse, choose an arena, and challenge other Discord users to cinematic jousts with accept/decline buttons.
 
 This version adds cinematic stage-by-stage Discord commentary and generated entrance/final scoreboard PNGs. All v0.9.1 tactics, seeded combat, history, tournaments, progression, injuries and admin safeguards remain intact.
+
+---
+
+## v2.9.3b — Red & Blue Final Scorecards
+
+The final match screen automatically uses one of two supplied medieval tournament scorecards: `assets/broadcast/final_blue_win.png` when the **blue knight wins** and `assets/broadcast/final_red_win.png` when the **red knight wins**. Both are native **1672×941 PNGs**; the original design and pre-drawn WINNER banner are preserved. This affects both the one-message live joust finale and the classic broadcast's final screen.
+
+**Critical layout mapping:** blue is on the **left** and red is on the **right** of both templates. In the saved match, fighter A is **red**, fighter B **blue**, so the text/stats are intentionally positioned by colour, not by the A/B data order.
+
+Dynamic fields are the two knight names, **passes**, **lance breaks**, **unhorsings**, **new injuries sustained in this bout**, **impact score** (final awarded match points), and **arena / format / seed**. Figures are taken from the already-saved match; no extra combat or RNG. Missing/corrupt art or a draw uses the pre-existing neutral generated scorecard.
+
+**To install the PNGs:** download `Jousting_Bot_v2.9.3b_Final_Scorecards.zip` from the release conversation, `git pull origin main`, then extract the ZIP **into the project root**. This installs only `assets/broadcast/final_blue_win.png` and `assets/broadcast/final_red_win.png`, leaving your existing `.env`, `storage/`, arenas and sprites untouched. Your image files are not uploaded to GitHub by this code change, so a Railway deployment also requires adding the two PNGs to the deployed repository/build.
+
+Run `python -m unittest discover -s tests -v` and perform a red-win and blue-win joust after restarting the bot.
 
 ---
 
