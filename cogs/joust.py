@@ -28,7 +28,7 @@ from services.injuries import (
 )
 
 
-VERSION_LABEL = "JoustingBot v0.9.2d — Illustrated Menus & Shop"
+VERSION_LABEL = "JoustingBot v2.9.3b — Final Scorecards"
 CHALLENGE_TIMEOUT_SECONDS = 240
 
 
