@@ -1,5 +1,15 @@
 # Changelog
 
+## v2.9.3a — Cinematic Timing, Three Grandstands and Fighter Flags
+
+- Lengthened each five-stage live GIF pass to approximately 6.95 seconds, keeping a single editable Discord message and normal final outcome hold.
+- Raised/reduced the central barrier into the between-horse depth plane; preserves blue-behind and red-in-front layers.
+- Tightened three separate crowd seating rectangles; optional left/centre/right transparent PNG masks improve crowd integration with local stand art.
+- Drew unlocked-and-equipped player title banners at the arena's left and right edges, independently per player and guild. No title means no banner.
+- Assigned 12 individually selected personality-themed flags to the 12 named training opponents, with an original heraldic fallback if the optional local PNG is absent.
+- Extended scene_layout.json with configurable side banner anchors. Existing locally installed artworks, combat scoring and records untouched.
+- Added dedicated tests for duration, authentic equipped-title lookup, NPC assignments, clipping and banners.
+
 ## v2.9.3 — Graphical Fine Tuning
 
 - Raised mounts ~36px relative to original background, scaled knights to 90% while retaining a consistent seated foot anchor.
