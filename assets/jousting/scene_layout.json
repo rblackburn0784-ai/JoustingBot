@@ -1,5 +1,5 @@
 {
-  "_notes": "v2.9.3a 960x540: middle divider, three bounded crowd boxes and independent fighter standard anchors; visual only.",
+  "_notes": "v2.9.3d 960x540 stage calibration. Off-hand shields raised/inboard; riders converge only for genuine lance contacts. Visual-only.",
   "horse_top": 159,
   "knight_scale": 0.9,
   "rider_foot_clearance": 69,
@@ -42,5 +42,8 @@
     144,
     69,
     133
-  ]
+  ],
+  "shield_forward_offset_x": 8,
+  "shield_offhand_lift": 49,
+  "collision_closure_px": 18
 }
