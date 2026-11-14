@@ -19,10 +19,12 @@ ART_ROOT = Path(__file__).resolve().parents[1] / "assets" / "ui" / "intro_screen
 SIZE = (1672, 941)
 ARENA_FILES = {key: f"{key}_intro.png" for key in ARENAS}
 INK = (64, 37, 19)
-RED_NAME = (151, 716, 573, 812)
-BLUE_NAME = (1093, 716, 1515, 812)
-EVENT_RECT = (545, 114, 1127, 196)
-ARENA_RECT = (609, 191, 1063, 239)
+# Name rectangles follow the centres of the two lower parchment plaques.
+RED_NAME = (118, 700, 592, 796)
+BLUE_NAME = (1080, 700, 1554, 796)
+EVENT_RECT = (535, 108, 1137, 192)
+# Separate arena subtitle, slightly higher and below the event title.
+ARENA_RECT = (618, 170, 1054, 214)
 RED_BANNER = (145, 76, 182, 231)
 BLUE_BANNER = (1345, 76, 182, 231)
 CREST_RECT = (806, 237, 870, 304)
@@ -43,8 +45,20 @@ def event_type(prepared) -> str:
 
 
 def _font(size: int) -> ImageFont.ImageFont:
-    for name in ("DejaVuSerif-Bold.ttf", "Georgia Bold.ttf",
-                 "DejaVuSans-Bold.ttf", "arialbd.ttf"):
+    """Prefer readable medieval display lettering, then portable bold serif."""
+    for name in (
+        "CinzelDecorative-Bold.ttf",
+        "Cinzel-Bold.ttf",
+        "CormorantGaramond-Bold.ttf",
+        "GoudyTextMT-LombardicCapitals.ttf",
+        "Old English Text MT.ttf",
+        "UnifrakturCook-Bold.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf",
+        "DejaVuSerif-Bold.ttf",
+        "Georgia Bold.ttf",
+        "Times New Roman Bold.ttf",
+        "arialbd.ttf",
+    ):
         try:
             return ImageFont.truetype(name, size)
         except OSError:
@@ -54,23 +68,34 @@ def _font(size: int) -> ImageFont.ImageFont:
 
 def _text(draw: ImageDraw.ImageDraw, label: object,
           box: tuple[int, int, int, int], *, size: int, minimum: int = 15) -> None:
+    """Centre the actual ink bounds, not the font's baseline or left bearing."""
     x0, y0, x1, y1 = box
     value = " ".join(str(label or "").split())
     if not value:
         return
+    available = x1 - x0 - 18
     while True:
         font = _font(size)
-        bbox = draw.textbbox((0, 0), value, font=font)
-        if bbox[2] - bbox[0] <= x1 - x0 - 12 or size <= minimum:
+        bbox = draw.textbbox((0, 0), value, font=font, stroke_width=1)
+        if bbox[2] - bbox[0] <= available or size <= minimum:
             break
         size -= 2
-    while len(value) > 1 and draw.textbbox((0, 0), value, font=font)[2] > x1-x0-12:
+    # Do not let long Discord usernames spill onto the border or shield.
+    while len(value) > 1:
+        bbox = draw.textbbox((0, 0), value, font=font, stroke_width=1)
+        if bbox[2] - bbox[0] <= available:
+            break
         value = value[:-2].rstrip() + "…"
-    bbox = draw.textbbox((0, 0), value, font=font)
-    x = x0 + (x1-x0-(bbox[2]-bbox[0]))/2 - bbox[0]
-    y = y0 + (y1-y0-(bbox[3]-bbox[1]))/2 - bbox[1]
+    if not value:
+        return
+    bbox = draw.textbbox((0, 0), value, font=font, stroke_width=1)
+    width = bbox[2] - bbox[0]
+    height = bbox[3] - bbox[1]
+    x = x0 + ((x1 - x0) - width) / 2 - bbox[0]
+    y = y0 + ((y1 - y0) - height) / 2 - bbox[1]
+    # Dark carved lettering with a restrained parchment highlight.
     draw.text((round(x), round(y)), value, fill=INK, font=font,
-              stroke_width=1, stroke_fill=(239, 214, 158))
+              stroke_width=1, stroke_fill=(232, 197, 138))
 
 
 def _name(prepared, side: str) -> str:

@@ -65,6 +65,27 @@ class IntroArtTests(unittest.TestCase):
             self.assertEqual(banners.call_args.kwargs["left_rect"], arena_intro.RED_BANNER)
             self.assertEqual(banners.call_args.kwargs["right_rect"], arena_intro.BLUE_BANNER)
 
+    def test_lower_plaque_names_are_centre_aligned(self):
+        # Verify the painted glyph bounds, including proportional glyph widths.
+        from PIL import ImageDraw
+        for rect, name in (
+            (arena_intro.RED_NAME, "TheDude"),
+            (arena_intro.BLUE_NAME, "Osric the Careful"),
+        ):
+            background = (250, 238, 212)
+            image = Image.new("RGB", (1672, 941), background)
+            arena_intro._text(ImageDraw.Draw(image), name, rect, size=46, minimum=20)
+            bounds = Image.eval(image.convert("L"), lambda x: 255 if x < 226 else 0).getbbox()
+            self.assertIsNotNone(bounds)
+            actual_cx = (bounds[0] + bounds[2]) / 2
+            expected_cx = (rect[0] + rect[2]) / 2
+            self.assertLessEqual(abs(actual_cx - expected_cx), 3)
+
+    def test_arena_label_is_higher_than_original_layout(self):
+        self.assertLess(
+            (arena_intro.ARENA_RECT[1] + arena_intro.ARENA_RECT[3]) / 2, 215
+        )
+
     def test_tournament_final_label_has_no_gameplay_side_effect(self):
         p = prepared()
         p.intro_event_type = "Tournament Final"
