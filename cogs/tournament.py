@@ -428,6 +428,10 @@ class TournamentCog(commands.Cog):
                 if error or prepared is None:
                     return await interaction.followup.send(error or "Riders not ready.", ephemeral=True)
                 prepared.mode = "challenge"
+                # Presentation only: retain challenge gameplay/scoring rules.
+                is_final = choice["round"] == len(state["rounds"]) - 1
+                prepared.intro_event_type = "TOURNAMENT FINAL" if is_final else "TOURNAMENT MATCH"
+                prepared.intro_crest_key = "tournament_final" if is_final else "tournament"
                 if not joust.try_lock_challenge(a.id, b.id):
                     return await interaction.followup.send(
                         "❌ A rider became busy before the tournament match began.",

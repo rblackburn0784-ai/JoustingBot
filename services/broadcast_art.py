@@ -107,6 +107,12 @@ def _name(draw, value: str, x: int, y: int, width: int):
 
 
 def intro(prepared) -> bytes:
+    # Reuse the same v2.9.3e template even when sprite broadcast is disabled.
+    from services.arena_intro import render as render_arena_intro
+    illustrated = render_arena_intro(prepared)
+    if illustrated is not None:
+        return illustrated
+
     arena_key = getattr(prepared, "arena_key", "royal_lists")
     image = background("intro", arena_key)
     draw = ImageDraw.Draw(image)

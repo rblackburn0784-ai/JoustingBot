@@ -28,7 +28,7 @@ from services.injuries import (
 )
 
 
-VERSION_LABEL = "JoustingBot v2.9.3d — Rider Equipment Alignment"
+VERSION_LABEL = "JoustingBot v2.9.3e — Arena Intro Screens"
 CHALLENGE_TIMEOUT_SECONDS = 240
 
 

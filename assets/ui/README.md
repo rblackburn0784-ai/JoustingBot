@@ -93,3 +93,37 @@ The eight labelled panel locations on the Knight and Horse images are reserved f
 New appearance changes are visual metadata only. Gameplay data, purchases, gold, progression, training, injuries, tournaments, score calculation and your existing joust animation asset tree are untouched.
 
 Images are resized to 1280×720 and compressed to a lightweight JPEG **at display time only**. Original PNGs stay untouched on disk. A cache invalidates when source image modification times change. Art render uses `asyncio.to_thread` so buttons are acknowledged promptly.
+
+
+## v2.9.3e — Six arena intro screens
+
+Place the six existing 1672×941 PNG templates here:
+
+```text
+assets/ui/intro_screens/royal_lists_intro.png
+assets/ui/intro_screens/muddy_field_intro.png
+assets/ui/intro_screens/frozen_ground_intro.png
+assets/ui/intro_screens/wind_swept_intro.png
+assets/ui/intro_screens/festival_arena_intro.png
+assets/ui/intro_screens/war_torn_intro.png
+```
+
+The live joust now starts with a pre-match introduction, then **edits the same
+Discord message** into the first GIF pass and the existing final scorecard.
+Red is always on the left, blue on the right. Event type and arena go in the
+top parchment, names go into the bottom plaques, and an earned/equipped title
+standard (if any) appears on the matching side banner. Training NPCs retain
+their existing cosmetic standards; players without one keep the blank fabric.
+The existing central gold-lion crest is retained by default. To replace it
+for a specific event, optionally install a transparent crest at
+`assets/ui/intro_screens/crests/tournament.png` or
+`tournament_final.png` (also supported: `training.png`,
+`challenge.png`, `friendly.png`). Missing art never stops a match.
+
+The configured intro hold is 2.7 seconds by default; set
+`JOUST_LIVE_INTRO_SECONDS=3.5` to change it (allowed 0.5–8 seconds), or
+`JOUST_LIVE_INTRO_ENABLED=false` to disable the live intro entirely.
+If PNGs are absent, existing live sprite playback starts at Pass 1 unchanged.
+The non-sprite broadcaster also reuses the same intro art when installed.
+Source-code commits do **not** upload local PC artwork automatically—commit
+these six PNGs from your own checkout before deploying to Railway.

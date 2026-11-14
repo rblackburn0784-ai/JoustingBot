@@ -1,3 +1,11 @@
+## v2.9.3e — Arena Intro Screens
+
+- Added six arena-specific intro layouts (Royal Lists, Muddy Field, Frozen Ground, Wind-Swept Field, Festival Arena and War-Torn Battlefield); user-installed PNGs remain separate from source.
+- Render red-left and blue-right jouster names on lower parchment plates, event and arena above, and equipped earned title standards within the matching red/blue banners. Optional whitelisted event crests preserve the existing lion when absent.
+- Display the intro before Pass 1 by editing the same live Discord broadcast message, then retain pass-by-pass animation and existing final scorecard. No changes to the deterministic joust result, injuries, awards, or storage.
+- Tournament matches and finals get distinct intro event labels without changing their existing challenge gameplay mode. Missing PNGs or renderer errors fall back to the previous broadcast behaviour.
+- Add intro overlay and one-message regression coverage.
+
 # Changelog
 
 ## v2.9.3d — Rider Shield and Lance Alignment

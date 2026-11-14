@@ -56,8 +56,40 @@ def _screen_embed(result, clip, *, arena_key):
         colour=discord.Colour(0xB4874C),
     )
     e.set_image(url=f"attachment://{clip.path.name}")
-    e.set_footer(text=f"JoustingBot v2.9.3d · {clip.pass_no} of {len(result.passes)} passes")
+    e.set_footer(text=f"JoustingBot v2.9.3e · {clip.pass_no} of {len(result.passes)} passes")
     return e
+
+
+def _intro_embed(result, prepared):
+    from services.arena_intro import event_type
+    e = discord.Embed(
+        title="🏰 The Grand Lists — The Challengers",
+        description=(
+            f"**{result.fighter_a}** vs **{result.fighter_b}** · "
+            f"{prepared.arena_key.replace('_', ' ').title()}\n"
+            f"{event_type(prepared)}"
+        ),
+        colour=discord.Colour(0xB4874C),
+    )
+    e.set_image(url="attachment://joust_live_intro.png")
+    e.set_footer(text="JoustingBot v2.9.3e · The joust begins shortly")
+    return e
+
+
+def _intro_pause():
+    return _float_setting("JOUST_LIVE_INTRO_SECONDS", 2.7, .5, 8.0)
+
+
+async def _intro_image(prepared, *, banner_a, banner_b, npc_a, npc_b):
+    try:
+        from services.arena_intro import render
+        return await asyncio.to_thread(
+            render, prepared, banner_a=banner_a, banner_b=banner_b,
+            npc_a=npc_a, npc_b=npc_b,
+        )
+    except Exception:
+        LOG.exception("v2.9.3e intro art failed; playing the original first pass.")
+        return None
 
 
 def _fallback_final_embed(result):
@@ -194,16 +226,61 @@ async def play_live_match(sender, result, prepared, *,
         LOG.exception("First pass could not render; fallback to v0.9.2.")
         return False
 
+    # Intro is the FIRST state of the SAME editable Discord message.
+    # If the PNG is not installed, retain the original first-pass behaviour.
+    intro_png = None
+    if _flag("JOUST_LIVE_INTRO_ENABLED", True):
+        intro_png = await _intro_image(
+            prepared, banner_a=banner_a, banner_b=banner_b,
+            npc_a=npc_a, npc_b=npc_b,
+        )
+    message = None
+    intro_posted = False
+    if intro_png:
+        intro_file = discord.File(io.BytesIO(intro_png), filename="joust_live_intro.png")
+        try:
+            message = await _publish_first(
+                sender, embed=_intro_embed(result, prepared),
+                file=intro_file, view=home_view,
+            )
+            intro_posted = True
+        except (discord.HTTPException, OSError):
+            LOG.exception("Cannot post arena introduction; trying first pass.")
+        finally:
+            intro_file.close()
+
     filename = current_clip.path.name
     initial_file = discord.File(str(current_clip.path), filename=filename)
     try:
-        message = await _publish_first(
-            sender, embed=_screen_embed(result, current_clip, arena_key=prepared.arena_key),
-            file=initial_file, view=home_view,
-        )
-    except (discord.HTTPException, OSError):
-        LOG.exception("Could not post first sprite pass; fallback to v0.9.2.")
-        return False
+        if intro_posted:
+            if message is None or not callable(getattr(message, "edit", None)):
+                LOG.warning("Introduction cannot be edited; showing final result.")
+                await _show_final_uneditable(sender, result, prepared, final_embed, home_view)
+                return True
+            try:
+                await sleep(_intro_pause())
+                await message.edit(
+                    embed=_screen_embed(result, current_clip, arena_key=prepared.arena_key),
+                    attachments=[initial_file], view=home_view,
+                )
+            except (discord.HTTPException, OSError, TypeError, ValueError):
+                # The recorded joust is already saved. Never re-run combat or
+                # start the fallback broadcaster after the intro was posted.
+                LOG.exception("Cannot advance arena introduction to pass one.")
+                try:
+                    await _show_final(message, sender, result, prepared, final_embed, home_view)
+                except Exception:
+                    LOG.exception("Cannot recover saved final score after failed intro edit.")
+                return True
+        else:
+            try:
+                message = await _publish_first(
+                    sender, embed=_screen_embed(result, current_clip, arena_key=prepared.arena_key),
+                    file=initial_file, view=home_view,
+                )
+            except (discord.HTTPException, OSError):
+                LOG.exception("Could not post first sprite pass; fallback to v0.9.2.")
+                return False
     finally:
         initial_file.close()
         _cleanup(current_clip.path)
