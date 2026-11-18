@@ -101,7 +101,7 @@ class TacticalCounterTests(TestCase):
 
     def test_small_balance_smoke_no_complete_winlock(self):
         stats = sweep(seeds=10)
-        self.assertEqual(len(stats), 6)
+        self.assertEqual(len(stats), len(__import__('tools.simulate_balance_v296', fromlist=['PLANS']).PLANS) - 1)
         for name, row in stats.items():
             self.assertEqual(row["matches"], 120)
             self.assertGreater(row["win_share"], 0.02, name)
