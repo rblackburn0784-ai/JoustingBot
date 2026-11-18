@@ -402,10 +402,17 @@ class TournamentCog(commands.Cog):
                 ephemeral=True)
         async with self.locks[interaction.guild_id]:
             try:
-                engine.create(interaction.guild_id, interaction.user.id, name, size,
-                              format=format, scheduled_at=scheduled_at,
-                              require_checkin=require_checkin, seeding=seeding,
-                              championship=championship)
+                if (format == "single_elimination" and not scheduled_at
+                        and not require_checkin and seeding == "random"
+                        and not championship):
+                    # Keep the v2.9.6a calling contract exactly for existing
+                    # standard tournaments, custom wrappers and integrations.
+                    engine.create(interaction.guild_id, interaction.user.id, name, size)
+                else:
+                    engine.create(interaction.guild_id, interaction.user.id, name, size,
+                                  format=format, scheduled_at=scheduled_at,
+                                  require_checkin=require_checkin, seeding=seeding,
+                                  championship=championship)
             except engine.TournamentError as ex:
                 return await interaction.response.send_message(f"❌ {ex}", ephemeral=True)
         await interaction.response.send_message("✅ Registration opened.", ephemeral=True)
