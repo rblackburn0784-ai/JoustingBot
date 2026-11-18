@@ -522,8 +522,9 @@ class ChallengeView(discord.ui.View):
         # Both competitors must still explicitly lock their private plans.
         if interaction.user.id not in prepared.tactics_ready and current == TacticPlan():
             from services.evolution import preferred_tactics
-            if prepared.guild_id:
-                current = preferred_tactics(prepared.guild_id, interaction.user.id)
+            guild_id = getattr(prepared, "guild_id", None)
+            if guild_id:
+                current = preferred_tactics(guild_id, interaction.user.id)
         panel = TacticEditor(self, interaction.user.id, current)
         await interaction.response.send_message(embed=panel.make_embed(), view=panel, ephemeral=True)
 
@@ -727,9 +728,9 @@ class JoustCog(commands.Cog):
             horse_breed=horse_a.breed,
             helm_key=loadout(guild_id, challenger.id, "helm", STARTER["helm"]),
             shield_key=loadout(guild_id, challenger.id, "shield", STARTER["shield"]),
-            saddle_key=loadout(guild_id, challenger.id, "saddle", horse_id=horse_a.horse_id),
-            bridle_key=loadout(guild_id, challenger.id, "bridle", horse_id=horse_a.horse_id),
-            shoes_key=loadout(guild_id, challenger.id, "shoes", horse_id=horse_a.horse_id),
+            saddle_key=loadout(guild_id, challenger.id, "saddle", STARTER["saddle"], horse_a.horse_id),
+            bridle_key=loadout(guild_id, challenger.id, "bridle", STARTER["bridle"], horse_a.horse_id),
+            shoes_key=loadout(guild_id, challenger.id, "shoes", STARTER["shoes"], horse_a.horse_id),
             bond_bonus=bond(guild_id, challenger.id, horse_a.horse_id, verified_owner=True)["obedience_bonus"] if guild_id else 0,
         )
 
@@ -745,9 +746,9 @@ class JoustCog(commands.Cog):
             horse_breed=horse_b.breed,
             helm_key=loadout(guild_id, opponent.id, "helm", STARTER["helm"]),
             shield_key=loadout(guild_id, opponent.id, "shield", STARTER["shield"]),
-            saddle_key=loadout(guild_id, opponent.id, "saddle", horse_id=horse_b.horse_id),
-            bridle_key=loadout(guild_id, opponent.id, "bridle", horse_id=horse_b.horse_id),
-            shoes_key=loadout(guild_id, opponent.id, "shoes", horse_id=horse_b.horse_id),
+            saddle_key=loadout(guild_id, opponent.id, "saddle", STARTER["saddle"], horse_b.horse_id),
+            bridle_key=loadout(guild_id, opponent.id, "bridle", STARTER["bridle"], horse_b.horse_id),
+            shoes_key=loadout(guild_id, opponent.id, "shoes", STARTER["shoes"], horse_b.horse_id),
             bond_bonus=bond(guild_id, opponent.id, horse_b.horse_id, verified_owner=True)["obedience_bonus"] if guild_id else 0,
         )
 
@@ -919,9 +920,9 @@ class JoustCog(commands.Cog):
             barding_key=horse.equipped_barding_key, horse_breed=horse.breed,
             helm_key=loadout(guild_id, player.id, "helm", STARTER["helm"]),
             shield_key=loadout(guild_id, player.id, "shield", STARTER["shield"]),
-            saddle_key=loadout(guild_id, player.id, "saddle", horse_id=horse.horse_id),
-            bridle_key=loadout(guild_id, player.id, "bridle", horse_id=horse.horse_id),
-            shoes_key=loadout(guild_id, player.id, "shoes", horse_id=horse.horse_id),
+            saddle_key=loadout(guild_id, player.id, "saddle", STARTER["saddle"], horse.horse_id),
+            bridle_key=loadout(guild_id, player.id, "bridle", STARTER["bridle"], horse.horse_id),
+            shoes_key=loadout(guild_id, player.id, "shoes", STARTER["shoes"], horse.horse_id),
             bond_bonus=bond(guild_id, player.id, horse.horse_id, verified_owner=True)["obedience_bonus"],
         )
         npc_knight = SimpleNamespace(
