@@ -54,6 +54,13 @@ class Fighter:
     # valid; older sprite tests/tools may supply breed as a ninth argument.
     # Combat calculations must not depend on this field.
     horse_breed: str = "rouncey"
+    # Optional v2.9.5 slots preserve the eight/nine-argument Fighter API.
+    helm_key: str = "helm_plain"
+    shield_key: str = "shield_kite"
+    saddle_key: str = "saddle_standard"
+    bridle_key: str = "bridle_simple"
+    shoes_key: str = "shoes_iron"
+    bond_bonus: int = 0
 
 
 @dataclass
@@ -174,13 +181,15 @@ def behaviour_check(
     arena_slip_mod: int = 0,
     arena_panic_mod: int = 0,
     handling: int = 0,
+    shoes_key: str | None = None,
+    bridle_key: str | None = None,
 ) -> tuple[Optional[str], List[str]]:
     courage = int(horse_stats.get("courage", 0))
     obedience = int(horse_stats.get("obedience", 0))
     stamina = int(horse_stats.get("stamina", 0))
 
-    panic_mod = total_panic_mod(barding_key) - arena_panic_mod
-    slip_mod = total_slip_mod(barding_key) + arena_slip_mod
+    panic_mod = total_panic_mod(barding_key, bridle_key) - arena_panic_mod
+    slip_mod = total_slip_mod(barding_key, shoes_key) + arena_slip_mod
 
     debug: List[str] = []
 
@@ -214,16 +223,23 @@ def calculate_alignment(fighter: Fighter, *, rng: random.Random, extra_penalty: 
         fighter.knight_stats,
         fighter.lance_key,
         fighter.armour_key,
+        fighter.helm_key,
+        fighter.shield_key,
     )
 
     horse_stats = apply_horse_equipment(
         fighter.horse_stats,
         fighter.barding_key,
+        fighter.saddle_key,
+        fighter.bridle_key,
+        fighter.shoes_key,
+        fighter.bond_bonus,
     )
 
     control = int(knight_stats.get("control", 0))
     obedience = int(horse_stats.get("obedience", 0))
-    equip_mod = total_alignment_mod(fighter.lance_key, fighter.armour_key)
+    equip_mod = total_alignment_mod(fighter.lance_key, fighter.armour_key,
+                                    fighter.helm_key, fighter.shield_key)
     roll = d20(rng)
     total = roll + control + obedience + equip_mod + extra_penalty
     debug = (
@@ -238,11 +254,17 @@ def calculate_charge(fighter: Fighter, *, rng: random.Random, extra_penalty: int
         fighter.knight_stats,
         fighter.lance_key,
         fighter.armour_key,
+        fighter.helm_key,
+        fighter.shield_key,
     )
 
     horse_stats = apply_horse_equipment(
         fighter.horse_stats,
         fighter.barding_key,
+        fighter.saddle_key,
+        fighter.bridle_key,
+        fighter.shoes_key,
+        fighter.bond_bonus,
     )
 
     strength = int(knight_stats.get("strength", 0))
@@ -252,6 +274,8 @@ def calculate_charge(fighter: Fighter, *, rng: random.Random, extra_penalty: int
         fighter.lance_key,
         fighter.armour_key,
         fighter.barding_key,
+        fighter.saddle_key,
+        fighter.shoes_key,
     )
     impact = total_impact_mult(fighter.lance_key, fighter.armour_key)
     roll = d20(rng)
@@ -319,12 +343,12 @@ def run_single_match(fighter_a: Fighter, fighter_b: Fighter, arena_key: str, see
         debug_rolls: List[str] = [f"seed: {seed_value}"]
 
         horse_a_effective = apply_horse_equipment(
-            fighter_a.horse_stats,
-            fighter_a.barding_key,
+            fighter_a.horse_stats, fighter_a.barding_key, fighter_a.saddle_key,
+            fighter_a.bridle_key, fighter_a.shoes_key, fighter_a.bond_bonus,
         )
         horse_b_effective = apply_horse_equipment(
-            fighter_b.horse_stats,
-            fighter_b.barding_key,
+            fighter_b.horse_stats, fighter_b.barding_key, fighter_b.saddle_key,
+            fighter_b.bridle_key, fighter_b.shoes_key, fighter_b.bond_bonus,
         )
 
         behaviour_a, behaviour_debug_a = behaviour_check(
@@ -334,6 +358,7 @@ def run_single_match(fighter_a: Fighter, fighter_b: Fighter, arena_key: str, see
             arena_slip_mod=arena.slip_mod,
             arena_panic_mod=arena.panic_mod,
             handling=a_fx.handling,
+            shoes_key=fighter_a.shoes_key, bridle_key=fighter_a.bridle_key,
         )
         behaviour_b, behaviour_debug_b = behaviour_check(
             rng=rng,
@@ -342,6 +367,7 @@ def run_single_match(fighter_a: Fighter, fighter_b: Fighter, arena_key: str, see
             arena_slip_mod=arena.slip_mod,
             arena_panic_mod=arena.panic_mod,
             handling=b_fx.handling,
+            shoes_key=fighter_b.shoes_key, bridle_key=fighter_b.bridle_key,
         )
         debug_rolls.extend([f"{fighter_a.horse_name} {line}" for line in behaviour_debug_a])
         debug_rolls.extend([f"{fighter_b.horse_name} {line}" for line in behaviour_debug_b])
@@ -507,8 +533,8 @@ def run_single_match(fighter_a: Fighter, fighter_b: Fighter, arena_key: str, see
             ]
         )
 
-        resist_a = total_unhorse_resist(fighter_a.armour_key) + a_fx.resistance
-        resist_b = total_unhorse_resist(fighter_b.armour_key) + b_fx.resistance
+        resist_a = total_unhorse_resist(fighter_a.armour_key, fighter_a.shield_key) + a_fx.resistance
+        resist_b = total_unhorse_resist(fighter_b.armour_key, fighter_b.shield_key) + b_fx.resistance
         margin = charge_a - charge_b
         debug_rolls.append(f"raw margin: {charge_a} - {charge_b} = {margin}; resist A {resist_a}; resist B {resist_b}")
 

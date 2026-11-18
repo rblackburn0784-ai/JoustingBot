@@ -27,8 +27,8 @@ def fight(index: int, *, guild: int = 7, arena: str = "royal_lists",
 
 class ProgressionTests(unittest.TestCase):
     def test_new_gear_all_have_tradeoffs(self):
-        self.assertEqual(len(p.UNLOCKS), 6)
-        self.assertEqual(len(ITEMS), 18)
+        self.assertEqual(len(p.UNLOCKS), 11)
+        self.assertEqual(len(ITEMS), 28)
         for key in p.UNLOCKS:
             item = ITEMS[key]
             negative = [
@@ -91,7 +91,10 @@ class ProgressionTests(unittest.TestCase):
                     p.buy(7, 101, "barding_marsh")
                     with self.assertRaises(ValueError):
                         p.set_loadout(7, 101, "barding", "barding_marsh")
-                    p.set_loadout(7, 101, "barding", "barding_marsh", horse_id="h101")
+                    with patch("cogs.horse.load_horses", return_value={
+                        "horses": {"h101": {"owner_id": 101}, "h103": {"owner_id": 101}}
+                    }):
+                        p.set_loadout(7, 101, "barding", "barding_marsh", horse_id="h101")
                     self.assertEqual(p.loadout(7, 101, "barding", "barding_none", "h101"), "barding_marsh")
                     self.assertEqual(p.loadout(7, 101, "barding", "barding_none", "h103"), "barding_none")
                     self.assertEqual(p.loadout(8, 101, "barding", "barding_none", "h101"), "barding_none")

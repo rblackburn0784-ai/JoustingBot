@@ -13,7 +13,11 @@ from services.records import load_history
 from services.storage import load_json, save_json
 
 PATH = "storage/progression.json"
-STARTER = {"lance": "lance_ash", "armour": "armour_mail", "barding": "barding_none"}
+STARTER = {
+    "lance": "lance_ash", "armour": "armour_mail", "barding": "barding_none",
+    "helm": "helm_plain", "shield": "shield_kite", "saddle": "saddle_standard",
+    "bridle": "bridle_simple", "shoes": "shoes_iron",
+}
 GOLD_PER_JOUST = 12
 GOLD_WIN_BONUS = 8
 GOLD_DRAW_BONUS = 4
@@ -27,6 +31,11 @@ UNLOCKS = {
     "armour_duelist": ("Duelist's Harness", "unhorsings", 3, 110),
     "barding_runner": ("Runner's Barding", "no_barding_wins", 1, 95),
     "barding_marsh": ("Marsh Warden Barding", "frozen_survivals", 3, 95),
+    "helm_watchful": ("Watchful Visor", "jousts", 5, 70),
+    "shield_round": ("Round Guard Shield", "unhorsings", 2, 80),
+    "saddle_charger": ("Charger Saddle", "wins", 4, 80),
+    "bridle_training": ("Training Bridle", "jousts", 6, 65),
+    "shoes_grip": ("Grip Horseshoes", "mud_wins", 2, 75),
 }
 
 STANDARDS = {
@@ -190,10 +199,17 @@ def set_loadout(guild_id: int | None, user_id: int, slot: str, key: str, horse_i
     if not unlocked(guild_id, user_id, key, data):
         raise ValueError("That gear is locked. Unlock it in the Armory first.")
     player = _ensure_player(data, guild_id, user_id)
-    if slot == "barding":
+    if slot in {"barding", "saddle", "bridle", "shoes"}:
         if not horse_id:
-            raise ValueError("Select your bound horse before equipping barding.")
-        player.setdefault("horse_barding", {})[horse_id] = key
+            raise ValueError("Bind a horse you own before equipping horse gear.")
+        # Horse ownership is always rechecked, not trusted from a select menu.
+        from cogs.horse import load_horses
+        horse = load_horses().get("horses", {}).get(horse_id)
+        if not isinstance(horse, dict) or int(horse.get("owner_id", 0)) != user_id:
+            raise ValueError("That horse does not belong to you.")
+        player.setdefault("horse_gear", {}).setdefault(horse_id, {})[slot] = key
+        if slot == "barding":
+            player.setdefault("horse_barding", {})[horse_id] = key
     else:
         player.setdefault("loadout", {})[slot] = key
     save_json(PATH, data)
@@ -204,8 +220,10 @@ def loadout(guild_id: int | None, user_id: int, slot: str, old_key: str | None =
     if guild_id is not None:
         player = _player(data, guild_id, user_id)
         selected = player.get("loadout", {}).get(slot)
-        if slot == "barding" and horse_id:
-            selected = player.get("horse_barding", {}).get(horse_id, selected)
+        if horse_id and slot in {"barding", "saddle", "bridle", "shoes"}:
+            selected = player.get("horse_gear", {}).get(horse_id, {}).get(slot, selected)
+            if slot == "barding" and not selected:
+                selected = player.get("horse_barding", {}).get(horse_id)
         if selected and unlocked(guild_id, user_id, selected, data):
             return selected
     if old_key and old_key in ITEMS and ITEMS[old_key].slot == slot and unlocked(guild_id, user_id, old_key, data):

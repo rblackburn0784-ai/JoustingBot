@@ -308,7 +308,7 @@ def reset_user_plan(guild_id: int, user_id: int, scope: str = "settings") -> dic
     changes = []
     if current:
         changes.append("Unequip selected title")
-    for key in ("loadout", "horse_barding"):
+    for key in ("loadout", "horse_barding", "horse_gear", "presets", "preferred_tactics"):
         if pdata.get(key):
             changes.append("Clear " + key.replace("_", " "))
     if pdata.get("standard") not in (None, "none"):
@@ -344,8 +344,9 @@ def reset_user(guild_id: int, user_id: int, scope: str, actor_id: int) -> dict:
     backup = create_backup()
     gid, uid = str(guild_id), str(user_id)
     record = progression.setdefault("guilds", {}).setdefault(gid, {}).setdefault(uid, {})
-    record.pop("loadout", None)
-    record.pop("horse_barding", None)
+    for key in ("loadout", "horse_barding", "horse_gear",
+                "presets", "preferred_tactics"):
+        record.pop(key, None)
     record["standard"] = "none"
     if scope == "inventory":
         retired = int(record.get("retired_spend", 0))

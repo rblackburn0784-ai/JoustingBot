@@ -56,7 +56,7 @@ def _screen_embed(result, clip, *, arena_key):
         colour=discord.Colour(0xB4874C),
     )
     e.set_image(url=f"attachment://{clip.path.name}")
-    e.set_footer(text=f"JoustingBot v2.9.4 · {clip.pass_no} of {len(result.passes)} passes")
+    e.set_footer(text=f"JoustingBot v2.9.5 · {clip.pass_no} of {len(result.passes)} passes")
     return e
 
 
@@ -72,7 +72,7 @@ def _intro_embed(result, prepared):
         colour=discord.Colour(0xB4874C),
     )
     e.set_image(url="attachment://joust_live_intro.png")
-    e.set_footer(text="JoustingBot v2.9.4 · The joust begins shortly")
+    e.set_footer(text="JoustingBot v2.9.5 · The joust begins shortly")
     return e
 
 

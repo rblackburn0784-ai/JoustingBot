@@ -21,14 +21,15 @@ from services.training import (
     OPPONENTS, opponent as find_trainer, TRAIN_COOLDOWN_SECONDS,
     TRAIN_XP_PER_BOUT, TRAIN_DAILY_XP_CAP, earned_training,
 )
-from services.progression import loadout, equipped_standard
+from services.progression import loadout, equipped_standard, STARTER
+from services.evolution import bond, HORSE_GEAR_SLOTS
 from services.injuries import (
     apply_penalty, active as active_injuries, duration as injury_duration,
     support_for_next_bout, risk_profile,
 )
 
 
-VERSION_LABEL = "JoustingBot v2.9.4 — Stability & Integrity"
+VERSION_LABEL = "JoustingBot v2.9.5 — Knight & Stable Evolution"
 CHALLENGE_TIMEOUT_SECONDS = 240
 
 
@@ -517,6 +518,12 @@ class ChallengeView(discord.ui.View):
                 "❌ Only active challenge participants can select tactics.", ephemeral=True)
         from cogs.tactic_ui import TacticEditor
         current = prepared.tactics_a if interaction.user.id == prepared.challenger.id else prepared.tactics_b
+        # Saved preferences only prefill an *unlocked* default editor.
+        # Both competitors must still explicitly lock their private plans.
+        if interaction.user.id not in prepared.tactics_ready and current == TacticPlan():
+            from services.evolution import preferred_tactics
+            if prepared.guild_id:
+                current = preferred_tactics(prepared.guild_id, interaction.user.id)
         panel = TacticEditor(self, interaction.user.id, current)
         await interaction.response.send_message(embed=panel.make_embed(), view=panel, ephemeral=True)
 
@@ -718,6 +725,12 @@ class JoustCog(commands.Cog):
             armour_key=knight_a.equipped_armour_key,
             barding_key=horse_a.equipped_barding_key,
             horse_breed=horse_a.breed,
+            helm_key=loadout(guild_id, challenger.id, "helm", STARTER["helm"]),
+            shield_key=loadout(guild_id, challenger.id, "shield", STARTER["shield"]),
+            saddle_key=loadout(guild_id, challenger.id, "saddle", horse_id=horse_a.horse_id),
+            bridle_key=loadout(guild_id, challenger.id, "bridle", horse_id=horse_a.horse_id),
+            shoes_key=loadout(guild_id, challenger.id, "shoes", horse_id=horse_a.horse_id),
+            bond_bonus=bond(guild_id, challenger.id, horse_a.horse_id, verified_owner=True)["obedience_bonus"] if guild_id else 0,
         )
 
         fighter_b = Fighter(
@@ -730,6 +743,12 @@ class JoustCog(commands.Cog):
             armour_key=knight_b.equipped_armour_key,
             barding_key=horse_b.equipped_barding_key,
             horse_breed=horse_b.breed,
+            helm_key=loadout(guild_id, opponent.id, "helm", STARTER["helm"]),
+            shield_key=loadout(guild_id, opponent.id, "shield", STARTER["shield"]),
+            saddle_key=loadout(guild_id, opponent.id, "saddle", horse_id=horse_b.horse_id),
+            bridle_key=loadout(guild_id, opponent.id, "bridle", horse_id=horse_b.horse_id),
+            shoes_key=loadout(guild_id, opponent.id, "shoes", horse_id=horse_b.horse_id),
+            bond_bonus=bond(guild_id, opponent.id, horse_b.horse_id, verified_owner=True)["obedience_bonus"] if guild_id else 0,
         )
 
         return None, PreparedDuel(
@@ -886,6 +905,8 @@ class JoustCog(commands.Cog):
         if not raw_horse:
             return "❌ Your bound horse was not found.", None
         horse = Horse.from_dict(raw_horse)
+        if horse.owner_id != player.id:
+            return "❌ The bound horse belongs to someone else.", None
         knight.equipped_lance_key = loadout(guild_id, player.id, "lance", knight.equipped_lance_key)
         knight.equipped_armour_key = loadout(guild_id, player.id, "armour", knight.equipped_armour_key)
         horse.equipped_barding_key = loadout(guild_id, player.id, "barding",
@@ -896,6 +917,12 @@ class JoustCog(commands.Cog):
             horse_stats=horse.stats, lance_key=knight.equipped_lance_key,
             armour_key=knight.equipped_armour_key,
             barding_key=horse.equipped_barding_key, horse_breed=horse.breed,
+            helm_key=loadout(guild_id, player.id, "helm", STARTER["helm"]),
+            shield_key=loadout(guild_id, player.id, "shield", STARTER["shield"]),
+            saddle_key=loadout(guild_id, player.id, "saddle", horse_id=horse.horse_id),
+            bridle_key=loadout(guild_id, player.id, "bridle", horse_id=horse.horse_id),
+            shoes_key=loadout(guild_id, player.id, "shoes", horse_id=horse.horse_id),
+            bond_bonus=bond(guild_id, player.id, horse.horse_id, verified_owner=True)["obedience_bonus"],
         )
         npc_knight = SimpleNamespace(
             name=npc.name, stats=npc.knight_map,

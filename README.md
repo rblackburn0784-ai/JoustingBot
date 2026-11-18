@@ -1,6 +1,22 @@
+## v2.9.5 — Knight & Stable Evolution
+
+**Current version:** \`v2.9.5 — Knight & Stable Evolution\`
+
+- **Expanded equipment:** five additional, fully functional sidegrade slots: helm, shield, saddle, bridle and horseshoes. Each has a free neutral starter and an earned, purchasable trade-off. Existing lance/armour/barding purchases continue unchanged. Browse via \`/menu → Shop/Equipment\` or \`/equip\`.
+- **Horse trust and care:** \`/stable bond\` and \`/stable groom\` for an owned horse. Recorded accepted/training jousts grant +2 bond; one daily grooming grants +3. All guild-scoped, capped at 100. At bond 40, the current mount receives **at most +1 obedience** (never above 10); match snapshots retain this bonus so later grooming cannot alter saved results. Existing horse temperament and refusal/slip mechanics remain intact.
+- **Three saved loadout presets:** \`/presets save\`, \`/presets equip\`, \`/presets view\`, plus private preferred tactics via \`/presets tactics\`. Horse gear is tied to the horse it was saved for; applying presets rechecks ownership and purchased items. There is no automatic weapon purchasing or forced horse rebinding. Tactics prefill the private editor, but **both riders must still lock tactics before accepting**.
+- **Daily objectives:** \`/daily\` shows three UTC-day goals: one training bout, one accepted challenge and one joust on the rotating featured arena. Complete goals and claim **honorary renown only** (3/5/8 points). Claim once per goal per day; no gold, XP, power or prize awards.
+- **Private Headquarters:** \`/headquarters\` or \`/menu → Headquarters\` combines knight, bound horse, bond, equipment, gold, renown, current titles, injuries, daily progress and navigation buttons. Uses the existing one-message private UI.
+- **Backward compatibility:** stored guild progression JSON is extended in place (no destructive migrations); legacy Fighter constructors, combat scores with neutral starter equipment, match history, training XP, tournament entry and health checks remain supported. One bot process with a persistent storage volume is still required.
+- **No new PNGs required:** existing medieval UI art remains; numerical slots display equipment names in the existing image windows. New item-specific overlays are not part of this release.
+
+To update: run \`git pull --ff-only origin main\`, keep \`storage/\`, \`backups/\`, \`.env\` and locally installed \`assets/\` intact, then \`python -m unittest discover -s tests -v\`. Test privately in a Discord server before announcing the update.
+
+---
+
 ## v2.9.4 — Stability, Security & Asset Readiness
 
-**Current version:** `v2.9.4 — Stability & Integrity`
+**Previous stability release:** `v2.9.4 — Stability & Integrity`
 
 Security and correctness changes: ranked `/joust challenge` rejects any manually chosen `seed` (to prevent cherry-picked results), while admin `/joust duel` and stored tournament brackets still support deterministic seeds. New random matches use a system-backed seed. Bound horse ownership is verified before matching, and tournament recovery can advance using recorded player IDs after someone has left the server. Tournament finals now say `GRAND FINAL` on the illustrated final scorecard.
 

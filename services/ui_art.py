@@ -31,22 +31,22 @@ SCREENS = {
 }
 COATS = {"bay", "black", "chestnut", "grey", "white"}
 HORSE_SLOTS = (
-    ("Bridle", None),
-    ("Saddle", None),
+    ("Bridle", "bridle"),
+    ("Saddle", "saddle"),
     ("Saddle Blanket", None),
     ("Chest Barding", "barding"),
-    ("Horseshoes", None),
+    ("Horseshoes", "shoes"),
     ("Face Armor", None),
     ("Leg Armor", None),
     ("Tail Gear", None),
 )
 KNIGHT_SLOTS = (
-    ("Helmet", None),
+    ("Helmet", "helm"),
     ("Armour", "armour"),
     ("Gauntlets", None),
     ("Boots", None),
     ("Lance", "lance"),
-    ("Shield", None),
+    ("Shield", "shield"),
     ("Cloak", None),
     ("Accessory", None),
 )

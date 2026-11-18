@@ -125,5 +125,5 @@ class BroadcastVersionTests(unittest.TestCase):
         clip = SimpleNamespace(pass_no=1, path=Path("pass_1.gif"))
         intro = _intro_embed(result, p)
         live_pass = _screen_embed(result, clip, arena_key=p.arena_key)
-        self.assertIn("v2.9.4", intro.footer.text)
-        self.assertIn("v2.9.4", live_pass.footer.text)
+        self.assertIn("v2.9.5", intro.footer.text)
+        self.assertIn("v2.9.5", live_pass.footer.text)

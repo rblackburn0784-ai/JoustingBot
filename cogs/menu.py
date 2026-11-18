@@ -29,7 +29,7 @@ from services.equipment import items_by_slot, get_item
 from services.records import load_history
 from services import ui_art
 
-VERSION = "v2.9.4"
+VERSION = "v2.9.5"
 STYLE = discord.ButtonStyle
 
 
@@ -160,7 +160,7 @@ class VersionPage(OwnedView):
     def make_embed(self):
         return embed(
             f"⚙️ JoustingBot {VERSION}",
-            "**Live Match Broadcast & Admin Tools**\n"
+            "**Knight & Stable Evolution**\n"
             "One live Discord graphic animates each pass: Prep, Gallop, Lance Ready, "
             "Collision and Outcome, before the final scorecard.\n\n"
             "Private tactics, seeded combat, tournaments, atomic saves, verified backups, "
@@ -173,6 +173,9 @@ class MainMenuView(OwnedView):
     def __init__(self, user_id: int, allow_admin: bool = False):
         super().__init__(user_id)
         pages = [
+            ("Headquarters", "🏰", lambda it: navigate(
+                it, __import__("cogs.evolution", fromlist=["HeadquartersPage"]).HeadquartersPage(
+                    it.user.id, it.guild_id))),
             ("Getting Started", "📜", lambda it: navigate(it, StartView(it.user.id))),
             ("Knight", "⚔️", lambda it: navigate(it, KnightPage(it.user.id, it.guild_id))),
             ("Horse", "🐎", lambda it: navigate(it, HorsePage(it.user.id))),
@@ -204,6 +207,7 @@ class MainMenuView(OwnedView):
                      "⚔️ Knight · 🐎 Horse · 🛡️ Equipment · 🪙 Shop · 🏟️ Arenas\n"
                      "🎯 Challenge · 🏇 Training Yard · 📜 Profile · 🏆 Leaderboards\n"
                      "🏅 Titles · 🪙 Progression · 🩹 Injuries · 🏆 Tournaments\n"
+                     "**NEW:** Headquarters, horse care, daily goals, presets and five more gear slots.\n"
                      "Buy gear in the Shop, then equip it on your Knight or Horse.\n\n"
                      "Only authorised members see the ⚙️ Admin controls.")
 
@@ -690,9 +694,13 @@ class ShopHome(OwnedView):
     def __init__(self, user_id: int, guild_id: int | None = None):
         super().__init__(user_id)
         self.guild_id = guild_id
-        for slot, title in (("lance", "Lances"), ("armour", "Armour"), ("barding", "Horse Gear")):
+        for idx, (slot, title) in enumerate((
+            ("lance", "Lances"), ("armour", "Armour"), ("helm", "Helmets"),
+            ("shield", "Shields"), ("barding", "Barding"), ("saddle", "Saddles"),
+            ("bridle", "Bridles"), ("shoes", "Horseshoes"),
+        )):
             self.button(title, lambda it, key=slot: navigate(
-                it, ShopPicker(it.user.id, key, it.guild_id)), row=0, emoji="🛒")
+                it, ShopPicker(it.user.id, key, it.guild_id)), row=idx // 5, emoji="🛒")
         self.button("Equip Owned Gear", lambda it: navigate(
             it, EquipmentPage(it.user.id, it.guild_id)), row=1, emoji="🛡️")
         self.home()
@@ -773,15 +781,19 @@ class EquipmentPage(OwnedView):
     def __init__(self, user_id: int, guild_id: int | None = None):
         super().__init__(user_id)
         self.guild_id = guild_id
-        for slot, name in (("lance", "Lances"), ("armour", "Armour"), ("barding", "Horse Barding")):
+        for idx, (slot, name) in enumerate((
+            ("lance", "Lances"), ("armour", "Armour"), ("helm", "Helmets"),
+            ("shield", "Shields"), ("barding", "Barding"), ("saddle", "Saddles"),
+            ("bridle", "Bridles"), ("shoes", "Horseshoes"),
+        )):
             self.button(name, lambda it, s=slot: navigate(
-                it, EquipmentPicker(it.user.id, s, it.guild_id)), row=0)
+                it, EquipmentPicker(it.user.id, s, it.guild_id)), row=idx // 5)
         self.button("Progression & Gold", lambda it: navigate(it, ProgressionPage(it.user.id, it.guild_id)),
                     row=1, emoji="🪙")
         self.button("Visit Shop", lambda it: navigate(it, ShopHome(it.user.id, it.guild_id)),
                     row=2, emoji="🛍️")
         self.button("Standards", lambda it: navigate(it, StandardPage(it.user.id, it.guild_id)),
-                    row=1, emoji="🚩")
+                    row=2, emoji="🚩")
         self.home()
 
     def art_kwargs(self):
@@ -789,9 +801,10 @@ class EquipmentPage(OwnedView):
         knight = get_knight(load_knights(), self.owner_id)
         items = {}
         if knight:
-            for slot in ("lance", "armour"):
+            for slot in ("lance", "armour", "helm", "shield"):
+                from services.progression import STARTER
                 key = loadout(self.guild_id, self.owner_id, slot,
-                              getattr(knight, "equipped_"+("lance" if slot=="lance" else "armour")+"_key"))
+                              getattr(knight, "equipped_" + slot + "_key", STARTER[slot]))
                 item = get_item(key)
                 if item:
                     items[slot] = item.name
@@ -801,21 +814,22 @@ class EquipmentPage(OwnedView):
         from services.progression import loadout, wallet
         knight = get_knight(load_knights(), self.owner_id)
         if knight:
-            description = (
-                f"**Lance:** {loadout(self.guild_id, self.owner_id, 'lance', knight.equipped_lance_key)}\n"
-                f"**Armour:** {loadout(self.guild_id, self.owner_id, 'armour', knight.equipped_armour_key)}\n"
-                f"**Bound Horse:** {knight.bound_horse_id or 'None'}"
-            )
+            from services.progression import STARTER
+            description = "\n".join(
+                f"**{slot.title()}:** {loadout(self.guild_id, self.owner_id, slot, STARTER[slot])}"
+                for slot in ("lance", "armour", "helm", "shield")
+            ) + f"\n**Bound Horse:** {knight.bound_horse_id or 'None'}"
             raw = load_horses().get("horses", {}).get(knight.bound_horse_id)
             if raw and raw.get("owner_id") == self.owner_id:
-                description += (
-                    f"\n**Barding:** {loadout(self.guild_id, self.owner_id, 'barding', raw.get('equipped_barding_key'), knight.bound_horse_id)}"
+                description += "\n" + "\n".join(
+                    f"**{slot.title()}:** {loadout(self.guild_id, self.owner_id, slot, STARTER[slot], knight.bound_horse_id)}"
+                    for slot in ("barding", "saddle", "bridle", "shoes")
                 )
         else:
             description = "Create a knight before equipping."
         money = wallet(self.guild_id, self.owner_id) if self.guild_id else 0
         return embed("🛡️ Armory — Equipment", description + f"\n\n🪙 **{money} gold**"
-                     "\nAll twelve starter items are free. Unlock sidegrades by playing accepted jousts.")
+                     "\nAll starter items are free. Unlock sidegrades by playing accepted jousts.")
 
 
 class GearSelect(discord.ui.Select):
@@ -852,23 +866,26 @@ class EquipmentPicker(OwnedView):
         knight = get_knight(load_knights(), self.owner_id)
         current = {}
         if knight:
-            for slot in ("lance", "armour"):
-                default = getattr(knight, "equipped_" + slot + "_key")
+            for slot in ("lance", "armour", "helm", "shield"):
+                from services.progression import STARTER
+                default = getattr(knight, "equipped_" + slot + "_key", STARTER[slot])
                 item = get_item(loadout(self.guild_id, self.owner_id, slot, default))
                 if item:
                     current[slot] = item.name
-        if self.slot == "barding":
+        if self.slot in {"barding", "saddle", "bridle", "shoes"}:
             horses = load_horses().get("horses", {})
             raw = horses.get(knight.bound_horse_id) if knight else None
             if raw and raw.get("owner_id") == self.owner_id:
                 from services.progression import loadout
-                key = loadout(self.guild_id, self.owner_id, "barding",
-                              raw.get("equipped_barding_key"), raw["horse_id"])
-                current["barding"] = get_item(key).name
+                from services.progression import STARTER
+                key = loadout(self.guild_id, self.owner_id, self.slot,
+                              raw.get("equipped_barding_key") if self.slot == "barding"
+                              else STARTER[self.slot], raw["horse_id"])
+                current[self.slot] = get_item(key).name
             return {"screen": "horse",
                     "coat": ui_art.horse_coat(raw, self.owner_id),
-                    "equipped": {"barding": get_item(self.selected).name},
-                    "focus": "barding"}
+                    "equipped": {self.slot: get_item(self.selected).name},
+                    "focus": self.slot}
         current[self.slot] = get_item(self.selected).name
         return {"screen": "knight", "equipped": current, "focus": self.slot}
 
@@ -901,13 +918,14 @@ class EquipmentPicker(OwnedView):
         knight = load_knights().get("knights", {}).get(str(interaction.user.id))
         if knight is None:
             return await interaction.response.send_message("❌ Create a knight first.", ephemeral=True)
-        if self.slot == "barding":
+        if self.slot in {"barding", "saddle", "bridle", "shoes"}:
             horse = load_horses().get("horses", {}).get(knight.get("bound_horse_id"))
             if horse is None or horse.get("owner_id") != interaction.user.id:
                 return await interaction.response.send_message("❌ Bind a horse you own first.", ephemeral=True)
         try:
             set_loadout(interaction.guild_id, interaction.user.id, self.slot, self.selected,
-                        horse_id=knight.get("bound_horse_id") if self.slot == "barding" else None)
+                        horse_id=knight.get("bound_horse_id")
+                        if self.slot in {"barding", "saddle", "bridle", "shoes"} else None)
         except ValueError as exc:
             return await interaction.response.send_message(f"🔒 {exc}", ephemeral=True)
         await navigate(interaction, EquipmentPicker(interaction.user.id, self.slot,

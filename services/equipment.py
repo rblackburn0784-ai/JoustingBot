@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from typing import Dict, Literal, Optional
 
 
-Slot = Literal["lance", "armour", "barding"]
+Slot = Literal["lance", "armour", "barding", "helm", "shield", "saddle", "bridle", "shoes"]
 
 
 @dataclass(frozen=True)
@@ -247,6 +247,55 @@ add_item(EquipmentItem(
     slip_mod=-2, charge_mod=-2,
 ))
 
+# v2.9.5 — Equipment slots formerly shown as unavailable on the menu art.
+# Each unlock is a sidegrade with a counterweight, never a straight upgrade.
+add_item(EquipmentItem(
+    key="helm_plain", name="Tournament Helm", slot="helm",
+    description="Open sightline and steady balance; the standard jousting helm.",
+))
+add_item(EquipmentItem(
+    key="helm_watchful", name="Watchful Visor", slot="helm",
+    description="Improves lance control but restricts the rider's awareness.",
+    knight_stat_mods={"control": 1, "resolve": -1},
+))
+add_item(EquipmentItem(
+    key="shield_kite", name="Tournament Kite Shield", slot="shield",
+    description="A balanced shield with familiar weight and coverage.",
+))
+add_item(EquipmentItem(
+    key="shield_round", name="Round Guard Shield", slot="shield",
+    description="More stable under impact, but less easy to aim around.",
+    unhorse_resist=1, alignment_mod=-1,
+))
+add_item(EquipmentItem(
+    key="saddle_standard", name="Standard Saddle", slot="saddle",
+    description="A well-fitted saddle with no handling trade-off.",
+))
+add_item(EquipmentItem(
+    key="saddle_charger", name="Charger Saddle", slot="saddle",
+    description="Helps maintain momentum but slows the horse's correction.",
+    horse_stat_mods={"power": 1, "obedience": -1},
+))
+add_item(EquipmentItem(
+    key="bridle_simple", name="Simple Bridle", slot="bridle",
+    description="Familiar tack that does not alter the horse's confidence.",
+))
+add_item(EquipmentItem(
+    key="bridle_training", name="Training Bridle", slot="bridle",
+    description="Improves obedience, but can make a nervous horse more cautious.",
+    horse_stat_mods={"obedience": 1, "courage": -1},
+))
+add_item(EquipmentItem(
+    key="shoes_iron", name="Iron Horseshoes", slot="shoes",
+    description="Balanced horseshoes for reliable general footing.",
+))
+add_item(EquipmentItem(
+    key="shoes_grip", name="Grip Horseshoes", slot="shoes",
+    description="Improved traction on difficult ground at the expense of speed.",
+    slip_mod=-2, horse_stat_mods={"speed": -1},
+))
+
+
 def get_item(key: Optional[str]) -> Optional[EquipmentItem]:
     if not key:
         return None
@@ -262,10 +311,12 @@ def apply_knight_equipment(
     base_stats: Dict[str, int],
     lance_key: Optional[str],
     armour_key: Optional[str],
+    helm_key: Optional[str] = None,
+    shield_key: Optional[str] = None,
 ) -> Dict[str, int]:
     stats = dict(base_stats)
 
-    for key in (lance_key, armour_key):
+    for key in (lance_key, armour_key, helm_key, shield_key):
         item = get_item(key)
         if not item:
             continue
@@ -279,24 +330,32 @@ def apply_knight_equipment(
 def apply_horse_equipment(
     base_stats: Dict[str, int],
     barding_key: Optional[str],
+    saddle_key: Optional[str] = None,
+    bridle_key: Optional[str] = None,
+    shoes_key: Optional[str] = None,
+    bond_bonus: int = 0,
 ) -> Dict[str, int]:
     stats = dict(base_stats)
-
-    item = get_item(barding_key)
-    if item:
-        for stat, mod in item.horse_stat_mods.items():
-            stats[stat] = max(0, stats.get(stat, 0) + mod)
-
+    for key in (barding_key, saddle_key, bridle_key, shoes_key):
+        item = get_item(key)
+        if item:
+            for stat, mod in item.horse_stat_mods.items():
+                stats[stat] = max(0, stats.get(stat, 0) + mod)
+    # One capped obedience point for a long-established horse bond.
+    if bond_bonus > 0:
+        stats["obedience"] = min(10, stats.get("obedience", 0) + min(1, bond_bonus))
     return stats
 
 
 def total_alignment_mod(
     lance_key: Optional[str],
     armour_key: Optional[str],
+    helm_key: Optional[str] = None,
+    shield_key: Optional[str] = None,
 ) -> int:
     total = 0
 
-    for key in (lance_key, armour_key):
+    for key in (lance_key, armour_key, helm_key, shield_key):
         item = get_item(key)
         if item:
             total += item.alignment_mod
@@ -308,10 +367,12 @@ def total_charge_mod(
     lance_key: Optional[str],
     armour_key: Optional[str],
     barding_key: Optional[str],
+    saddle_key: Optional[str] = None,
+    shoes_key: Optional[str] = None,
 ) -> int:
     total = 0
 
-    for key in (lance_key, armour_key, barding_key):
+    for key in (lance_key, armour_key, barding_key, saddle_key, shoes_key):
         item = get_item(key)
         if item:
             total += item.charge_mod
@@ -333,16 +394,19 @@ def total_impact_mult(
     return mult
 
 
-def total_slip_mod(barding_key: Optional[str]) -> int:
-    item = get_item(barding_key)
-    return item.slip_mod if item else 0
+def total_slip_mod(barding_key: Optional[str],
+                   shoes_key: Optional[str] = None) -> int:
+    return sum(item.slip_mod for key in (barding_key, shoes_key)
+               if (item := get_item(key)) is not None)
 
 
-def total_panic_mod(barding_key: Optional[str]) -> int:
-    item = get_item(barding_key)
-    return item.panic_mod if item else 0
+def total_panic_mod(barding_key: Optional[str],
+                    bridle_key: Optional[str] = None) -> int:
+    return sum(item.panic_mod for key in (barding_key, bridle_key)
+               if (item := get_item(key)) is not None)
 
 
-def total_unhorse_resist(armour_key: Optional[str]) -> int:
-    item = get_item(armour_key)
-    return item.unhorse_resist if item else 0
+def total_unhorse_resist(armour_key: Optional[str],
+                         shield_key: Optional[str] = None) -> int:
+    return sum(item.unhorse_resist for key in (armour_key, shield_key)
+               if (item := get_item(key)) is not None)

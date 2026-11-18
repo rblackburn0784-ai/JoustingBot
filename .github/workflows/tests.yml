@@ -31,11 +31,11 @@ jobs:
                   for module in (
                       "cogs.menu", "cogs.knight", "cogs.horse",
                       "cogs.equipment", "cogs.arena", "cogs.joust",
-                      "cogs.profile", "cogs.competition", "cogs.tournament", "cogs.maintenance",
+                      "cogs.profile", "cogs.competition", "cogs.tournament", "cogs.maintenance", "cogs.evolution",
                   ):
                       await bot.load_extension(module)
                   names = {command.name for command in bot.tree.get_commands()}
-                  assert {"menu", "profile", "titles", "title", "leaderboard", "knight", "horse", "joust", "tournament", "version", "maintenance", "admin"} <= names, names
+                  assert {"menu", "profile", "titles", "title", "leaderboard", "knight", "horse", "joust", "tournament", "version", "maintenance", "admin", "headquarters", "daily", "stable", "presets"} <= names, names
                   admin = bot.tree.get_command("admin")
                   assert {"panel", "backup", "repair", "reset_user", "health"} <= {sub.name for sub in admin.commands}
                   print("All cogs loaded; slash commands registered.")

@@ -23,18 +23,21 @@ class EquipmentCog(commands.Cog):
         self.bot = bot
 
     equip_group = app_commands.Group(
-        name="equip", description="Manage your server's lances, armour and barding"
+        name="equip", description="Manage your knight and horse equipment"
     )
 
     @equip_group.command(name="list", description="Browse gear and its unlock requirements.")
     async def list_items(self, interaction: discord.Interaction, slot: str = ""):
         slot = slot.strip().lower()
-        if slot and slot not in {"lance", "armour", "barding"}:
-            return await send_with_home(interaction, "❌ Slot must be lance, armour or barding.")
+        from services.progression import STARTER
+        if slot and slot not in STARTER:
+            return await send_with_home(interaction, "❌ Unknown equipment slot.")
         from cogs.menu import HomeOnlyView
         e = discord.Embed(title="🛡️ Equipment Catalog",
                           description="Original equipment is free. Extra gear needs achievements and gold.")
-        for current_slot in ([slot] if slot else ["lance", "armour", "barding"]):
+        for current_slot in ([slot] if slot else [
+            "lance", "armour", "helm", "shield", "barding", "saddle", "bridle", "shoes"
+        ]):
             lines = []
             for key, item in items_by_slot(current_slot).items():
                 state = unlock_info(interaction.guild_id, interaction.user.id, key)
@@ -59,7 +62,7 @@ class EquipmentCog(commands.Cog):
         if not knight:
             return await send_with_home(interaction, "❌ Create a knight first.")
         horse_id = None
-        if slot == "barding":
+        if slot in {"barding", "saddle", "bridle", "shoes"}:
             horse_id = knight.get("bound_horse_id")
             horse = load_horses().get("horses", {}).get(knight.get("bound_horse_id"))
             if not horse or int(horse.get("owner_id", -1)) != interaction.user.id:
@@ -81,6 +84,26 @@ class EquipmentCog(commands.Cog):
     @equip_group.command(name="barding", description="Equip owned barding on your bound mount.")
     async def barding(self, interaction: discord.Interaction, item_key: str):
         await self._equip(interaction, item_key, "barding")
+
+    @equip_group.command(name="helm", description="Equip an owned helmet.")
+    async def helm(self, interaction: discord.Interaction, item_key: str):
+        await self._equip(interaction, item_key, "helm")
+
+    @equip_group.command(name="shield", description="Equip an owned shield.")
+    async def shield(self, interaction: discord.Interaction, item_key: str):
+        await self._equip(interaction, item_key, "shield")
+
+    @equip_group.command(name="saddle", description="Equip an owned saddle.")
+    async def saddle(self, interaction: discord.Interaction, item_key: str):
+        await self._equip(interaction, item_key, "saddle")
+
+    @equip_group.command(name="bridle", description="Equip an owned bridle.")
+    async def bridle(self, interaction: discord.Interaction, item_key: str):
+        await self._equip(interaction, item_key, "bridle")
+
+    @equip_group.command(name="shoes", description="Equip owned horseshoes.")
+    async def shoes(self, interaction: discord.Interaction, item_key: str):
+        await self._equip(interaction, item_key, "shoes")
 
     @equip_group.command(name="unlock", description="Spend earned gold to unlock a sidegrade.")
     async def unlock(self, interaction: discord.Interaction, item_key: str):
