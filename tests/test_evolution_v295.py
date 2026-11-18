@@ -189,3 +189,53 @@ class MenuSmokeTests(TestCase):
                 else:
                     self.assertLessEqual(len(contents), 5)
             self.assertLessEqual(len(view.make_embed().description or ""), 4096)
+
+
+class RespecSafetyTests(TestCase):
+    def test_respec_cooldown_validation_and_metadata_survive_recreation(self):
+        from datetime import timedelta
+        stats = {"strength": 4, "control": 4, "endurance": 3,
+                 "agility": 3, "resolve": 3, "tactics": 3}
+        changed = {"strength": 5, "control": 3, "endurance": 3,
+                   "agility": 3, "resolve": 3, "tactics": 3}
+        db = {"knights": {"5": {
+            "user_id": 5, "stats": stats.copy(), "name": "Sir Test",
+            "bound_horse_id": "h5", "equipped_lance_key": "lance_ash"
+        }}}
+        with patch("cogs.knight.load_knights", return_value=db), \
+             patch("cogs.knight.save_knights") as save, \
+             patch("services.tournaments.load_db", return_value={"guilds": {}}):
+            with self.assertRaisesRegex(ValueError, "active challenge"):
+                evolution.respec_knight(5, changed, now=NOW, active_match=True)
+            with self.assertRaisesRegex(ValueError, "total 20"):
+                evolution.respec_knight(5, {**changed, "strength": 6}, now=NOW)
+            with self.assertRaisesRegex(ValueError, "No changes"):
+                evolution.respec_knight(5, stats.copy(), now=NOW)
+            result = evolution.respec_knight(5, changed, now=NOW)
+            self.assertEqual(result["stats"], changed)
+            self.assertEqual(result["bound_horse_id"], "h5")
+            self.assertEqual(save.call_count, 1)
+            self.assertEqual(evolution.respec_remaining(5, now=NOW), 14*24*3600)
+            # Recreating a knight must never clear the persisted cooldown.
+            db["knights"]["5"] = {"user_id": 5, "stats": stats.copy(), "name": "New Knight"}
+            with self.assertRaisesRegex(ValueError, "cooldown"):
+                evolution.respec_knight(5, changed, now=NOW + timedelta(days=2))
+            evolution.respec_knight(5, changed, now=NOW + timedelta(days=14, seconds=1))
+            self.assertEqual(save.call_count, 2)
+
+    def test_tournament_registration_blocks_global_stat_reallocation(self):
+        stats = {"strength": 5, "control": 3, "endurance": 3,
+                 "agility": 3, "resolve": 3, "tactics": 3}
+        data = {"knights": {"5": {"user_id": 5, "name": "Sir Test",
+                                 "stats": {"strength": 4, "control": 4,
+                                           "endurance": 3, "agility": 3,
+                                           "resolve": 3, "tactics": 3}}}}
+        events = {"guilds": {"99": {"active": {
+            "status": "registration", "entrants": [5]
+        }}}}
+        with patch("cogs.knight.load_knights", return_value=data), \
+             patch("cogs.knight.save_knights") as save, \
+             patch("services.tournaments.load_db", return_value=events):
+            with self.assertRaisesRegex(ValueError, "tournament"):
+                evolution.respec_knight(5, stats, now=NOW)
+            save.assert_not_called()

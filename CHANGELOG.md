@@ -3,6 +3,7 @@
 - Added five new functional gear slots (helm, shield, saddle, bridle, horseshoes), ten items and five earned purchase requirements. New items use balanced trade-offs; old items and neutral starters preserve historic combat results.
 - Added horse care/bond tracking, capped trust, a single capped obedience bonus and ownership validation, without modifying existing horses or player XP/gold records.
 - Added three equipment/tactical presets with ownership and unlock checks before any change, plus prefilled *private* tactical editors.
+- Added limited knight-stat respec with owner-only modal, 14-day persistent cooldown and active challenge/tournament guards.
 - Added three rotating UTC-day objectives with claim-once honorary renown, separate from economy, rankings and training XP.
 - Added player Headquarters and navigation for daily objectives, stable care, preset management and tactical preferences. Existing one-message private menus remain in use.
 - Extended guild progression in place without migrations; maintained single-process persistence constraints, admin reset support and old Fighter constructor compatibility. Added regression tests and updated version indicators.
