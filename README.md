@@ -1,6 +1,6 @@
 ## v2.9.6a — Defensive Counterbalance
 
-**Current version:** \`v2.9.6a — Defensive Counterbalance\`
+**Current version:** `v2.9.6a — Defensive Counterbalance`
 
 - Restores viability to the cautious, low-guard, measured-charge, precise-lance setup. Previously it won only **26.1%** of equal-stat, mirrored-seat games against the neutral plan.
 - **Measured Charge** now costs 1 charge point instead of 2, still granting +2 alignment and +1 handling. **Low Guard** no longer incurs an additional charge penalty: it still exposes high rider-target strikes and counters lance attacks.
@@ -8,6 +8,8 @@
 - **High Guard** now reduces a rider-target Full Charge by 3 rather than 2 charge points (still wearing down normally). Opponent-specific counters are preserved: pure defence is not automatically safe against a smart lance-target attack.
 - No changes to random seeds, match journals, training XP, gold, earned equipment, arena conditions, injuries or player records. Seeded combat still produces repeatable results **under the same balance version**; old saved pass logs remain the historical source of truth.
 - Ongoing automated checks include a cross-arena, seat-mirrored viability check (`python tools/simulate_balance_v296.py --seeds 100 --defence-check`) and regular regression tests. Defensive simulations are diagnostic, not a guarantee against stronger horses or higher-stat knights.
+
+- **Measured trial (100 seeds × two seats × six arenas per build):** Cautious Counter 48.8% vs neutral (formerly 26.1%); Cautious High Guard 47.2% vs neutral and 59.0% vs Aggressive Striker. An intentionally mismatched Low Guard vs Aggressive Striker won 26.8%, rewarding the correct shield choice. The CI release sweep now uses 200 seeds per arena.
 
 ---
 

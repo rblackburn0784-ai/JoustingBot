@@ -11,7 +11,7 @@ import discord
 from services import tactics, training, drills, combat_analysis, evolution
 from services.combat import Fighter, run_single_match
 from cogs.tactic_ui import AdvancedEditor, TacticEditor
-from tools.simulate_balance_v296 import sweep
+from tools.simulate_balance_v296 import sweep, PLANS
 
 NOW = datetime(2026, 11, 18, 14, 0, tzinfo=timezone.utc)
 
@@ -101,7 +101,7 @@ class TacticalCounterTests(TestCase):
 
     def test_small_balance_smoke_no_complete_winlock(self):
         stats = sweep(seeds=10)
-        self.assertEqual(len(stats), len(__import__('tools.simulate_balance_v296', fromlist=['PLANS']).PLANS) - 1)
+        self.assertEqual(len(stats), len(PLANS) - 1)
         for name, row in stats.items():
             self.assertEqual(row["matches"], 120)
             self.assertGreater(row["win_share"], 0.02, name)
