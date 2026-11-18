@@ -326,6 +326,31 @@ class MaintenanceCog(commands.Cog):
         view = AdminPage(interaction.user.id)
         await interaction.response.send_message(embed=view.make_embed(), view=view, ephemeral=True)
 
+
+    @admin_group.command(name="assets", description="Check installed graphical asset packs.")
+    @app_commands.default_permissions(manage_guild=True)
+    @app_commands.guild_only()
+    async def admin_assets(self, interaction: discord.Interaction):
+        if not is_admin(interaction):
+            return await interaction.response.send_message("Manage Server required.", ephemeral=True)
+        await interaction.response.defer(thinking=True, ephemeral=True)
+        from services.asset_health import audit_assets
+        report = await asyncio.to_thread(audit_assets)
+        lines = [
+            f"Available: **{report['present']}/{report['expected']}** required graphic files",
+            f"Invalid or damaged: **{len(report['errors'])}**",
+            f"Missing: **{report['missing']}** (fallbacks remain operational)",
+        ]
+        for issue in report["errors"][:5]:
+            lines.append("❌ " + issue)
+        for issue in report["warnings"][:7]:
+            lines.append("⚠️ " + issue)
+        if not report["errors"] and report["missing"] == 0:
+            lines.append("✅ Full graphics pack passes file checks.")
+        lines.append("Use python tools/audit_assets_v294.py --strict locally for a complete report.")
+        card = embed("🖼️ Asset Health — v2.9.4", "\n".join(lines)[:3900])
+        await interaction.edit_original_response(embed=card)
+
     @admin_group.command(name="health", description="Inspect persistent JSON health.")
     @app_commands.default_permissions(manage_guild=True)
     @app_commands.guild_only()
@@ -399,8 +424,8 @@ class MaintenanceCog(commands.Cog):
     async def version(self, interaction: discord.Interaction):
         view = MainMenuView(interaction.user.id, is_admin(interaction))
         await interaction.response.send_message(
-            embed=embed("⚙️ JoustingBot v0.9.2d",
-                        "Training Yard & Tournament Controls\n"
+            embed=embed("⚙️ JoustingBot v2.9.4",
+                        "Stability, Economy Integrity & Arena Presentation\n"
                         "✅ Atomic JSON saves · verified local backups · safe repairs\n"
                         "✅ Private tactics · one-screen Prep / Gallop / Lance / Collision / Outcome\n"
                         "✅ One evolving animated graphic per pass · final scorecard after last pass\n"

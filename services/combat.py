@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import random
+import secrets
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
@@ -293,7 +294,9 @@ def make_pass(
 def run_single_match(fighter_a: Fighter, fighter_b: Fighter, arena_key: str, seed: Optional[int] = None,
                      tactics_a: TacticPlan | None = None, tactics_b: TacticPlan | None = None) -> MatchResult:
     arena = get_arena(arena_key)
-    seed_value = int(seed if seed is not None else random.randint(1, 2_147_483_647))
+    # Unspecified ranked seeds must not be inferred from the global PRNG.
+    # Explicit seeds remain supported for admin tests, brackets and replays.
+    seed_value = int(seed if seed is not None else secrets.randbelow(2_147_483_647) + 1)
     rng = random.Random(seed_value)
 
     score_a = 0

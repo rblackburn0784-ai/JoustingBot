@@ -28,7 +28,7 @@ from services.injuries import (
 )
 
 
-VERSION_LABEL = "JoustingBot v2.9.3e — Arena Intro Screens"
+VERSION_LABEL = "JoustingBot v2.9.4 — Stability & Integrity"
 CHALLENGE_TIMEOUT_SECONDS = 240
 
 
@@ -690,6 +690,10 @@ class JoustCog(commands.Cog):
 
         horse_a = Horse.from_dict(horse_a_raw)
         horse_b = Horse.from_dict(horse_b_raw)
+        # Defensive validation: stale or manually corrupted bindings must not
+        # let a knight joust with someone else's horse.
+        if horse_a.owner_id != challenger.id or horse_b.owner_id != opponent.id:
+            return "❌ A bound horse belongs to a different rider. Rebind your own horse.", None
 
         # v0.8: resolve per-server unlocked loadouts before simulation and presentation.
         # Legacy starter equipment remains usable without migration.
@@ -1071,6 +1075,13 @@ class JoustCog(commands.Cog):
         seed: Optional[int] = None,
         debug: bool = False,
     ):
+        # A player-chosen RNG seed could predetermine a ranked match result.
+        # Only the non-competitive admin /joust duel command accepts test seeds.
+        if seed is not None:
+            return await interaction.response.send_message(
+                "⛔ Competitive challenges cannot specify a seed. "
+                "Leave seed empty; admins can use /joust duel for seeded tests.",
+                ephemeral=True)
         if self.is_player_busy(interaction.user.id):
             return await interaction.response.send_message("❌ You already have an active joust challenge.", ephemeral=True)
 

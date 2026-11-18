@@ -24,6 +24,16 @@ def at(uid):
     return "<@" + str(uid) + ">" if uid is not None else "TBD"
 
 
+def advancing_rider(score_a: int, score_b: int, red_id: int, blue_id: int,
+                    seed: int) -> tuple[int, str | None]:
+    """Select a bracket winner using persisted IDs (even if a rider left)."""
+    if score_a > score_b:
+        return red_id, None
+    if score_b > score_a:
+        return blue_id, None
+    return engine.tie_winner(red_id, blue_id, seed), "seeded marshal decision"
+
+
 def status_embed(gid):
     t = engine.current(gid)
     e = discord.Embed(title="🏆 Tournament Lite", colour=discord.Colour.gold())
@@ -454,17 +464,19 @@ class TournamentCog(commands.Cog):
                 finally:
                     joust.release_challenge(a.id, b.id)
             else:
-                if journal.get("tournament_id") != state["id"]:
-                    return await interaction.followup.send("❌ Match journal ID conflict.", ephemeral=True)
+                if (journal.get("tournament_id") != state["id"]
+                        or journal.get("guild_id") != interaction.guild_id
+                        or (journal.get("a") or {}).get("user_id") != match["a"]
+                        or (journal.get("b") or {}).get("user_id") != match["b"]
+                        or journal.get("seed") != match["seed"]):
+                    return await interaction.followup.send("❌ Match journal identity conflict.", ephemeral=True)
                 engine.reserve_next(interaction.guild_id)
                 score_a, score_b = journal["a"]["score"], journal["b"]["score"]
-            if score_a > score_b:
-                winner, tiebreak = a.id, None
-            elif score_b > score_a:
-                winner, tiebreak = b.id, None
-            else:
-                winner = engine.tie_winner(a.id, b.id, match["seed"])
-                tiebreak = "seeded marshal decision"
+            # Resume even when a rider has left Discord: use saved bracket IDs,
+            # never potentially missing Member objects for the advance decision.
+            winner, tiebreak = advancing_rider(
+                score_a, score_b, match["a"], match["b"], match["seed"]
+            )
             # Compare progress across the bracket commit so only newly earned
             # achievements/titles are announced, including runner-up awards.
             previous = {

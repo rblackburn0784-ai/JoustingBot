@@ -1,8 +1,18 @@
+## v2.9.4 — Stability, Security & Asset Readiness
+
+**Current version:** `v2.9.4 — Stability & Integrity`
+
+Security and correctness changes: ranked `/joust challenge` rejects any manually chosen `seed` (to prevent cherry-picked results), while admin `/joust duel` and stored tournament brackets still support deterministic seeds. New random matches use a system-backed seed. Bound horse ownership is verified before matching, and tournament recovery can advance using recorded player IDs after someone has left the server. Tournament finals now say `GRAND FINAL` on the illustrated final scorecard.
+
+Run `python -m unittest discover -s tests -v` and `python tools/audit_assets_v294.py --strict` in the deployment checkout. Admins can also run `/admin assets` to inspect the current host's graphics. The asset command only reads image files; it never edits game state. Without `--strict`, missing graphics are warnings and gameplay retains its fallbacks. For full cinematic graphics, install the arena, horse, knight, title, UI and six intro PNG packs **on the server running the bot**, then commit/push them if deployed from GitHub. The GitHub repository currently lacks several of these large artwork packs.
+
+**Security/operations:** JSON writes are individually atomic but not distributed transactions. Run one persistent bot instance per shared storage directory; take verified backups before upgrades and restore only while matches are idle. No code audit can guarantee that all bugs or exploits are absent, and visual alignment still needs live Discord testing with the actual artwork.
+
 # JoustingBot
 
 A lightweight medieval jousting Discord game bot built with `discord.py`.
 
-**Current version:** `v2.9.3d — Rider Shield & Lance Alignment`
+**Previous feature release:** `v2.9.3e — Arena Intro Screens`
 
 Players create a knight, build and bind a horse, equip both rider and horse, choose an arena, and challenge other Discord users to cinematic jousts with accept/decline buttons.
 

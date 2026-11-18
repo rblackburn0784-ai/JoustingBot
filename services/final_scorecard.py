@@ -107,6 +107,13 @@ def _injuries(prepared) -> tuple[int, int]:
 
 
 def _format(prepared) -> str:
+    # Tournament matches retain mode=challenge for scoring/rewards, while
+    # their visual identity must still say TOURNAMENT on the final card.
+    event = str(getattr(prepared, "intro_event_type", "")).strip().upper()
+    if event == "TOURNAMENT FINAL":
+        return "GRAND FINAL"
+    if event == "TOURNAMENT MATCH":
+        return "TOURNAMENT"
     return {
         "challenge": "RANKED JOUST",
         "training": "TRAINING",

@@ -1,3 +1,13 @@
+## v2.9.4 — Full Stability & Integrity Review
+
+- **Competitive integrity:** accepted player challenges no longer accept client-chosen RNG seeds; unseeded matches use a system-backed random seed while explicit seeds remain supported for admin test duels, tournament brackets and deterministic replays.
+- **Roster protection:** a stale bound-horse reference cannot be used to joust with another player's mount.
+- **Tournament recovery:** bracket advancement uses persisted rider IDs even if someone leaves after a match has been recorded; saved journal identity is validated against guild, bracket entrants and seed.
+- **Visual correctness:** tournament matches/finals retain their correct labels on final scorecards; all displayed version indicators updated to v2.9.4.
+- **Art diagnostics:** `/admin assets` and `python tools/audit_assets_v294.py [--strict]` inspect the installed sprite, title, intro and scene packs, including PNG integrity, transparency and frame sizes. Missing optional art is reported separately from corrupt files.
+- **Regression:** new focused tests cover user seed blocking, seeded replay, horse ownership, tournament recovery, scorecard labels and asset validation.
+- **Scope:** no character saves, tournament results, match scoring or existing artwork are migrated or overwritten; full graphical readiness still requires installation of each locally stored PNG pack on the actual bot host. Multi-process JSON writes remain unsupported; deploy one persistent bot worker.
+
 ## v2.9.3e — Arena Intro Screens
 
 - Added six arena-specific intro layouts (Royal Lists, Muddy Field, Frozen Ground, Wind-Swept Field, Festival Arena and War-Torn Battlefield); user-installed PNGs remain separate from source.
