@@ -115,3 +115,15 @@ class AssetAuditTests(unittest.TestCase):
         self.assertEqual(len(report["errors"]), 2)
         self.assertTrue(any("barrier.png" in e for e in report["errors"]))
         self.assertTrue(any("alpha" in e for e in report["errors"]))
+
+class BroadcastVersionTests(unittest.TestCase):
+    def test_live_intro_and_passes_show_release_version(self):
+        from services.live_broadcast import _intro_embed, _screen_embed
+        p = SimpleNamespace(arena_key="royal_lists", mode="training")
+        result = SimpleNamespace(fighter_a="Red", fighter_b="Blue",
+                                 passes=[object()])
+        clip = SimpleNamespace(pass_no=1, path=Path("pass_1.gif"))
+        intro = _intro_embed(result, p)
+        live_pass = _screen_embed(result, clip, arena_key=p.arena_key)
+        self.assertIn("v2.9.4", intro.footer.text)
+        self.assertIn("v2.9.4", live_pass.footer.text)
