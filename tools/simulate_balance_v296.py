@@ -31,6 +31,9 @@ PLANS = {
     "aggressive_striker": TacticPlan(
         style="aggressive", target="rider", manoeuvre="reckless_charge",
         shield_guard="high", charge_intensity="full", lance_control="forceful"),
+    "cautious_high_guard": TacticPlan(
+        style="cautious", target="shield", manoeuvre="shield_brace",
+        shield_guard="high", charge_intensity="measured", lance_control="precise"),
 }
 
 
@@ -116,8 +119,9 @@ def main() -> int:
     options = parser.parse_args()
     result = sweep(options.seeds)
     matchups = (
-        [head_to_head("cautious_counter", other, options.seeds)
-         for other in ("aggressive_striker", "full_force", "neutral")]
+        ([head_to_head("cautious_counter", other, options.seeds)
+           for other in ("aggressive_striker", "full_force", "neutral")]
+         + [head_to_head("cautious_high_guard", "aggressive_striker", options.seeds)])
         if options.defence_check else []
     )
     if options.json:
