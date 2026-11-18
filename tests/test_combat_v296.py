@@ -221,6 +221,13 @@ class DefensiveRebalanceTests(TestCase):
         mount = {"stamina": 5, "obedience": 5, "courage": 5}
         actual = tactics.effects(p, pass_no=1, fatigue=0, horse_stats=mount)
         self.assertEqual(actual.charge, -3)
+        high_same = tactics.TacticPlan(
+            style="cautious", target="lance", manoeuvre="shield_brace",
+            shield_guard="high", charge_intensity="measured",
+            lance_control="precise",
+        )
+        high_effect = tactics.effects(high_same, pass_no=1, fatigue=0, horse_stats=mount)
+        self.assertEqual(high_effect.charge, actual.charge - 2)
         self.assertGreater(actual.alignment, 0)
         self.assertGreaterEqual(actual.resistance, 3)
         # The bonus must never be granted to all-out aggression.

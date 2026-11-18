@@ -134,7 +134,7 @@ def main() -> int:
             for arena, ratio in value["arenas"].items():
                 print(f"  {arena:22} {ratio:.1%}")
         for row in matchups:
-            print(f"Counter vs {row['second']:19} {row['win_share']:.1%} "
+            print(f"{row['first']} vs {row['second']:19} {row['win_share']:.1%} "
                   "seat-adjusted win share")
     if options.defence_check:
         # These are viability floors, not a claim of perfect balance.
@@ -148,6 +148,19 @@ def main() -> int:
             return 2
         if result["aggressive_striker"]["win_share"] > 0.68:
             print("FAIL: aggressive striker dominates neutral.", file=sys.stderr)
+            return 2
+        cautious_high = result["cautious_high_guard"]["win_share"]
+        if not 0.38 <= cautious_high <= 0.62:
+            print(f"FAIL: cautious high-guard dominance/weakness: {cautious_high:.1%}",
+                  file=sys.stderr)
+            return 2
+        high_vs_aggressive = next(
+            m["win_share"] for m in matchups
+            if m["first"] == "cautious_high_guard" and m["second"] == "aggressive_striker"
+        )
+        if not 0.40 <= high_vs_aggressive <= 0.68:
+            print(f"FAIL: high-guard anti-aggression counter is outside its "
+                  f"target band: {high_vs_aggressive:.1%}", file=sys.stderr)
             return 2
     # Wide safety tripwire: identity/seat-neutral tactics should not become
     # completely unstoppable. The full sweep still needs human review.

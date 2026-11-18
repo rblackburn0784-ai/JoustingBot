@@ -160,11 +160,12 @@ def effects(plan: TacticPlan, *, pass_no: int, fatigue: int, horse_stats: dict[s
         handling += add_handle
         gain += add_fatigue
         risk += add_risk
-    # v2.9.6a: guarded, measured precision should convert a sound defensive
-    # line into an occasional effective counterstrike. The narrow +2 only
-    # offsets part of the stacked cautious/lance/brace/precision penalties;
-    # it cannot be stacked with Full Charge or an aggressive riding style.
-    if (plan.style == "cautious" and plan.shield_guard in {"high", "low"}
+    # v2.9.6a: a cautious LOW guard, measured charge and precision grip
+    # convert sound defensive positioning into an effective counterstrike.
+    # High guard already counters rider-target attacks, so it is EXCLUDED
+    # to avoid an overpowered shield/charge combination. The narrow +2 only
+    # offsets stacked cautious/lance/brace penalties and never aids aggression.
+    if (plan.style == "cautious" and plan.shield_guard == "low"
             and plan.charge_intensity == "measured"
             and plan.lance_control == "precise"):
         charge += 2
