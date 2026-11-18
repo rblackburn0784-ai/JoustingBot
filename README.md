@@ -1,6 +1,46 @@
+## v2.9.7 — The Grand Tournament Circuit
+
+**Current version:** v2.9.7 — The Grand Tournament Circuit
+
+The v2.9.6a combat balance is preserved. This release adds an honorary, continuing medieval competitive world using only verified completed tournament records; it does not create new spending currency, gold, XP, equipment power, health changes or paid prizes.
+
+### Seasonal championships and qualified Grand Finals
+- **Six-week UTC seasons**, beginning on **18 November 2026**, numbered deterministically from the fixed calendar. Seasons roll automatically when views are opened; no background scheduler or cache is needed. Historic seasons remain queryable.
+- **Circuit leaderboard:** 2 honorary points per verified completed tournament match, +5 for advancing, +10 for a fully verified event crown and +3 for a knockout runner-up. A completed bracket and matching journal record are required; fake/duplicate events cannot be rewarded by refreshing the view. Use /circuit standings or /menu -> Grand Circuit.
+- **Qualified Circuit Finals:** admins may create a ranked knockout tournament with championship=true. It snapshots the top 4/8 riders with at least 7 current-season Circuit points at creation. Only that qualified roster can register. No separate paid rewards.
+- **Six arena championships:** each arena has a seasonal honour leaderboard. Three or more verified tournament wins in that arena qualify a rider for that area's title. Use /circuit arenas.
+
+### Knight Houses and daily cooperation
+- **Knight Houses:** /house menu, /house found, /house join, /house leave, /house captain and /house roster. Houses are guild-scoped; each player can belong to only one House at once. Founding requires an existing knight. Captains must transfer leadership before leaving a populated House. Limits: 12 Houses per guild, 50 riders per House.
+- **Honorary House standings:** points are calculated only from verified tournament jousts. Each completed round grants 1 point, a win +3, and a win against a different House +1. Intra-House sparring does not count. Each match snapshots both riders' Houses; later transfers never rewrite old results.
+- **Daily House missions:** /house missions or House menu -> Daily Missions. UTC-day objectives include a cross-House bout, turnout by three different Housemates and two cross-House victories. Progress is automatic and non-claimable; no economy or combat rewards.
+
+### Tournament formats and event controls
+- Existing 4/8-rider **single-elimination** tournaments and admin buttons are unchanged by default.
+- New **round-robin** mode: every participant faces every other (6 matches for four riders; 28 for eight), with stable match IDs and arena/seed snapshots for recoverable admin-run match progression. League winners receive 3 table points; equal totals are deterministically ordered by ascending player ID. The last fixture is never mislabelled a knockout final.
+- Optional **ranked seeding** for knockout brackets uses completed guild challenge wins to pair highest against lowest. All seeded brackets are recorded and reproducible, with a saved order. Circuit Finals use their **seasonal qualification order** instead.
+- Optional scheduled UTC starts and required rider check-in. Admins set ISO 8601 start timestamps in /tournament create, and riders use /tournament checkin or Check In on the tournament panel. Participants can use /tournament leave during registration. **Scheduling gates an admin's Start action; it does not automatically start matches or send timed notifications.**
+
+### The Chronicle, Hall and safe persistence
+- **The Herald's Chronicle:** /herald read; automated reports about verifiably crowned winners and ranked underdog upsets. It does not invent events or require manual newspaper entry.
+- **Hall of Champions:** /hall champions retains verified historical tournament champions, formats and event dates using the original permanent tournament archive. No separate claimable records or manual prize counter.
+- The illustrated Tournament Hub, the Grand Circuit dashboard, five-tab season views and private House menus use the existing Discord edit-in-place system. **No new PNG packs are required** for this release.
+- Houses now use storage/houses.json and are included in /admin health, backup, verify and restore. Existing knights, horses, competitive matches, tournament saves, titles and player inventories remain intact. Use a *single persistent bot process* sharing the JSON save directory.
+
+### New commands
+/circuit menu, /circuit standings, /circuit arenas, /circuit houses
+/house menu, /house found, /house join, /house leave, /house captain, /house roster, /house missions
+/herald read, /hall champions
+/tournament checkin, /tournament leave
+/tournament create (optional format, seeding, scheduled_at, require_checkin and championship)
+
+Before updating, take an /admin backup and verify it. Then git pull --ff-only origin main, run the regression suite and restart the bot. Validate a four-player league, a scheduled event and House creation in a test Discord server before announcing a live season.
+
+---
+
 ## v2.9.6a — Defensive Counterbalance
 
-**Current version:** `v2.9.6a — Defensive Counterbalance`
+**Previous balance release:** `v2.9.6a — Defensive Counterbalance`
 
 - Restores viability to the cautious, low-guard, measured-charge, precise-lance setup. Previously it won only **26.1%** of equal-stat, mirrored-seat games against the neutral plan.
 - **Measured Charge** now costs 1 charge point instead of 2, still granting +2 alignment and +1 handling. **Low Guard** no longer incurs an additional charge penalty: it still exposes high rider-target strikes and counters lance attacks.

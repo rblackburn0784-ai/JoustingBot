@@ -27,6 +27,7 @@ SCHEMAS = {
     "titles.json": ("guilds", dict),
     "progression.json": ("guilds", dict),
     "tournaments.json": ("guilds", dict),
+    "houses.json": ("guilds", dict),
     "admin_audit.json": ("events", list),
 }
 BACKUP_RE = re.compile(r"^bkp-[0-9]{8}T[0-9]{6}Z-[a-f0-9]{8}$")

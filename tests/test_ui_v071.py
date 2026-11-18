@@ -13,7 +13,7 @@ from services.competition import TITLE_RULES, title_progress
 
 class UIReleaseTests(unittest.TestCase):
     def test_version_page_matches_current_release_and_broadcast(self):
-        self.assertEqual(menu.VERSION, "v2.9.6a")
+        self.assertEqual(menu.VERSION, "v2.9.7")
         overview = menu.VersionPage(123).make_embed()
         self.assertIn(menu.VERSION, overview.title)
         self.assertIn("Gallop", overview.description)

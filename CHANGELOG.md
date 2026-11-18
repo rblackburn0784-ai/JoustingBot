@@ -1,3 +1,12 @@
+## v2.9.7 — The Grand Tournament Circuit
+
+- Implemented deterministic six-week UTC seasonal standings, honorary verified participation/win/crown/finalist points, qualified Circuit Finals and six arena championship honours; no extra gold, XP, paid prizes or buffs.
+- Implemented guild-scoped Knight Houses, officer transfer, member limits, match-time House snapshots, honorary inter-House rankings and non-claimable UTC-day cooperative missions.
+- Extended existing tournaments with 4/8-rider round-robin leagues, ranked knockout seeding, optional scheduled admin starts, check-in and safe withdrawal before start. Circuit Finals snapshot top seasonal qualifiers. Existing knockout events retain their normal format and stable replay IDs.
+- Prevented round-robin fixtures from being treated as knockout finals by the illustrated match opener or awards engine. All tournament results remain durable, ID-stable and recoverable through the existing admin flow.
+- Added the Herald's Chronicle for verified crowns/seed upsets and the lifetime Hall of Champions; no artificial article writing or duplicate claims.
+- Added new private interactive Circuit/House menus, public Tournament Panel Check In/Leave buttons, version alignment, houses.json in backup/restore/health and comprehensive regression coverage.
+
 ## v2.9.6a — Defensive Counterbalance
 
 - Reduced the excessive charge penalty for measured speed; removed low guard's extra impact penalty while keeping its vulnerability to high strikes.

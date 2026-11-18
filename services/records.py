@@ -72,6 +72,17 @@ def record_match(prepared: Any, result: Any, *, match_id: str | None = None,
               "tactics": getattr(prepared, "tactics_b", None).as_dict() if getattr(prepared, "tactics_b", None) else {"style": "balanced", "target": "shield", "manoeuvre": "none"}},
         "passes": passes,
     }
+    # v2.9.7: preserve House allegiance at match time for honorary
+    # standings. Missing or malformed optional House data must NEVER
+    # prevent a completed joust from entering its durable match journal.
+    try:
+        from services.circuit import house_for
+        for side in ("a", "b"):
+            uid = entry[side]["user_id"]
+            entry[side]["house_id"] = house_for(entry["guild_id"], uid)
+    except (ValueError, OSError, TypeError):
+        for side in ("a", "b"):
+            entry[side]["house_id"] = None
     from services.injuries import make_events
     entry["injuries"] = make_events(entry)
     data["matches"].append(entry)

@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import io
 from collections import defaultdict
+from typing import Literal
 
 import discord
 from discord import app_commands
@@ -44,26 +45,48 @@ def status_embed(gid):
                          "No active tournament. Last champion: " + at(last[0]["champion"]))
         return e
     e.title = "🏆 " + discord.utils.escape_markdown(t["name"])
+    competition_format = t.get("format", "single_elimination")
     e.description = (
-        f"Format: **{t['size']} players** · {t['status'].title()}\n"
+        f"Format: **{t['size']} riders · {competition_format.replace('_', ' ').title()}** "
+        f"· {t['status'].title()}\n"
         f"Registered: **{len(t['entrants'])}/{t['size']}**\n"
-        "Joining consents to admin-run competitive matches. Gear, injuries and rewards apply."
+        + (f"👑 Circuit Final — Season {t.get('season')} qualified riders only\n"
+           if t.get("championship") else "")
+        + (f"Scheduled start: {t['scheduled_at'][:16]} UTC\n"
+           if t.get("scheduled_at") else "")
+        + (f"Checked in: {len(t.get('checked_in', []))}/{len(t['entrants'])}\n"
+           if t.get("require_checkin") else "")
+        + f"Seeding: {t.get('seeding', 'random').title()}\n"
+        + "Joining consents to admin-run competitive matches. Gear, injuries and rewards apply."
     )
     if t["status"] == "registration":
         e.add_field(name="Entrants", value="\n".join(
-            f"{i + 1}. {at(uid)}" for i, uid in enumerate(t["entrants"])
+            f"{i + 1}. {at(uid)}"
+            + ((" ✅" if uid in t.get("checked_in", []) else " ⏳")
+               if t.get("require_checkin") else "")
+            for i, uid in enumerate(t["entrants"])
         ) or "Awaiting registrations.", inline=False)
         e.add_field(name="Next", value="Players Join, then admin Starts when full.", inline=False)
     else:
         rounds = t.get("rounds", [])
-        for idx, rnd in enumerate(rounds):
-            label = "Final" if idx == len(rounds)-1 else ("Semifinals" if idx == len(rounds)-2 else "Quarterfinals")
-            lines = []
-            for i, m in enumerate(rnd):
-                sym = "✅" if m["status"] == "complete" else ("⏳" if m["status"] == "running" else "◯")
-                win = " → " + at(m["winner"]) if m["winner"] else ""
-                lines.append(f"{sym} {i+1}. {at(m['a'])} vs {at(m['b'])}{win}")
-            e.add_field(name=label, value="\n".join(lines), inline=False)
+        if competition_format == "round_robin":
+            completed = sum(m["status"] == "complete" for r in rounds for m in r)
+            total = sum(len(r) for r in rounds)
+            e.add_field(name="League Progress",
+                        value=f"{completed}/{total} round-robin bouts recorded.", inline=False)
+            if t.get("standings"):
+                e.add_field(name="Final Standings", value="\n".join(
+                    f"{ix}. {at(entry['user_id'])} — {entry['points']} points"
+                    for ix, entry in enumerate(t["standings"][:8], 1)), inline=False)
+        else:
+            for idx, rnd in enumerate(rounds):
+                label = "Final" if idx == len(rounds)-1 else ("Semifinals" if idx == len(rounds)-2 else "Quarterfinals")
+                lines = []
+                for i, m in enumerate(rnd):
+                    sym = "✅" if m["status"] == "complete" else ("⏳" if m["status"] == "running" else "◯")
+                    win = " → " + at(m["winner"]) if m["winner"] else ""
+                    lines.append(f"{sym} {i+1}. {at(m['a'])} vs {at(m['b'])}{win}")
+                e.add_field(name=label, value="\n".join(lines), inline=False)
         nxt = engine.pending(t)
         if nxt:
             m = nxt["match"]
@@ -247,6 +270,16 @@ class TournamentPanel(discord.ui.View):
     async def join(self, interaction, button):
         await interaction.client.get_cog("TournamentCog").do_join(interaction)
 
+    @discord.ui.button(label="Check In", emoji="✅", style=discord.ButtonStyle.secondary,
+                       custom_id="tournament:checkin", row=0)
+    async def checkin(self, interaction, button):
+        await interaction.client.get_cog("TournamentCog").do_checkin(interaction)
+
+    @discord.ui.button(label="Leave Tournament", emoji="🚪", style=discord.ButtonStyle.secondary,
+                       custom_id="tournament:leave", row=1)
+    async def leave(self, interaction, button):
+        await interaction.client.get_cog("TournamentCog").do_leave(interaction)
+
     @discord.ui.button(label="Start Tournament", emoji="🏆", style=discord.ButtonStyle.primary,
                        custom_id="tournament:start", row=0)
     async def start(self, interaction, button):
@@ -303,8 +336,11 @@ class TournamentHub(OwnedView):
         self.gid = gid
         self.button("Refresh", self.refresh, row=0, emoji="🔄")
         self.button("Join", self.join, row=0, emoji="🛡️")
+        self.button("Check In", self.checkin, row=0, emoji="✅")
+        self.button("Leave", self.leave, row=0, emoji="🚪")
         self.button("History", self.history, row=0, emoji="📜")
         self.button("Trophy Cabinet", self.cabinet, row=2, emoji="🎖️")
+        self.button("Grand Circuit", self.circuit, row=2, emoji="🏰")
         if admin:
             self.button("Create", self.create, row=1, style=discord.ButtonStyle.primary)
             self.button("Start", self.start, row=1)
@@ -325,6 +361,13 @@ class TournamentHub(OwnedView):
         await it.client.get_cog("TournamentCog").do_join(it)
     async def history(self, it):
         await navigate(it, TournamentHistory(it.user.id, it.guild_id))
+    async def checkin(self, it):
+        await it.client.get_cog("TournamentCog").do_checkin(it)
+    async def leave(self, it):
+        await it.client.get_cog("TournamentCog").do_leave(it)
+    async def circuit(self, it):
+        from cogs.circuit import CircuitHub
+        await navigate(it, CircuitHub(it.user.id, it.guild_id))
     async def cabinet(self, it):
         await navigate(it, TournamentCabinet(it.user.id, it.guild_id))
     async def create(self, it):
@@ -347,7 +390,10 @@ class TournamentCog(commands.Cog):
     async def cog_load(self):
         self.bot.add_view(TournamentPanel())
 
-    async def do_create(self, interaction, name, size):
+    async def do_create(self, interaction, name, size, *,
+                        format="single_elimination", scheduled_at="",
+                        require_checkin=False, seeding="random",
+                        championship=False):
         # Permission checks are REQUIRED here as well as on the slash command
         # and creation modal; a manually triggered component cannot bypass them.
         if not interaction.guild_id or not is_admin(interaction):
@@ -356,7 +402,10 @@ class TournamentCog(commands.Cog):
                 ephemeral=True)
         async with self.locks[interaction.guild_id]:
             try:
-                engine.create(interaction.guild_id, interaction.user.id, name, size)
+                engine.create(interaction.guild_id, interaction.user.id, name, size,
+                              format=format, scheduled_at=scheduled_at,
+                              require_checkin=require_checkin, seeding=seeding,
+                              championship=championship)
             except engine.TournamentError as ex:
                 return await interaction.response.send_message(f"❌ {ex}", ephemeral=True)
         await interaction.response.send_message("✅ Registration opened.", ephemeral=True)
@@ -383,6 +432,31 @@ class TournamentCog(commands.Cog):
                                                view=TournamentPanel())
             except discord.HTTPException:
                 pass
+
+    async def do_checkin(self, interaction):
+        if not interaction.guild_id or not isinstance(interaction.user, discord.Member):
+            return await interaction.response.send_message("Check in inside the server.", ephemeral=True)
+        reason = valid_rider(interaction.user)
+        if reason:
+            return await interaction.response.send_message(f"❌ {reason}", ephemeral=True)
+        async with self.locks[interaction.guild_id]:
+            try:
+                item = engine.check_in(interaction.guild_id, interaction.user.id)
+            except engine.TournamentError as ex:
+                return await interaction.response.send_message(f"❌ {ex}", ephemeral=True)
+        await interaction.response.send_message(
+            f"✅ Checked in for {discord.utils.escape_markdown(item['name'])}.", ephemeral=True)
+
+    async def do_leave(self, interaction):
+        if not interaction.guild_id:
+            return await interaction.response.send_message("Server only.", ephemeral=True)
+        async with self.locks[interaction.guild_id]:
+            try:
+                item = engine.leave(interaction.guild_id, interaction.user.id)
+            except engine.TournamentError as ex:
+                return await interaction.response.send_message(f"❌ {ex}", ephemeral=True)
+        await interaction.response.send_message(
+            f"✅ You left {discord.utils.escape_markdown(item['name'])}.", ephemeral=True)
 
     async def do_start(self, interaction):
         if not is_admin(interaction):
@@ -439,7 +513,8 @@ class TournamentCog(commands.Cog):
                     return await interaction.followup.send(error or "Riders not ready.", ephemeral=True)
                 prepared.mode = "challenge"
                 # Presentation only: retain challenge gameplay/scoring rules.
-                is_final = choice["round"] == len(state["rounds"]) - 1
+                is_final = (state.get("format", "single_elimination") == "single_elimination"
+                            and choice["round"] == len(state["rounds"]) - 1)
                 prepared.intro_event_type = "TOURNAMENT FINAL" if is_final else "TOURNAMENT MATCH"
                 prepared.intro_crest_key = "tournament_final" if is_final else "tournament"
                 if not joust.try_lock_challenge(a.id, b.id):
@@ -531,13 +606,29 @@ class TournamentCog(commands.Cog):
     @app_commands.default_permissions(manage_guild=True)
     @app_commands.choices(size=[app_commands.Choice(name="4 riders", value=4),
                                 app_commands.Choice(name="8 riders", value=8)])
-    async def create(self, interaction: discord.Interaction, name: str, size: int = 4):
-        await self.do_create(interaction, name, size)
+    async def create(self, interaction: discord.Interaction, name: str, size: int = 4,
+                     format: Literal["single_elimination", "round_robin"] = "single_elimination",
+                     seeding: Literal["random", "ranked"] = "random",
+                     scheduled_at: str = "", require_checkin: bool = False,
+                     championship: bool = False):
+        await self.do_create(interaction, name, size, format=format, seeding=seeding,
+                             scheduled_at=scheduled_at, require_checkin=require_checkin,
+                             championship=championship)
 
     @group.command(name="join", description="Register for the open tournament.")
     @app_commands.guild_only()
     async def join(self, interaction: discord.Interaction):
         await self.do_join(interaction)
+
+    @group.command(name="checkin", description="Confirm attendance before a checked-in tournament.")
+    @app_commands.guild_only()
+    async def checkin(self, interaction: discord.Interaction):
+        await self.do_checkin(interaction)
+
+    @group.command(name="leave", description="Withdraw from a tournament before it starts.")
+    @app_commands.guild_only()
+    async def leave(self, interaction: discord.Interaction):
+        await self.do_leave(interaction)
 
     @group.command(name="start", description="Admin: generate the full bracket.")
     @app_commands.guild_only()

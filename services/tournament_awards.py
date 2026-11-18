@@ -88,6 +88,7 @@ def tournament_stats(
             result["eight_entries"] += 1
 
         rounds = event.get("rounds", [])
+        is_league = event.get("format") == "round_robin"
         for ridx, rnd in enumerate(rounds):
             if not isinstance(rnd, list):
                 continue
@@ -104,7 +105,7 @@ def tournament_stats(
                         or {entry.get("a", {}).get("user_id"), entry.get("b", {}).get("user_id")} != {a, b}):
                     continue
                 result["matches"] += 1
-                if ridx == len(rounds) - 1:
+                if ridx == len(rounds) - 1 and not is_league:
                     result["finals"] += 1
                     if event.get("status") == "completed":
                         if event.get("champion") == user_id:
@@ -167,6 +168,27 @@ def tournament_stats(
                         result["unhorsings"] += 1
                     elif pts > 0 and p.get("category") == "lance_break":
                         result["lance_breaks"] += 1
+        # In a round robin there is no knockout "last-round final". Award
+        # championship and runner-up only when every round has a verified
+        # recorded match, so partially resumed leagues cannot award honours.
+        if is_league and event.get("status") == "completed":
+            all_pairs = [pair for rnd in rounds for pair in rnd]
+            verified = all(
+                pair.get("status") == "complete"
+                and (row := records.get(pair.get("record_id"))) is not None
+                and row.get("tournament_id") == eid
+                and row.get("id") == pair.get("id")
+                and (row.get("a") or {}).get("user_id") == pair.get("a")
+                and (row.get("b") or {}).get("user_id") == pair.get("b")
+                for pair in all_pairs
+            )
+            if all_pairs and verified:
+                rank = event.get("standings", [])
+                if event.get("champion") == user_id and rank and rank[0].get("user_id") == user_id:
+                    result["championships"] += 1
+                    result["four_crowns" if size == 4 else "eight_crowns"] += 1
+                elif len(rank) > 1 and rank[1].get("user_id") == user_id:
+                    result["runners_up"] += 1
     result["unique_arenas"] = len(arenas)
     return result
 

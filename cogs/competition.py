@@ -77,7 +77,7 @@ class CompetitionCog(commands.Cog):
         elif key == "arena":
             e.set_footer(text="Each rider's strongest arena; minimum 3 appearances in that arena.")
         else:
-            e.set_footer(text="JoustingBot v0.7.1 — UI & Titles")
+            e.set_footer(text="JoustingBot v2.9.7 — The Grand Tournament Circuit")
         from cogs.menu import PublicHomeView
         await interaction.response.send_message(embed=e, view=PublicHomeView())
 

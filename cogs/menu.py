@@ -29,7 +29,7 @@ from services.equipment import items_by_slot, get_item
 from services.records import load_history
 from services import ui_art
 
-VERSION = "v2.9.6a"
+VERSION = "v2.9.7"
 STYLE = discord.ButtonStyle
 
 
@@ -160,13 +160,14 @@ class VersionPage(OwnedView):
     def make_embed(self):
         return embed(
             f"⚙️ JoustingBot {VERSION}",
-            "**Jousting Combat 2.0**\n"
+            "**The Grand Tournament Circuit**\n"
             "One live Discord graphic animates each pass: Prep, Gallop, Lance Ready, "
             "Collision and Outcome, before the final scorecard.\n\n"
             "Private tactics, seeded combat, tournaments, atomic saves, verified backups, "
             "challenge locks and cooldowns remain available. "
             "Advanced shield/charge/lance setups, specialist drills and "
             "private match analysis are now supported. "
+            "Grand Circuit seasons, Knight Houses and round-robin championships are live. "
             "Admin tools require Manage Server permission."
         )
 
@@ -192,6 +193,9 @@ class MainMenuView(OwnedView):
             ("Progression", "🪙", lambda it: navigate(it, ProgressionPage(it.user.id, it.guild_id))),
             ("Injuries", "🩹", lambda it: navigate(it, InjuryPage(it.user.id, it.guild_id))),
             ("Tournaments", "🏆", open_tournaments),
+            ("Grand Circuit", "🏰", lambda it: navigate(
+                it, __import__("cogs.circuit", fromlist=["CircuitHub"]).CircuitHub(
+                    it.user.id, it.guild_id))),
             ("Version", "ℹ️", lambda it: navigate(it, VersionPage(it.user.id))),
         ]
         for i, (label, icon, action) in enumerate(pages):
@@ -209,7 +213,8 @@ class MainMenuView(OwnedView):
                      "⚔️ Knight · 🐎 Horse · 🛡️ Equipment · 🪙 Shop · 🏟️ Arenas\n"
                      "🎯 Challenge · 🏇 Training Yard · 📜 Profile · 🏆 Leaderboards\n"
                      "🏅 Titles · 🪙 Progression · 🩹 Injuries · 🏆 Tournaments\n"
-                     "**NEW:** Advanced jousting tactics, smarter NPCs, drills and match analysis.\n"
+                     "**NEW:** Six-week seasons, Knight Houses, a Circuit leaderboard, "
+                     "Herald Chronicle and round-robin events.\n"
                      "Buy gear in the Shop, then equip it on your Knight or Horse.\n\n"
                      "Only authorised members see the ⚙️ Admin controls.")
 

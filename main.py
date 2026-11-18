@@ -30,6 +30,7 @@ class JoustBot(commands.Bot):
             "cogs.menu", "cogs.knight", "cogs.horse", "cogs.equipment",
             "cogs.arena", "cogs.joust", "cogs.profile", "cogs.competition",
             "cogs.tournament", "cogs.maintenance", "cogs.evolution",
+            "cogs.circuit",
         ):
             await self.load_extension(module)
         await self.tree.sync()

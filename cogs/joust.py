@@ -29,7 +29,7 @@ from services.injuries import (
 )
 
 
-VERSION_LABEL = "JoustingBot v2.9.6a — Defensive Counterbalance"
+VERSION_LABEL = "JoustingBot v2.9.7 — Grand Tournament Circuit"
 CHALLENGE_TIMEOUT_SECONDS = 240
 
 
