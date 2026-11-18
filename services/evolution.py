@@ -282,3 +282,83 @@ def delete_preset(guild_id: int, user_id: int, name: str) -> None:
         raise ValueError("No saved preset in that slot.")
     del profile["presets"][name]
     save_json(PATH, data)
+
+
+# Knight statistics are global across guilds, so the respec cooldown is stored
+# in knights.json rather than a guild's progression.json. Deleting a knight
+# cannot erase this historical cooldown record.
+RESPEC_COOLDOWN_DAYS = 14
+
+
+def respec_remaining(user_id: int, *, now: datetime | None = None) -> int:
+    """Whole seconds before another respec; malformed cooldown fails closed."""
+    from cogs.knight import load_knights
+    from datetime import timedelta
+    if user_id <= 0:
+        raise ValueError("Invalid knight owner.")
+    data = load_knights()
+    stamped = data.get("respec_history", {}).get(str(user_id))
+    if not stamped:
+        return 0
+    try:
+        at = datetime.fromisoformat(str(stamped).replace("Z", "+00:00"))
+        if at.tzinfo is None:
+            raise ValueError("Naive timestamp")
+        point = now or datetime.now(timezone.utc)
+        if point.tzinfo is None:
+            raise ValueError("Naive current time")
+        remaining = ((at.astimezone(timezone.utc) +
+                      timedelta(days=RESPEC_COOLDOWN_DAYS)) -
+                     point.astimezone(timezone.utc)).total_seconds()
+        return max(0, int(remaining + 0.999))
+    except (ValueError, TypeError, OverflowError):
+        raise ValueError("Respec cooldown data is invalid; ask an admin to review it.") from None
+
+
+def respec_knight(user_id: int, stats: dict[str, int], *,
+                  now: datetime | None = None, active_match: bool = False) -> dict:
+    """Respend exactly 20 existing points, never changing equipment or history.
+
+    The caller checks live challenge locks. Tournament registrations are checked
+    independently here, including other guilds the owner participates in.
+    """
+    from cogs.knight import load_knights, save_knights, validate_stats
+    from services.tournaments import load_db
+    if user_id <= 0:
+        raise ValueError("Invalid knight owner.")
+    if active_match:
+        raise ValueError("Finish or decline your active challenge before changing stats.")
+    tournament_data = load_db()
+    for guild in tournament_data.get("guilds", {}).values():
+        if not isinstance(guild, dict):
+            continue
+        tournament = guild.get("active") or {}
+        if (isinstance(tournament, dict)
+                and tournament.get("status") in ("registration", "running")
+                and user_id in tournament.get("entrants", [])):
+            raise ValueError("Leave or complete your registered tournament before changing stats.")
+    if not isinstance(stats, dict):
+        raise ValueError("Invalid stat allocation.")
+    # Ensure boolean values cannot masquerade as valid integers.
+    if any(type(x) is not int for x in stats.values()):
+        raise ValueError("Stats must be whole numbers.")
+    validate_stats(stats)
+    knight_data = load_knights()
+    existing = knight_data.get("knights", {}).get(str(user_id))
+    if not isinstance(existing, dict) or int(existing.get("user_id", -1)) != user_id:
+        raise ValueError("Create your own knight before reallocating stats.")
+    if dict(existing.get("stats", {})) == stats:
+        raise ValueError("No changes to the current stat allocation.")
+    cooldown = respec_remaining(user_id, now=now)
+    if cooldown:
+        remaining_days = (cooldown + 86_399) // 86_400
+        raise ValueError(f"Respec cooldown: {remaining_days} day(s) remain.")
+    point = now or datetime.now(timezone.utc)
+    if point.tzinfo is None:
+        raise ValueError("Time must include a timezone.")
+    existing["stats"] = dict(stats)
+    existing["updated_at"] = point.astimezone(timezone.utc).isoformat()
+    knight_data.setdefault("respec_history", {})[str(user_id)] = existing["updated_at"]
+    # One atomic file update. Bound horse, gear, name and career remain intact.
+    save_knights(knight_data)
+    return dict(existing)
