@@ -275,6 +275,7 @@ class KnightPage(OwnedView):
             it, EquipmentPicker(it.user.id, "lance", it.guild_id)), row=1, emoji="🏇")
         self.button("Equip Armour", lambda it: navigate(
             it, EquipmentPicker(it.user.id, "armour", it.guild_id)), row=1, emoji="🛡️")
+        self.button("Respec Stats", self.respec, row=2, emoji="📊")
         self.button("Delete", lambda it: navigate(it, ConfirmKnightDelete(it.user.id)), style=STYLE.danger)
         self.home()
 
@@ -295,6 +296,22 @@ class KnightPage(OwnedView):
                         knight.equipped_armour_key)).name,
             }
         return {"screen": "knight", "equipped": items}
+
+    async def respec(self, interaction):
+        from cogs.knight import KnightRespecModal
+        from services.evolution import respec_remaining
+        if not get_knight(load_knights(), interaction.user.id):
+            return await interaction.response.send_message(
+                "❌ Create your knight before reallocating stats.", ephemeral=True)
+        try:
+            remaining = respec_remaining(interaction.user.id)
+        except ValueError as exc:
+            return await interaction.response.send_message(f"❌ {exc}", ephemeral=True)
+        if remaining:
+            days = (remaining + 86_399) // 86_400
+            return await interaction.response.send_message(
+                f"⌛ Knight respec available in {days} day(s).", ephemeral=True)
+        await interaction.response.send_modal(KnightRespecModal())
 
     async def create(self, interaction):
         await interaction.response.send_modal(KnightModal())
