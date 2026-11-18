@@ -343,6 +343,38 @@ class KnightStatBuilderView(discord.ui.View):
             item.disabled = True
 
 
+class KnightRespecModal(discord.ui.Modal, title="Reallocate Knight Stats"):
+    """Owner-only, 14-day cooldown, no skill points created or destroyed."""
+    allocation = discord.ui.TextInput(
+        label="Strength, Control, Endurance, Agility, Resolve, Tactics",
+        placeholder="4,4,3,3,3,3",
+        style=discord.TextStyle.short,
+        min_length=11,
+        max_length=35,
+        required=True,
+    )
+
+    async def on_submit(self, interaction: discord.Interaction):
+        from services.evolution import respec_knight
+        try:
+            values = [int(part.strip()) for part in str(self.allocation).split(",")]
+            if len(values) != len(STATS):
+                raise ValueError("Enter exactly six numbers, separated by commas.")
+            stats = dict(zip(STATS, values))
+            cog = interaction.client.get_cog("JoustCog") if interaction.client else None
+            active = bool(cog and cog.is_player_busy(interaction.user.id))
+            result = respec_knight(interaction.user.id, stats, active_match=active)
+        except ValueError as exc:
+            return await interaction.response.send_message(f"❌ {exc}", ephemeral=True)
+        summary = " · ".join(f"{key.title()} {value}" for key, value in result["stats"].items())
+        await interaction.response.send_message(
+            f"✅ Knight stats updated: {summary}\n"
+            "Another respec is available after 14 days. "
+            "Your knight's horse, equipment, achievements and match records are unchanged.",
+            ephemeral=True,
+        )
+
+
 class KnightCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -404,6 +436,22 @@ class KnightCog(commands.Cog):
             embed=knight_embed(knight, interaction.user),
             ephemeral=True,
         )
+
+    @knight_group.command(name="respec", description="Redistribute 20 points, once every 14 days.")
+    async def respec(self, interaction: discord.Interaction):
+        from services.evolution import respec_remaining
+        if not get_knight(load_knights(), interaction.user.id):
+            return await interaction.response.send_message(
+                "❌ Create a knight before reallocating stats.", ephemeral=True)
+        try:
+            remaining = respec_remaining(interaction.user.id)
+        except ValueError as exc:
+            return await interaction.response.send_message(f"❌ {exc}", ephemeral=True)
+        if remaining:
+            days = (remaining + 86_399) // 86_400
+            return await interaction.response.send_message(
+                f"⌛ Respec cooldown: {days} day(s) remain.", ephemeral=True)
+        await interaction.response.send_modal(KnightRespecModal())
 
     @knight_group.command(name="delete", description="Delete your knight.")
     async def delete(self, interaction: discord.Interaction):
