@@ -40,7 +40,7 @@ class CompetitiveIntegrityTests(unittest.IsolatedAsyncioTestCase):
         knight_b = SimpleNamespace(bound_horse_id="blue-horse")
         with patch("cogs.joust.load_knights", return_value={}), \
              patch("cogs.joust.load_horses", return_value={
-                 "horses": {"red-horse": {}, "blue-horse": {}}
+                 "horses": {"red-horse": {"owner_id": 999}, "blue-horse": {"owner_id": 22}}
              }), \
              patch("cogs.joust.get_knight", side_effect=[knight_a, knight_b]), \
              patch("cogs.joust.Horse.from_dict", side_effect=[
