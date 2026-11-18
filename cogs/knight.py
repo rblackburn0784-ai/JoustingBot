@@ -346,7 +346,7 @@ class KnightStatBuilderView(discord.ui.View):
 class KnightRespecModal(discord.ui.Modal, title="Reallocate Knight Stats"):
     """Owner-only, 14-day cooldown, no skill points created or destroyed."""
     allocation = discord.ui.TextInput(
-        label="Strength, Control, Endurance, Agility, Resolve, Tactics",
+        label="STR, CTRL, END, AGI, RES, TAC (in order)",
         placeholder="4,4,3,3,3,3",
         style=discord.TextStyle.short,
         min_length=11,
