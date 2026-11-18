@@ -29,7 +29,7 @@ from services.equipment import items_by_slot, get_item
 from services.records import load_history
 from services import ui_art
 
-VERSION = "v2.9.5"
+VERSION = "v2.9.6"
 STYLE = discord.ButtonStyle
 
 
@@ -160,11 +160,13 @@ class VersionPage(OwnedView):
     def make_embed(self):
         return embed(
             f"⚙️ JoustingBot {VERSION}",
-            "**Knight & Stable Evolution**\n"
+            "**Jousting Combat 2.0**\n"
             "One live Discord graphic animates each pass: Prep, Gallop, Lance Ready, "
             "Collision and Outcome, before the final scorecard.\n\n"
             "Private tactics, seeded combat, tournaments, atomic saves, verified backups, "
             "challenge locks and cooldowns remain available. "
+            "Advanced shield/charge/lance setups, specialist drills and "
+            "private match analysis are now supported. "
             "Admin tools require Manage Server permission."
         )
 
@@ -207,7 +209,7 @@ class MainMenuView(OwnedView):
                      "⚔️ Knight · 🐎 Horse · 🛡️ Equipment · 🪙 Shop · 🏟️ Arenas\n"
                      "🎯 Challenge · 🏇 Training Yard · 📜 Profile · 🏆 Leaderboards\n"
                      "🏅 Titles · 🪙 Progression · 🩹 Injuries · 🏆 Tournaments\n"
-                     "**NEW:** Headquarters, horse care, daily goals, presets and five more gear slots.\n"
+                     "**NEW:** Advanced jousting tactics, smarter NPCs, drills and match analysis.\n"
                      "Buy gear in the Shop, then equip it on your Knight or Horse.\n\n"
                      "Only authorised members see the ⚙️ Admin controls.")
 
@@ -1139,6 +1141,8 @@ class TrainingPage(OwnedView):
         self.button("Start Training Joust", self.ride, row=1,
                     style=STYLE.primary, emoji="🏇")
         self.button("Training Stats", self.stats, row=1, emoji="📊")
+        self.button("Specialist Drills", lambda it: navigate(
+            it, DrillPage(it.user.id, it.guild_id)), row=2, emoji="🎯")
         self.home()
 
     def make_embed(self):
@@ -1148,7 +1152,7 @@ class TrainingPage(OwnedView):
             return embed("🏇 The Training Yard", "Open the Training Yard in a Discord server.")
         stats = earned_training(self.guild_id, self.owner_id)
         return embed(
-            "🏇 The Training Yard — v0.9.2c",
+            "🏇 The Training Yard — Combat 2.0",
             f"**{npc.name}** · Level {npc.level}/12 · {npc.title}\n"
             f"Mount: **{npc.horse_name}** ({npc.breed.title()})\n"
             f"_{npc.personality}_\n\n"
@@ -1159,7 +1163,9 @@ class TrainingPage(OwnedView):
             f"**Your training:** {stats['sessions']} bouts · {stats['xp']} XP "
             f"· Yard level {stats['level']}\n\n"
             "Choose an NPC and press **Start Training Joust**. "
-            "Training runs as a public live animated match.",
+            "Training runs as a public live animated match. "
+            "Each NPC now uses a distinctive advanced tactical setup, and may "
+            "adapt to repeated targets in completed rematches.",
         )
 
     async def stats(self, interaction):
@@ -1180,6 +1186,78 @@ class TrainingPage(OwnedView):
         if cog is None:
             return await interaction.response.send_message("❌ Training yard unavailable.", ephemeral=True)
         await cog.start_training(interaction, self.npc_key)
+
+
+class DrillSelect(discord.ui.Select):
+    def __init__(self, view: "DrillPage"):
+        from services.drills import DRILLS
+        self.screen = view
+        super().__init__(row=0, placeholder="Choose a specialist training drill",
+                         options=[
+                             discord.SelectOption(label=value[0], value=key,
+                                                  description=value[4][:100],
+                                                  default=view.selected == key)
+                             for key, value in DRILLS.items()
+                         ])
+
+    async def callback(self, interaction):
+        await navigate(interaction, DrillPage(
+            interaction.user.id, interaction.guild_id, self.values[0]))
+
+
+class DrillPage(OwnedView):
+    def __init__(self, user_id: int, guild_id: int | None = None,
+                 selected: str = "accuracy"):
+        super().__init__(user_id)
+        from services.drills import DRILLS
+        self.guild_id = guild_id
+        self.selected = selected if selected in DRILLS else "accuracy"
+        self.add_item(DrillSelect(self))
+        self.button("Attempt Drill", self.attempt, row=1,
+                    style=STYLE.primary, emoji="🎯")
+        self.button("Training Yard", lambda it: navigate(
+            it, TrainingPage(it.user.id, it.guild_id)), row=2)
+        self.home()
+
+    def make_embed(self):
+        from services.drills import DRILLS, drill_status
+        if not self.guild_id:
+            return embed("🎯 Specialist Training Drills",
+                         "Open this screen in a Discord server.")
+        state = drill_status(self.guild_id, self.owner_id)
+        name, a, b, target, detail = DRILLS[self.selected]
+        lines = [
+            f"{'✅' if key not in state['available'] else '⏳'} **{value[0]}**"
+            for key, value in DRILLS.items()
+        ]
+        return embed(
+            "🎯 Specialist Training Drills",
+            f"**Today's attempts:** {state['completed']}/4 · "
+            f"**Mastery:** {state['mastery']}\n\n"
+            + "\n".join(lines)
+            + f"\n\n**Selected:** {name}\n_{detail}_\n"
+              f"**Relevant skills:** {a.title()} + {b.title()}\n"
+              f"**Success target:** {target} including a d20 roll.\n\n"
+              "Each drill may be attempted once per UTC day. "
+              "Mastery is cosmetic: no gold, XP, permanent stats or injuries.",
+        )
+
+    async def attempt(self, interaction):
+        from services.drills import run_drill
+        if not self.guild_id:
+            return await interaction.response.send_message(
+                "❌ Run drills inside a Discord server.", ephemeral=True)
+        try:
+            result = run_drill(self.guild_id, interaction.user.id, self.selected)
+        except ValueError as exc:
+            return await interaction.response.send_message(f"❌ {exc}", ephemeral=True)
+        await navigate(
+            interaction,
+            DrillPage(interaction.user.id, self.guild_id, self.selected),
+            f"{'✅ Passed' if result['success'] else '⚠️ Keep practising'} — "
+            f"{result['name']}: {result['score']} vs target {result['target']}. "
+            f"+{result['mastery_awarded']} mastery.",
+        )
 
 
 class DuelPage(OwnedView):
@@ -1296,6 +1374,7 @@ class ProfilePage(OwnedView):
         self.button("My Profile", self.mine, row=1)
         self.button("Career Stats", self.stats, row=1)
         self.button("Match History", self.history, row=1)
+        self.button("Analyse Last Joust", self.analyse, row=2, emoji="🧾")
         self.button("Injury Ward", lambda it: navigate(it, InjuryPage(it.user.id, it.guild_id)), row=2, emoji="🩹")
         self.home()
 
@@ -1320,6 +1399,18 @@ class ProfilePage(OwnedView):
     async def history(self, interaction):
         user = self.target or interaction.user
         await interaction.response.edit_message(embed=embed("📜 Last Five Jousts", history_lines(user.id)[:4000]), view=self)
+
+    async def analyse(self, interaction):
+        from services.combat_analysis import owned_match, breakdown
+        match = owned_match(interaction.guild_id, interaction.user.id)
+        if match is None:
+            return await interaction.response.send_message(
+                "❌ No completed match of yours in this server.", ephemeral=True)
+        result = breakdown(match, interaction.user.id)
+        card = embed(result["title"], result["summary"])
+        for index, line in enumerate(result["passes"], 1):
+            card.add_field(name=f"Pass {index}", value=line[:1024], inline=False)
+        await interaction.response.edit_message(embed=card, view=self)
 
 
 class RankingSelect(discord.ui.Select):

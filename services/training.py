@@ -7,7 +7,7 @@ separate award writes or duplicate rewards on retries).
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from typing import Any
 
@@ -61,7 +61,9 @@ class YardOpponent:
 
     @property
     def tactics(self) -> TacticPlan:
-        return TacticPlan(style=self.style, target=self.target)
+        return TacticPlan(
+            style=self.style, target=self.target, **NPC_ADVANCED.get(self.key, {})
+        )
 
 
 # Four original training characters retained, expanded to 12 different levels.
@@ -122,6 +124,25 @@ OPPONENTS: tuple[YardOpponent, ...] = (
                  barding="barding_steel", style="aggressive", target="rider"),
 )
 
+# Each original trainer keeps their established stats and equipment.
+# Tactical personality now extends to the three new advanced settings.
+NPC_ADVANCED = {
+    "osric": {"shield_guard": "low", "charge_intensity": "measured", "lance_control": "precise"},
+    "beren": {"shield_guard": "square"},
+    "elis": {"charge_intensity": "full", "lance_control": "forceful"},
+    "maud": {"shield_guard": "high", "charge_intensity": "full", "lance_control": "forceful"},
+    "tamsin": {"shield_guard": "high", "charge_intensity": "measured", "lance_control": "precise"},
+    "roland": {"shield_guard": "high", "charge_intensity": "full", "lance_control": "forceful"},
+    "ysabel": {"shield_guard": "low", "charge_intensity": "measured", "lance_control": "precise"},
+    "godric": {"shield_guard": "high", "charge_intensity": "measured"},
+    "rowena": {"shield_guard": "low", "lance_control": "precise",
+               "manoeuvre": "feigned_miss"},
+    "aldric": {"shield_guard": "high", "charge_intensity": "full", "lance_control": "forceful"},
+    "seraphine": {"shield_guard": "low", "charge_intensity": "measured", "lance_control": "precise"},
+    "black_knight": {"shield_guard": "high", "charge_intensity": "full",
+                     "lance_control": "forceful", "manoeuvre": "reckless_charge"},
+}
+
 BY_KEY = {npc.key: npc for npc in OPPONENTS}
 
 
@@ -179,3 +200,34 @@ def earned_training(guild_id: int, user_id: int, history: dict | None = None,
         "today_xp": min(TRAIN_DAILY_XP_CAP, daily.get(today, 0) * TRAIN_XP_PER_BOUT),
         "awards": rewarded,
     }
+
+
+
+def adaptive_tactics(npc: YardOpponent, guild_id: int, user_id: int,
+                     history: dict | None = None) -> TacticPlan:
+    """Predictable training adaptation, based solely on completed prior bouts.
+
+    After two repeated targets against this particular NPC, the trainer sets
+    a matching guard. It never inspects the active rider's private selection.
+    This does not affect training XP, gold or competitive rankings.
+    """
+    journal = history if history is not None else load_history()
+    recent = []
+    for item in journal.get("matches", []):
+        if (not isinstance(item, dict) or item.get("mode") != "training"
+                or item.get("guild_id") != guild_id):
+            continue
+        a, b = item.get("a") or {}, item.get("b") or {}
+        if a.get("user_id") != user_id or b.get("user_id") != npc.player_id:
+            continue
+        target = (a.get("tactics") or {}).get("target")
+        if target in {"shield", "rider", "lance"}:
+            recent.append(target)
+    recent = recent[-3:]
+    if len(recent) < 2:
+        return npc.tactics
+    key = max(("rider", "lance", "shield"), key=lambda t: recent.count(t))
+    if recent.count(key) < 2:
+        return npc.tactics
+    guard = {"rider": "high", "lance": "low", "shield": "square"}[key]
+    return replace(npc.tactics, shield_guard=guard)

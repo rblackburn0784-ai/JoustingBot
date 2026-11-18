@@ -28,19 +28,73 @@ MAX_FATIGUE = 8
 COOLDOWN_PASSES = 2
 MAX_TACTICAL_RISK_MOD = 12
 
+# v2.9.6: neutral defaults retain earlier seed/replay and scoring behaviour.
+# (display name, description, alignment, charge, defence, handling, fatigue, injury risk)
+GUARDS = {
+    "square": ("Square Guard", "Balanced shield coverage; no modifier.", 0, 0, 0, 0, 0, 0),
+    "high": ("High Guard", "Covers the rider against high strikes; gives up low coverage.", -1, 0, 1, 0, 0, 0),
+    "low": ("Low Guard", "Protects the lance line; exposes the upper seat.", 1, -1, 0, 0, 0, 0),
+}
+CHARGE_INTENSITIES = {
+    "balanced": ("Balanced Charge", "Even momentum and control.", 0, 0, 0, 0, 0, 0),
+    "measured": ("Measured Charge", "Cleaner line, less impact.", 2, -2, 0, 1, 0, -1),
+    "full": ("Full Charge", "Greater impact with mounting fatigue and handling risk.", -2, 2, 0, -1, 1, 2),
+}
+LANCE_CONTROLS = {
+    "balanced": ("Balanced Lance", "Familiar balance of precision and force.", 0, 0, 0, 0, 0, 0),
+    "precise": ("Precision Grip", "Steadier tip but weaker impact.", 2, -1, 0, 0, 0, 0),
+    "forceful": ("Driving Grip", "More power, harder to place the tip.", -2, 2, 0, 0, 0, 1),
+}
+
+
+def advanced_active(*plans: "TacticPlan") -> bool:
+    """Keep legacy matches numerically unchanged with default advanced choices."""
+    return any((p.shield_guard, p.charge_intensity, p.lance_control)
+               != ("square", "balanced", "balanced") for p in plans)
+
+
+def counterplay(attacker: "TacticPlan", defender: "TacticPlan",
+                defender_wear: int = 0) -> tuple[int, int, int, str]:
+    """Return alignment, charge and defender-resistance adjustments.
+
+    High guard answers a rider-target charge; low guard answers lance hunting.
+    Wear weakens a previously battered shield, without altering its inventory.
+    """
+    if attacker.target == "rider" and defender.shield_guard == "high":
+        resist = max(0, 2 - min(2, max(0, defender_wear)))
+        return (0, -2, resist, "High shield guard smothers the rider-target charge.")
+    if attacker.target == "lance" and defender.shield_guard == "low":
+        resist = max(0, 1 - min(1, max(0, defender_wear)))
+        return (-2, 0, resist, "Low shield guard frustrates the lance attack.")
+    if attacker.target == "rider" and defender.shield_guard == "low":
+        return (1, 1, -1, "The low shield guard exposes the high strike.")
+    return 0, 0, 0, ""
+
+
 
 @dataclass(frozen=True)
 class TacticPlan:
     style: str = "balanced"
     target: str = "shield"
     manoeuvre: str = "none"
+    shield_guard: str = "square"
+    charge_intensity: str = "balanced"
+    lance_control: str = "balanced"
 
     def __post_init__(self):
-        if self.style not in STYLES or self.target not in TARGETS or self.manoeuvre not in MOVES:
+        if (self.style not in STYLES or self.target not in TARGETS
+                or self.manoeuvre not in MOVES or self.shield_guard not in GUARDS
+                or self.charge_intensity not in CHARGE_INTENSITIES
+                or self.lance_control not in LANCE_CONTROLS):
             raise ValueError("Invalid jousting tactic.")
 
     def as_dict(self) -> dict[str, str]:
-        return {"style": self.style, "target": self.target, "manoeuvre": self.manoeuvre}
+        return {
+            "style": self.style, "target": self.target, "manoeuvre": self.manoeuvre,
+            "shield_guard": self.shield_guard,
+            "charge_intensity": self.charge_intensity,
+            "lance_control": self.lance_control,
+        }
 
 
 @dataclass(frozen=True)
@@ -93,6 +147,16 @@ def effects(plan: TacticPlan, *, pass_no: int, fatigue: int, horse_stats: dict[s
         gain += 1 if move in {"reckless_charge", "last_stand"} else 0
     else:
         mr = 0
+    for choices, key in ((GUARDS, plan.shield_guard),
+                         (CHARGE_INTENSITIES, plan.charge_intensity),
+                         (LANCE_CONTROLS, plan.lance_control)):
+        _, _, add_align, add_charge, add_resist, add_handle, add_fatigue, add_risk = choices[key]
+        align += add_align
+        charge += add_charge
+        mr += add_resist
+        handling += add_handle
+        gain += add_fatigue
+        risk += add_risk
     spent = fatigue_penalty(fatigue, horse_stats, plan.style)
     return PassTactics(
         alignment=align - spent,
@@ -111,8 +175,13 @@ def advance_fatigue(fatigue: int, tactic: PassTactics) -> int:
 
 
 def label(plan: TacticPlan) -> str:
-    return (f"{STYLES[plan.style][0]} · {TARGETS[plan.target][0]} · "
+    base = (f"{STYLES[plan.style][0]} · {TARGETS[plan.target][0]} · "
             f"{MOVES[plan.manoeuvre][0]}")
+    if not advanced_active(plan):
+        return base
+    return (base + f" · {GUARDS[plan.shield_guard][0]} / "
+            f"{CHARGE_INTENSITIES[plan.charge_intensity][0]} / "
+            f"{LANCE_CONTROLS[plan.lance_control][0]}")
 
 
 def target_result(category: str, points: int, target: str) -> tuple[str, int]:

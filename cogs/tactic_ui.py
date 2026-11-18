@@ -3,7 +3,10 @@ from __future__ import annotations
 
 import discord
 
-from services.tactics import MOVES, STYLES, TARGETS, TacticPlan, label
+from services.tactics import (
+    MOVES, STYLES, TARGETS, GUARDS, CHARGE_INTENSITIES, LANCE_CONTROLS,
+    TacticPlan, label,
+)
 
 
 class PlanSelect(discord.ui.Select):
@@ -53,6 +56,14 @@ class TacticEditor(discord.ui.View):
             colour=discord.Colour.blue(),
         )
         box.add_field(name="Selected", value=label(self.plan), inline=False)
+        box.add_field(
+            name="Advanced Setup",
+            value=(f"Shield: **{GUARDS[self.plan.shield_guard][0]}** · "
+                   f"Charge: **{CHARGE_INTENSITIES[self.plan.charge_intensity][0]}** · "
+                   f"Lance: **{LANCE_CONTROLS[self.plan.lance_control][0]}**\n"
+                   "Use **Advanced Setup** to change these trade-offs."),
+            inline=False,
+        )
         box.add_field(name="Style", value=STYLES[self.plan.style][-1], inline=False)
         box.add_field(name="Target", value=TARGETS[self.plan.target][-1], inline=False)
         box.add_field(
@@ -63,6 +74,12 @@ class TacticEditor(discord.ui.View):
             inline=False,
         )
         return box
+
+    @discord.ui.button(label="Advanced Setup", emoji="🛡️",
+                       style=discord.ButtonStyle.secondary, row=3)
+    async def advanced(self, interaction: discord.Interaction, button: discord.ui.Button):
+        page = AdvancedEditor(self.challenge, self.player_id, self.plan)
+        await interaction.response.edit_message(embed=page.make_embed(), view=page)
 
     @discord.ui.button(label="Main Menu", emoji="🏰",
                        style=discord.ButtonStyle.secondary, row=4)
@@ -101,3 +118,82 @@ class TacticEditor(discord.ui.View):
                     embed=make_challenge_embed(prepared), view=self.challenge)
             except discord.HTTPException:
                 pass
+
+
+
+class AdvancedSelect(discord.ui.Select):
+    def __init__(self, screen: "AdvancedEditor", field: str, choices: dict,
+                 row: int):
+        self.screen = screen
+        self.field = field
+        self.choices = choices
+        super().__init__(
+            placeholder={
+                "shield_guard": "Shield guard position",
+                "charge_intensity": "Charge intensity",
+                "lance_control": "Lance grip and control",
+            }[field],
+            row=row,
+            options=[
+                discord.SelectOption(
+                    label=value[0][:100], value=key,
+                    description=value[1][:100],
+                    default=getattr(screen.plan, field) == key,
+                ) for key, value in choices.items()
+            ],
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        data = self.screen.plan.as_dict()
+        data[self.field] = self.values[0]
+        page = AdvancedEditor(self.screen.challenge, self.screen.player_id, TacticPlan(**data))
+        await interaction.response.edit_message(embed=page.make_embed(), view=page)
+
+
+class AdvancedEditor(discord.ui.View):
+    """Secondary 3-select panel; never publishes unrevealed tactics."""
+    def __init__(self, challenge, player_id: int, plan: TacticPlan):
+        super().__init__(timeout=180)
+        self.challenge = challenge
+        self.player_id = player_id
+        self.plan = plan
+        self.add_item(AdvancedSelect(self, "shield_guard", GUARDS, 0))
+        self.add_item(AdvancedSelect(self, "charge_intensity", CHARGE_INTENSITIES, 1))
+        self.add_item(AdvancedSelect(self, "lance_control", LANCE_CONTROLS, 2))
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id != self.player_id or self.challenge.completed:
+            await interaction.response.send_message(
+                "❌ Only an active participant can change these tactics.", ephemeral=True)
+            return False
+        return True
+
+    def make_embed(self) -> discord.Embed:
+        box = discord.Embed(
+            title="🛡️ Advanced Joust Setup",
+            description="Set your shield guard, charge intensity and lance grip. "
+                        "All three choices have trade-offs. "
+                        "Return to the main tactics page and **Lock Tactics** to confirm.",
+            colour=discord.Colour.dark_gold(),
+        )
+        for title, mapping, key in (
+            ("Shield Guard", GUARDS, self.plan.shield_guard),
+            ("Charge Intensity", CHARGE_INTENSITIES, self.plan.charge_intensity),
+            ("Lance Control", LANCE_CONTROLS, self.plan.lance_control),
+        ):
+            item = mapping[key]
+            box.add_field(name=title, value=f"**{item[0]}** — {item[1]}", inline=False)
+        return box
+
+    @discord.ui.button(label="Back to Tactics", emoji="🧠",
+                       style=discord.ButtonStyle.primary, row=3)
+    async def back(self, interaction: discord.Interaction, button: discord.ui.Button):
+        page = TacticEditor(self.challenge, self.player_id, self.plan)
+        await interaction.response.edit_message(embed=page.make_embed(), view=page)
+
+    @discord.ui.button(label="Main Menu", emoji="🏰",
+                       style=discord.ButtonStyle.secondary, row=4)
+    async def home(self, interaction: discord.Interaction, button: discord.ui.Button):
+        from cogs.menu import MainMenuView, is_admin
+        view = MainMenuView(interaction.user.id, is_admin(interaction))
+        await interaction.response.edit_message(embed=view.make_embed(), view=view)

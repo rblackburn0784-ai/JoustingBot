@@ -25,7 +25,9 @@ from services.balance import (
     UNHORSING_MARGIN,
     WINNING_SCORE,
 )
-from services.tactics import TacticPlan, effects, advance_fatigue, target_result
+from services.tactics import (
+    TacticPlan, effects, advance_fatigue, target_result, advanced_active, counterplay,
+)
 from services.equipment import (
     apply_horse_equipment,
     apply_knight_equipment,
@@ -330,8 +332,15 @@ def run_single_match(fighter_a: Fighter, fighter_b: Fighter, arena_key: str, see
     tactics_b = tactics_b or TacticPlan()
     fatigue_a = fatigue_b = 0
     tactical_snapshots = {}
+    advanced = advanced_active(tactics_a, tactics_b)
+    # Match-local shield wear and recovery: never destroy purchased equipment or
+    # persist temporary debuffs into later matches.
+    shield_wear_a = shield_wear_b = 0
+    staggered_a = staggered_b = False
 
     for pass_no in range(1, PASSES_PER_MATCH + 1):
+        recovering_a, recovering_b = staggered_a, staggered_b
+        staggered_a = staggered_b = False
         a_fx = effects(tactics_a, pass_no=pass_no, fatigue=fatigue_a,
                        horse_stats=fighter_a.horse_stats, score_for=score_a, score_against=score_b)
         b_fx = effects(tactics_b, pass_no=pass_no, fatigue=fatigue_b,
@@ -341,6 +350,24 @@ def run_single_match(fighter_a: Fighter, fighter_b: Fighter, arena_key: str, see
         fatigue_b = advance_fatigue(fatigue_b, b_fx)
         notes: List[str] = []
         debug_rolls: List[str] = [f"seed: {seed_value}"]
+        a_align_adj = b_align_adj = 0
+        a_charge_adj = b_charge_adj = 0
+        a_resist_adj = b_resist_adj = 0
+        if advanced:
+            a_align_adj, a_charge_adj, b_resist_adj, line_a = counterplay(
+                tactics_a, tactics_b, shield_wear_b)
+            b_align_adj, b_charge_adj, a_resist_adj, line_b = counterplay(
+                tactics_b, tactics_a, shield_wear_a)
+            if line_a:
+                notes.append(f"{fighter_a.knight_name}: {line_a}")
+            if line_b:
+                notes.append(f"{fighter_b.knight_name}: {line_b}")
+            if recovering_a:
+                a_align_adj -= 1
+                notes.append(f"{fighter_a.knight_name} fights to regain the saddle after the stagger.")
+            if recovering_b:
+                b_align_adj -= 1
+                notes.append(f"{fighter_b.knight_name} fights to regain the saddle after the stagger.")
 
         horse_a_effective = apply_horse_equipment(
             fighter_a.horse_stats, fighter_a.barding_key, fighter_a.saddle_key,
@@ -460,8 +487,8 @@ def run_single_match(fighter_a: Fighter, fighter_b: Fighter, arena_key: str, see
             )
             continue
 
-        penalty_a = arena.alignment_mod + a_fx.alignment
-        penalty_b = arena.alignment_mod + b_fx.alignment
+        penalty_a = arena.alignment_mod + a_fx.alignment + a_align_adj
+        penalty_b = arena.alignment_mod + b_fx.alignment + b_align_adj
         # The Feigned Miss counters an overcommitted aggressive rider.
         # Precision Strike remains better against other riding styles.
         if a_fx.move == "feigned_miss" and tactics_b.style == "aggressive":
@@ -504,8 +531,8 @@ def run_single_match(fighter_a: Fighter, fighter_b: Fighter, arena_key: str, see
             )
             continue
 
-        charge_penalty_a = arena.charge_mod + a_fx.charge
-        charge_penalty_b = arena.charge_mod + b_fx.charge
+        charge_penalty_a = arena.charge_mod + a_fx.charge + a_charge_adj
+        charge_penalty_b = arena.charge_mod + b_fx.charge + b_charge_adj
         if behaviour_a == "bolted":
             charge_penalty_a += BOLT_ALIGNMENT_PENALTY
         elif behaviour_a == "slipped":
@@ -533,8 +560,10 @@ def run_single_match(fighter_a: Fighter, fighter_b: Fighter, arena_key: str, see
             ]
         )
 
-        resist_a = total_unhorse_resist(fighter_a.armour_key, fighter_a.shield_key) + a_fx.resistance
-        resist_b = total_unhorse_resist(fighter_b.armour_key, fighter_b.shield_key) + b_fx.resistance
+        resist_a = (total_unhorse_resist(fighter_a.armour_key, fighter_a.shield_key)
+                    + a_fx.resistance + a_resist_adj)
+        resist_b = (total_unhorse_resist(fighter_b.armour_key, fighter_b.shield_key)
+                    + b_fx.resistance + b_resist_adj)
         margin = charge_a - charge_b
         debug_rolls.append(f"raw margin: {charge_a} - {charge_b} = {margin}; resist A {resist_a}; resist B {resist_b}")
 
@@ -593,6 +622,25 @@ def run_single_match(fighter_a: Fighter, fighter_b: Fighter, arena_key: str, see
                 )
             )
 
+        if advanced:
+            scored = passes[-1]
+            # These observations are descriptive and match-scoped. The temporary
+            # stagger/guard wear effect applies only when advanced tactics are used.
+            if scored.category == "shield_scrape":
+                scored.notes.append("A glancing lance strike scuffs the shield without scoring.")
+            if scored.category in {"heavy_shield_hit", "saddle_stagger", "lance_break", "unhorsing"}:
+                if scored.points_a:
+                    shield_wear_b = min(2, shield_wear_b + 1)
+                    scored.notes.append(f"{fighter_b.knight_name}'s shield takes the shock "
+                                        f"({shield_wear_b}/2 wear this match).")
+                if scored.points_b:
+                    shield_wear_a = min(2, shield_wear_a + 1)
+                    scored.notes.append(f"{fighter_a.knight_name}'s shield takes the shock "
+                                        f"({shield_wear_a}/2 wear this match).")
+            if scored.category == "saddle_stagger":
+                staggered_b = scored.points_a > 0
+                staggered_a = scored.points_b > 0
+
         if score_a >= WINNING_SCORE or score_b >= WINNING_SCORE:
             break
 
@@ -604,7 +652,8 @@ def run_single_match(fighter_a: Fighter, fighter_b: Fighter, arena_key: str, see
                                      (fighter_b.knight_name, tactics_b, bb)):
             log.notes.append(
                 f"{knight}: {plan.style.title()} / {plan.target.title()} "
-                f"(fatigue {detail.fatigue})"
+                f"(fatigue {detail.fatigue}, guard {plan.shield_guard}, "
+                f"charge {plan.charge_intensity}, lance {plan.lance_control})"
                 + (f" · {detail.move.replace('_',' ').title()}" if detail.move != "none" else "")
             )
             log.debug_rolls.append(

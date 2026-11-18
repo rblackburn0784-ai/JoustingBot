@@ -1,3 +1,21 @@
+## v2.9.6 — Jousting Combat 2.0
+
+**Current version:** \`v2.9.6 — Jousting Combat 2.0\`
+
+Combat depth and presentation:
+- **Advanced tactics:** \`/joust challenge\` → each rider privately selects style, target and manoeuvre → **Advanced Setup** → choose shield guard (Square/High/Low), charge intensity (Balanced/Measured/Full) and lance control (Balanced/Precise/Forceful). The five-row Discord limit is respected by using two separate private panels. Both must still press **Lock Tactics** before acceptance.
+- **Real counters and trade-offs:** high shield guard counters rider-target charges but sacrifices accuracy; low guard counters lance attacks but exposes a high strike. Full charge increases power but reduces aim and horse handling and increases fatigue/injury risk. Precise lance alignment trades force for accuracy. After advanced collisions, shield wear can reduce guard effectiveness later in the same joust; saddle staggers create a next-pass recovery penalty. Shield wear and stagger do **not** persist or damage purchased equipment.
+- **Compatibility:** old three-choice plans and stored presets automatically use neutral advanced defaults; matches with neutral advanced choices preserve previous numerical scoring. All simulated and archived matches remain seeded/replayable; combat results are still recorded exactly once.
+- **Smarter NPCs:** all twelve Training Yard knights have distinctive advanced setups. After two completed bouts in which a player repeatedly targets the same area against the same trainer, that trainer may adjust guard on their next bout. No access to the current player's private unconfirmed plan and no new gold or XP rewards.
+- **Specialist drills:** \`/joust drills\`, \`/joust drill\` and \`/menu → Training Yard → Specialist Drills\`. Choose Accuracy, Saddle Stability, Shield Defence or Horse Handling. One attempt *per discipline* per UTC day. Successful drills earn a single **non-spendable cosmetic Mastery point**, stored with capped recent drill records; no permanent stats, gold, XP, competitive wins or injuries.
+- **Post-match tactical analysis:** \`/joust analyse\` (optional match ID) and \`/menu → Profile → Analyse Last Joust\`. Reads only completed saved matches that include the requesting user and belong to the current server. Shows equipment, selected tactics, fatigue, pass outcomes and key moments without rerunning combat.
+- **Balancing:** \`python tools/simulate_balance_v296.py --seeds 200\` compares advanced builds against a neutral equal-stat opponent across all six arenas, swapping player sides for each seed. Wide safety thresholds warn of possible extreme metas; they do not guarantee perfect competitive balance.
+- **Operational safeguards:** use a single persistent bot process for guild JSON and make a verified backup before deployment. No extra images or migrations are required. The renderer continues to use the existing sprite packs.
+
+Validation: \`python -m unittest discover -s tests -v\`, then run the balance sweep and test several live challenge/training matches in Discord with the real PNG packs. Any existing match history is preserved.
+
+---
+
 ## v2.9.5 — Knight & Stable Evolution
 
 **Current version:** \`v2.9.5 — Knight & Stable Evolution\`

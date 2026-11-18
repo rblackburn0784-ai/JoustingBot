@@ -1,3 +1,13 @@
+## v2.9.6 — Jousting Combat 2.0
+
+- Added three optional advanced tactical dimensions, deterministic guard-counter interactions, charge/accuracy trade-offs, match-only shield wear and next-pass stagger recovery. Neutral defaults retain old balance and seeded-replay behaviour.
+- Reworked the two-rider private tactics menu with an additional Advanced Setup panel; locked tactics remain required before a player challenge is accepted.
+- Extended all 12 training NPCs with distinct advanced tactics and repeat-target adaptation based only on finished sessions; existing training XP, gold and injury rules remain unchanged.
+- Added four specialist drills, once per UTC day each, with private UI, fair random skill rolls and honorary non-spendable Mastery records; no progression advantages or injuries.
+- Added private read-only post-match analysis and pass summaries accessible through \`/joust analyse\` or the profile menu. Only a match participant can access the analysis within its own guild.
+- Extended preferences and saved presets to preserve advanced options while loading old three-choice saved plans safely.
+- Included cross-arena, seat-swapped balance simulations, regression tests, version alignment and documentation.
+
 ## v2.9.5 — Knight & Stable Evolution
 
 - Added five new functional gear slots (helm, shield, saddle, bridle, horseshoes), ten items and five earned purchase requirements. New items use balanced trade-offs; old items and neutral starters preserve historic combat results.

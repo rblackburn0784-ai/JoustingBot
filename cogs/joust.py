@@ -19,7 +19,7 @@ from services.equipment import get_item
 from services.records import record_match
 from services.training import (
     OPPONENTS, opponent as find_trainer, TRAIN_COOLDOWN_SECONDS,
-    TRAIN_XP_PER_BOUT, TRAIN_DAILY_XP_CAP, earned_training,
+    TRAIN_XP_PER_BOUT, TRAIN_DAILY_XP_CAP, earned_training, adaptive_tactics,
 )
 from services.progression import loadout, equipped_standard, STARTER
 from services.evolution import bond, HORSE_GEAR_SLOTS
@@ -29,7 +29,7 @@ from services.injuries import (
 )
 
 
-VERSION_LABEL = "JoustingBot v2.9.5 — Knight & Stable Evolution"
+VERSION_LABEL = "JoustingBot v2.9.6 — Jousting Combat 2.0"
 CHALLENGE_TIMEOUT_SECONDS = 240
 
 
@@ -941,7 +941,8 @@ class JoustCog(commands.Cog):
             knight_a=knight, knight_b=npc_knight, horse_a=horse,
             horse_b=npc_horse, fighter_a=player_fighter,
             fighter_b=npc.fighter(), guild_id=guild_id, mode="training",
-            tactics_a=TacticPlan(style=style), tactics_b=npc.tactics,
+            tactics_a=TacticPlan(style=style),
+            tactics_b=adaptive_tactics(npc, guild_id, player.id),
         )
 
     async def start_training(self, interaction: discord.Interaction, npc_key: str,
@@ -1003,6 +1004,71 @@ class JoustCog(commands.Cog):
                 "before retrying: a match may already have been saved.", ephemeral=True)
         finally:
             self.active_challenge_players.discard(interaction.user.id)
+
+    @joust_group.command(name="analyse", description="Read your completed joust's tactical breakdown.")
+    @app_commands.guild_only()
+    async def analyse(self, interaction: discord.Interaction, match_id: str = ""):
+        from services.combat_analysis import owned_match, breakdown
+        if not interaction.guild_id:
+            return await interaction.response.send_message("❌ Use this in a server.", ephemeral=True)
+        entry = owned_match(interaction.guild_id, interaction.user.id,
+                            match_id=match_id.strip() or None)
+        if entry is None:
+            return await interaction.response.send_message(
+                "❌ No completed match found for you in this server. "
+                "Leave match_id blank to analyse your latest joust.", ephemeral=True)
+        report = breakdown(entry, interaction.user.id)
+        card = discord.Embed(title=report["title"],
+                             description=report["summary"],
+                             colour=discord.Colour.dark_gold())
+        for index, line in enumerate(report["passes"], 1):
+            card.add_field(name=f"⚔️ Pass {index}",
+                           value=line[:1024] or "No further detail recorded.", inline=False)
+        card.set_footer(text="Saved match analysis · No reroll, rewards or changes to combat history")
+        await interaction.response.send_message(embed=card, ephemeral=True)
+
+    @joust_group.command(name="drills", description="Check four specialist drills and personal mastery.")
+    @app_commands.guild_only()
+    async def drills(self, interaction: discord.Interaction):
+        from services.drills import DRILLS, drill_status
+        stats = drill_status(interaction.guild_id, interaction.user.id)
+        lines = []
+        for key, (name, knight_stat, horse_stat, threshold, detail) in DRILLS.items():
+            flag = "✅ Done" if key not in stats["available"] else "⏳ Available"
+            lines.append(f"**{name}** — {flag}\n_{detail}_")
+        card = discord.Embed(
+            title="🏇 Specialist Training Drills",
+            description=f"**Practice Mastery:** {stats['mastery']} · "
+                        f"**Today:** {stats['completed']}/4 (UTC)\n\n"
+                        + "\n".join(lines) +
+                        "\n\nUse `/joust drill` to attempt a chosen drill. "
+                        "One attempt per discipline each UTC day. "
+                        "Mastery is honorary only: no gold, XP or injuries.",
+            colour=discord.Colour.dark_gold(),
+        )
+        await interaction.response.send_message(embed=card, ephemeral=True)
+
+    @joust_group.command(name="drill", description="Attempt a specialist drill once per UTC day.")
+    @app_commands.guild_only()
+    async def drill(self, interaction: discord.Interaction,
+                    discipline: Literal["accuracy", "seat", "defence", "horsemanship"] = "accuracy"):
+        from services.drills import run_drill
+        try:
+            result = run_drill(interaction.guild_id, interaction.user.id, discipline)
+        except ValueError as exc:
+            return await interaction.response.send_message(f"❌ {exc}", ephemeral=True)
+        stamp = "✅ Passed" if result["success"] else "⚠️ Keep practising"
+        await interaction.response.send_message(
+            f"🏇 **{result['name']} — {stamp}**\n"
+            f"{result['description']}\n"
+            f"Roll {result['roll']} + skill {result['bonus']} = "
+            f"**{result['score']}** (target {result['target']}).\n"
+            f"**Mastery earned:** {result['mastery_awarded']} · "
+            f"Lifetime mastery: **{result['mastery']}** · "
+            f"Remaining drills today: **{result['remaining_today']}**.\n"
+            "No gold, XP, permanent stat boosts or injury risk.",
+            ephemeral=True,
+        )
 
     @joust_group.command(name="train", description="Train with a named NPC; 3 XP, no gold, real injury risk.")
     @app_commands.guild_only()

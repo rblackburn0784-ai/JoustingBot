@@ -31,7 +31,9 @@ def fighter(user_id=1, *, courage=5, obedience=5, stamina=5):
 class TacticRules(unittest.TestCase):
     def test_defaults_validation_and_fatigue_cap(self):
         self.assertEqual(TacticPlan().as_dict(),
-                         {"style": "balanced", "target": "shield", "manoeuvre": "none"})
+                         {"style": "balanced", "target": "shield", "manoeuvre": "none",
+                          "shield_guard": "square", "charge_intensity": "balanced",
+                          "lance_control": "balanced"})
         for field, bad in (("style", "invincible"), ("target", "neck"), ("manoeuvre", "cheat")):
             with self.subTest(field=field), self.assertRaises(ValueError):
                 TacticPlan(**{**TacticPlan().as_dict(), field: bad})

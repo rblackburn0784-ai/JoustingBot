@@ -193,10 +193,19 @@ def preferred_tactics(guild_id: int, user_id: int,
 
 
 def set_preferred_tactics(guild_id: int, user_id: int, *,
-                          style: str, target: str, manoeuvre: str) -> TacticPlan:
+                          style: str, target: str, manoeuvre: str,
+                          shield_guard: str | None = None,
+                          charge_intensity: str | None = None,
+                          lance_control: str | None = None) -> TacticPlan:
     _state(guild_id, user_id)
-    plan = TacticPlan(style=style, target=target, manoeuvre=manoeuvre)
     data = _db()
+    existing = preferred_tactics(guild_id, user_id, data=data)
+    plan = TacticPlan(
+        style=style, target=target, manoeuvre=manoeuvre,
+        shield_guard=shield_guard or existing.shield_guard,
+        charge_intensity=charge_intensity or existing.charge_intensity,
+        lance_control=lance_control or existing.lance_control,
+    )
     _ensure_player(data, guild_id, user_id)["preferred_tactics"] = plan.as_dict()
     save_json(PATH, data)
     return plan

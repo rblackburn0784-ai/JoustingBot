@@ -16,7 +16,10 @@ from services.evolution import (
 )
 from services.injuries import active as active_injuries
 from services.progression import loadout, wallet, STARTER
-from services.tactics import STYLES, TARGETS, MOVES
+from services.tactics import (
+    STYLES, TARGETS, MOVES, GUARDS, CHARGE_INTENSITIES, LANCE_CONTROLS,
+    TacticPlan,
+)
 
 
 def my_horses(uid: int) -> list[dict]:
@@ -275,16 +278,23 @@ class PreferenceSelect(discord.ui.Select):
 class TacticsPreferencePage(OwnedView):
     def __init__(self, user_id: int, guild_id: int | None,
                  style: str | None = None, target: str | None = None,
-                 manoeuvre: str | None = None):
+                 manoeuvre: str | None = None, shield_guard: str | None = None,
+                 charge_intensity: str | None = None,
+                 lance_control: str | None = None):
         super().__init__(user_id)
         self.guild_id = guild_id
-        from services.tactics import TacticPlan
         plan = preferred_tactics(guild_id, user_id) if guild_id else TacticPlan()
-        self.plan = TacticPlan(style=style or plan.style, target=target or plan.target,
-                               manoeuvre=manoeuvre or plan.manoeuvre)
+        self.plan = TacticPlan(
+            style=style or plan.style, target=target or plan.target,
+            manoeuvre=manoeuvre or plan.manoeuvre,
+            shield_guard=shield_guard or plan.shield_guard,
+            charge_intensity=charge_intensity or plan.charge_intensity,
+            lance_control=lance_control or plan.lance_control,
+        )
         self.add_item(PreferenceSelect(self, "style", STYLES, 0))
         self.add_item(PreferenceSelect(self, "target", TARGETS, 1))
         self.add_item(PreferenceSelect(self, "manoeuvre", MOVES, 2))
+        self.button("Advanced Defaults", self.advanced, row=3, emoji="🛡️")
         self.button("Save Preference", self.save, row=3, style=discord.ButtonStyle.primary)
         self.button("Headquarters", lambda it: navigate(
             it, HeadquartersPage(it.user.id, it.guild_id)), row=3)
@@ -293,10 +303,17 @@ class TacticsPreferencePage(OwnedView):
     def make_embed(self):
         return embed("🧠 Preferred Tactical Plan",
                      f"**Style:** {self.plan.style}\n**Target:** {self.plan.target}\n"
-                     f"**Manoeuvre:** {self.plan.manoeuvre}\n\n"
+                     f"**Manoeuvre:** {self.plan.manoeuvre}\n"
+                     f"**Shield guard:** {self.plan.shield_guard}\n"
+                     f"**Charge:** {self.plan.charge_intensity}\n"
+                     f"**Lance grip:** {self.plan.lance_control}\n\n"
                      "Your plan is stored privately and prefilled when you first "
                      "open the tactics editor for a new challenge. It is not "
                      "automatically locked or revealed to your opponent.")
+
+    async def advanced(self, interaction):
+        await navigate(interaction, AdvancedPreferencePage(
+            interaction.user.id, interaction.guild_id, self.plan))
 
     async def save(self, interaction):
         if not self.guild_id:
@@ -307,6 +324,58 @@ class TacticsPreferencePage(OwnedView):
             return await interaction.response.send_message(f"❌ {exc}", ephemeral=True)
         await navigate(interaction, TacticsPreferencePage(interaction.user.id, self.guild_id),
                        "✅ Preferred tactics saved privately.")
+
+
+
+
+
+class AdvancedPreferenceSelect(discord.ui.Select):
+    def __init__(self, page: "AdvancedPreferencePage", field: str,
+                 choices: dict, row: int):
+        self.page = page
+        self.field = field
+        super().__init__(row=row, placeholder=field.replace("_", " ").title(),
+                         options=[
+                             discord.SelectOption(
+                                 label=value[0][:100], value=key,
+                                 description=value[1][:100],
+                                 default=getattr(page.plan, field) == key,
+                             )
+                             for key, value in choices.items()
+                         ])
+
+    async def callback(self, interaction: discord.Interaction):
+        data = self.page.plan.as_dict()
+        data[self.field] = self.values[0]
+        await navigate(interaction, AdvancedPreferencePage(
+            interaction.user.id, interaction.guild_id, TacticPlan(**data)))
+
+
+class AdvancedPreferencePage(OwnedView):
+    def __init__(self, user_id: int, guild_id: int | None, plan: TacticPlan):
+        super().__init__(user_id)
+        self.guild_id = guild_id
+        self.plan = plan
+        for row, (field, options) in enumerate((
+            ("shield_guard", GUARDS),
+            ("charge_intensity", CHARGE_INTENSITIES),
+            ("lance_control", LANCE_CONTROLS),
+        )):
+            self.add_item(AdvancedPreferenceSelect(self, field, options, row))
+        self.button("Back to Tactics", lambda it: navigate(
+            it, TacticsPreferencePage(it.user.id, it.guild_id, **self.plan.as_dict())),
+            row=3, style=discord.ButtonStyle.primary)
+        self.home()
+
+    def make_embed(self):
+        return embed(
+            "🛡️ Advanced Tactical Defaults",
+            f"**Shield:** {GUARDS[self.plan.shield_guard][0]}\n"
+            f"**Charge:** {CHARGE_INTENSITIES[self.plan.charge_intensity][0]}\n"
+            f"**Lance:** {LANCE_CONTROLS[self.plan.lance_control][0]}\n\n"
+            "Select your options, then return to Tactics and press **Save Preference**. "
+            "These are just defaults; both players still lock tactics privately.",
+        )
 
 
 class EvolutionCog(commands.Cog):
@@ -376,13 +445,18 @@ class EvolutionCog(commands.Cog):
 
     @presets_group.command(name="tactics", description="Save preferred tactical choices.")
     async def preset_tactics(self, interaction: discord.Interaction, style: str = "balanced",
-                             target: str = "shield", manoeuvre: str = "none"):
+                             target: str = "shield", manoeuvre: str = "none",
+                             shield_guard: str = "", charge_intensity: str = "",
+                             lance_control: str = ""):
         if not interaction.guild_id:
             return await interaction.response.send_message("Use this in a server.", ephemeral=True)
         try:
             plan = set_preferred_tactics(
                 interaction.guild_id, interaction.user.id,
-                style=style, target=target, manoeuvre=manoeuvre)
+                style=style, target=target, manoeuvre=manoeuvre,
+                shield_guard=shield_guard or None,
+                charge_intensity=charge_intensity or None,
+                lance_control=lance_control or None)
         except ValueError as exc:
             return await interaction.response.send_message(f"❌ {exc}", ephemeral=True)
         await interaction.response.send_message(

@@ -348,7 +348,7 @@ class MaintenanceCog(commands.Cog):
         if not report["errors"] and report["missing"] == 0:
             lines.append("✅ Full graphics pack passes file checks.")
         lines.append("Use python tools/audit_assets_v294.py --strict locally for a complete report.")
-        card = embed("🖼️ Asset Health — v2.9.5", "\n".join(lines)[:3900])
+        card = embed("🖼️ Asset Health — v2.9.6", "\n".join(lines)[:3900])
         await interaction.edit_original_response(embed=card)
 
     @admin_group.command(name="health", description="Inspect persistent JSON health.")
@@ -424,7 +424,7 @@ class MaintenanceCog(commands.Cog):
     async def version(self, interaction: discord.Interaction):
         view = MainMenuView(interaction.user.id, is_admin(interaction))
         await interaction.response.send_message(
-            embed=embed("⚙️ JoustingBot v2.9.5",
+            embed=embed("⚙️ JoustingBot v2.9.6",
                         "Stability, Economy Integrity & Arena Presentation\n"
                         "✅ Atomic JSON saves · verified local backups · safe repairs\n"
                         "✅ Private tactics · one-screen Prep / Gallop / Lance / Collision / Outcome\n"
