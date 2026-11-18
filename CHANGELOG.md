@@ -1,3 +1,11 @@
+## v2.9.6a — Defensive Counterbalance
+
+- Reduced the excessive charge penalty for measured speed; removed low guard's extra impact penalty while keeping its vulnerability to high strikes.
+- Added a narrow +2 counterstrike for fully defensive cautious/guarded/measured/precision builds, without assisting Full Charge or reckless offence.
+- Strengthened high shield guard as the direct answer to high rider-target Full Charge, with guard wear still providing counterplay.
+- Added defensive viability and matchup metrics to the six-arena seeded balance sweep, added unit regression checks for the guarded counterstrike, and aligned the version displayed throughout the bot.
+- Existing item inventory, match history, injuries and economy remain untouched; no migrations or new PNGs needed.
+
 ## v2.9.6 — Jousting Combat 2.0
 
 - Added three optional advanced tactical dimensions, deterministic guard-counter interactions, charge/accuracy trade-offs, match-only shield wear and next-pass stagger recovery. Neutral defaults retain old balance and seeded-replay behaviour.

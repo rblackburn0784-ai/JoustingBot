@@ -208,3 +208,43 @@ class AdvancedPanelTests(TestCase):
                             for x in a.children))
         self.assertTrue(any(getattr(x, "label", None) == "Back to Tactics"
                             for x in b.children))
+
+
+
+class DefensiveRebalanceTests(TestCase):
+    def test_measured_low_guard_and_controlled_counterstrike(self):
+        p = tactics.TacticPlan(
+            style="cautious", target="lance", manoeuvre="shield_brace",
+            shield_guard="low", charge_intensity="measured",
+            lance_control="precise",
+        )
+        mount = {"stamina": 5, "obedience": 5, "courage": 5}
+        actual = tactics.effects(p, pass_no=1, fatigue=0, horse_stats=mount)
+        self.assertEqual(actual.charge, -3)
+        self.assertGreater(actual.alignment, 0)
+        self.assertGreaterEqual(actual.resistance, 3)
+        # The bonus must never be granted to all-out aggression.
+        wild = tactics.TacticPlan(style="aggressive", target="rider",
+                                  manoeuvre="reckless_charge",
+                                  shield_guard="high",
+                                  charge_intensity="full", lance_control="forceful")
+        self.assertNotEqual(actual.charge, tactics.effects(
+            wild, pass_no=1, fatigue=0, horse_stats=mount).charge)
+        high = tactics.TacticPlan(shield_guard="high")
+        self.assertEqual(tactics.counterplay(wild, high)[1], -3)
+        self.assertEqual(tactics.counterplay(wild, high, defender_wear=2)[2], 0)
+
+    def test_no_legacy_change_when_advanced_controls_are_neutral(self):
+        legacy = tactics.TacticPlan(style="cautious", target="lance",
+                                     manoeuvre="shield_brace")
+        new = tactics.TacticPlan(style="cautious", target="lance",
+                                  manoeuvre="shield_brace",
+                                  shield_guard="square",
+                                  charge_intensity="balanced",
+                                  lance_control="balanced")
+        a = tactics.effects(legacy, pass_no=1, fatigue=0,
+                            horse_stats={"stamina": 5, "obedience": 5, "courage": 5})
+        b = tactics.effects(new, pass_no=1, fatigue=0,
+                            horse_stats={"stamina": 5, "obedience": 5, "courage": 5})
+        self.assertEqual(a, b)
+        self.assertFalse(tactics.advanced_active(legacy))

@@ -33,11 +33,11 @@ MAX_TACTICAL_RISK_MOD = 12
 GUARDS = {
     "square": ("Square Guard", "Balanced shield coverage; no modifier.", 0, 0, 0, 0, 0, 0),
     "high": ("High Guard", "Covers the rider against high strikes; gives up low coverage.", -1, 0, 1, 0, 0, 0),
-    "low": ("Low Guard", "Protects the lance line; exposes the upper seat.", 1, -1, 0, 0, 0, 0),
+    "low": ("Low Guard", "Protects the lance line; exposes the upper seat.", 1, 0, 0, 0, 0, 0),
 }
 CHARGE_INTENSITIES = {
     "balanced": ("Balanced Charge", "Even momentum and control.", 0, 0, 0, 0, 0, 0),
-    "measured": ("Measured Charge", "Cleaner line, less impact.", 2, -2, 0, 1, 0, -1),
+    "measured": ("Measured Charge", "Cleaner line, moderately less impact.", 2, -1, 0, 1, 0, -1),
     "full": ("Full Charge", "Greater impact with mounting fatigue and handling risk.", -2, 2, 0, -1, 1, 2),
 }
 LANCE_CONTROLS = {
@@ -62,7 +62,10 @@ def counterplay(attacker: "TacticPlan", defender: "TacticPlan",
     """
     if attacker.target == "rider" and defender.shield_guard == "high":
         resist = max(0, 2 - min(2, max(0, defender_wear)))
-        return (0, -2, resist, "High shield guard smothers the rider-target charge.")
+        # A high guard is especially effective against an all-out high strike,
+        # but loses effectiveness as the shield absorbs hits.
+        penalty = -3 if attacker.charge_intensity == "full" else -2
+        return (0, penalty, resist, "High shield guard smothers the rider-target charge.")
     if attacker.target == "lance" and defender.shield_guard == "low":
         resist = max(0, 1 - min(1, max(0, defender_wear)))
         return (-2, 0, resist, "Low shield guard frustrates the lance attack.")
@@ -157,6 +160,14 @@ def effects(plan: TacticPlan, *, pass_no: int, fatigue: int, horse_stats: dict[s
         handling += add_handle
         gain += add_fatigue
         risk += add_risk
+    # v2.9.6a: guarded, measured precision should convert a sound defensive
+    # line into an occasional effective counterstrike. The narrow +2 only
+    # offsets part of the stacked cautious/lance/brace/precision penalties;
+    # it cannot be stacked with Full Charge or an aggressive riding style.
+    if (plan.style == "cautious" and plan.shield_guard in {"high", "low"}
+            and plan.charge_intensity == "measured"
+            and plan.lance_control == "precise"):
+        charge += 2
     spent = fatigue_penalty(fatigue, horse_stats, plan.style)
     return PassTactics(
         alignment=align - spent,

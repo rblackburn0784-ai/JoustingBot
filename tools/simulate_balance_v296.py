@@ -80,14 +80,48 @@ def sweep(seeds: int = 200) -> dict:
     return rows
 
 
+
+
+
+def head_to_head(first: str, second: str, seeds: int = 100) -> dict:
+    """Equal-stat, mirrored-seat trial of an explicit pair of strategies."""
+    if first not in PLANS or second not in PLANS or not 1 <= seeds <= 5000:
+        raise ValueError("Choose valid plans and 1–5000 seeds.")
+    results = {}
+    total = 0.0
+    for key in ARENAS:
+        points = 0.0
+        for seed in range(1, seeds + 1):
+            for swapped in (False, True):
+                left, right = ((PLANS[first], PLANS[second]) if not swapped
+                               else (PLANS[second], PLANS[first]))
+                result = run_single_match(fighter(1), fighter(2), key,
+                                          seed=seed, tactics_a=left, tactics_b=right)
+                own, theirs = ((result.score_a, result.score_b) if not swapped
+                               else (result.score_b, result.score_a))
+                points += 1.0 if own > theirs else 0.5 if own == theirs else 0.0
+        results[key] = round(points / (seeds * 2), 4)
+        total += points
+    return {"first": first, "second": second,
+            "win_share": round(total / (len(ARENAS) * seeds * 2), 4),
+            "arenas": results}
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--seeds", type=int, default=200)
     parser.add_argument("--json", action="store_true")
+    parser.add_argument("--defence-check", action="store_true",
+                        help="Require defensive builds to remain viable.")
     options = parser.parse_args()
     result = sweep(options.seeds)
+    matchups = (
+        [head_to_head("cautious_counter", other, options.seeds)
+         for other in ("aggressive_striker", "full_force", "neutral")]
+        if options.defence_check else []
+    )
     if options.json:
-        print(json.dumps(result, indent=2))
+        print(json.dumps({"vs_neutral": result, "head_to_head": matchups}, indent=2))
     else:
         print(f"v2.9.6 combat balance · {options.seeds} seeded pairs per arena")
         for name, value in result.items():
@@ -95,6 +129,22 @@ def main() -> int:
                   f"({value['matches']} matches)")
             for arena, ratio in value["arenas"].items():
                 print(f"  {arena:22} {ratio:.1%}")
+        for row in matchups:
+            print(f"Counter vs {row['second']:19} {row['win_share']:.1%} "
+                  "seat-adjusted win share")
+    if options.defence_check:
+        # These are viability floors, not a claim of perfect balance.
+        defensive = result["cautious_counter"]["win_share"]
+        if not 0.38 <= defensive <= 0.65:
+            print(f"FAIL: cautious defence remains outside viability band: "
+                  f"{defensive:.1%}", file=sys.stderr)
+            return 2
+        if result["measured_precision"]["win_share"] < 0.38:
+            print("FAIL: measured precision is underpowered.", file=sys.stderr)
+            return 2
+        if result["aggressive_striker"]["win_share"] > 0.68:
+            print("FAIL: aggressive striker dominates neutral.", file=sys.stderr)
+            return 2
     # Wide safety tripwire: identity/seat-neutral tactics should not become
     # completely unstoppable. The full sweep still needs human review.
     if any(not 0.10 <= row["win_share"] <= 0.90 for row in result.values()):

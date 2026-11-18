@@ -20,7 +20,7 @@ jobs:
       - name: Run competition regression tests
         run: python -m unittest discover -s tests -v
       - name: Sweep tactical balance across all six arenas
-        run: python tools/simulate_balance_v296.py --seeds 100
+        run: python tools/simulate_balance_v296.py --seeds 100 --defence-check
       - name: Check Discord cog and slash command registration
         run: |
           python - <<'PY'
