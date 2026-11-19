@@ -1,6 +1,34 @@
+## v2.9.7a — Circuit Integrity & UX
+
+**Current version:** v2.9.7a — Circuit Integrity & UX
+
+This security, reliability and menu cleanup follows v2.9.7. The deterministic combat engine and v2.9.6a combat balancing remain unchanged.
+
+### Integrity repairs
+- Prevent House score manipulation through instant cross-House hopping: a 24-hour switch cooldown survives bot restarts. Rejoining your prior House immediately remains permitted.
+- Share a per-guild async lock across House slash actions, private dropdowns, modals and buttons. Malformed House membership/captain indices fail safely and appear in admin health diagnostics rather than silently creating entries.
+- The Circuit now compares any saved match seed and arena with its recorded tournament pairing before counting season points, arena honours, House rivalries or Hall of Champions. Historical logs without optional seed remain usable.
+- Admin tournament cancellation is now available, with confirmation in the private hub and a separate capped cancelled-event audit. No event containing a saved or completed bout can be cancelled.
+- Start validates every registered rider while holding the same guild lock used by registration and withdrawal, preventing a roster-change race.
+- Fixed round-robin result reporting: individual bout winners do not automatically advance, and the league champion comes from the completed league standings, not the last pairing's winner.
+- Rejects unwanted mentions and control characters in tournament names.
+
+### Discord experience
+- Custom Event modal offers league/knockout format, random/ranked seeding and check-in with clear prompts. Scheduling is still accessible with the tournament create slash command.
+- Participant buttons, admin options and history are grouped more cleanly. Irrelevant Join, Check In, Leave, Start and Next buttons are disabled based on the tournament state, while server-side checks still apply to old persistent messages.
+- House screens show House IDs for easy joining, explain transfer cooldowns, and edit the current private menu. Tournament cancellation has its own explicit confirmation step.
+- Menu layout tests check Discord row/component counts and embed limits. No extra PNGs or destructive data migrations are necessary.
+
+### Validation and deployment
+Run the complete unittest suite, cross-arena balance sweep, command-registration check and targeted exploit/recovery regression tests before deployment. Live Discord presentation, mobile layout and real bot network failures must still be tested manually; passing automated tests is not a pixel-perfect visual certification.
+
+Create and verify an admin backup, then git pull --ff-only origin main and restart. Preserve storage, backups, local assets and the environment configuration.
+
+---
+
 ## v2.9.7 — The Grand Tournament Circuit
 
-**Current version:** v2.9.7 — The Grand Tournament Circuit
+**Previous feature release:** v2.9.7 — The Grand Tournament Circuit
 
 The v2.9.6a combat balance is preserved. This release adds an honorary, continuing medieval competitive world using only verified completed tournament records; it does not create new spending currency, gold, XP, equipment power, health changes or paid prizes.
 

@@ -37,12 +37,16 @@ def advancing_rider(score_a: int, score_b: int, red_id: int, blue_id: int,
 
 def status_embed(gid):
     t = engine.current(gid)
-    e = discord.Embed(title="🏆 Tournament Lite", colour=discord.Colour.gold())
+    e = discord.Embed(title="🏆 Grand Circuit Tournaments", colour=discord.Colour.gold())
     if not t:
         last = engine.recent(gid, 1)
-        e.description = ("No active tournament. Admins can create one."
-                         if not last else
-                         "No active tournament. Last champion: " + at(last[0]["champion"]))
+        e.description = (
+            "No active tournament. Admins can choose **Create** for a standard cup "
+            "or **Custom Event** for a league, ranked seeding or check-in. "
+            "Use `/tournament create` for scheduled events. "
+            "The Grand Circuit menu shows seasons and House standings."
+            + ("\n\n**Last champion:** " + at(last[0]["champion"]) if last else "")
+        )
         return e
     e.title = "🏆 " + discord.utils.escape_markdown(t["name"])
     competition_format = t.get("format", "single_elimination")
@@ -60,6 +64,14 @@ def status_embed(gid):
         + "Joining consents to admin-run competitive matches. Gear, injuries and rewards apply."
     )
     if t["status"] == "registration":
+        e.add_field(name="How to enter", value=(
+            "Press **Join** to register. "
+            + ("Then press **Check In**; all riders must check in before Start."
+               if t.get("require_checkin") else
+               "No separate check-in needed. Admin starts when full.")
+            + ("\n**Scheduled start:** UTC time displayed above."
+               if t.get("scheduled_at") else "")),
+            inline=False)
         e.add_field(name="Entrants", value="\n".join(
             f"{i + 1}. {at(uid)}"
             + ((" ✅" if uid in t.get("checked_in", []) else " ⏳")
@@ -87,6 +99,12 @@ def status_embed(gid):
                     win = " → " + at(m["winner"]) if m["winner"] else ""
                     lines.append(f"{sym} {i+1}. {at(m['a'])} vs {at(m['b'])}{win}")
                 e.add_field(name=label, value="\n".join(lines), inline=False)
+        if competition_format == "round_robin":
+            e.add_field(name="League Rules",
+                        value="Each pairing is a separate fixture, not an elimination. "
+                              "3 table points per win; drawn scores use the fixed seeded "
+                              "marshal tiebreak. Final table ties are broken by player ID.",
+                        inline=False)
         nxt = engine.pending(t)
         if nxt:
             m = nxt["match"]
@@ -262,8 +280,21 @@ class TournamentCabinet(OwnedView):
 
 class TournamentPanel(discord.ui.View):
     """Registered persistent public buttons; permissions checked by the cog."""
-    def __init__(self):
+    def __init__(self, guild_id: int | None = None):
         super().__init__(timeout=None)
+        if guild_id:
+            active = engine.current(guild_id)
+            registration = bool(active and active.get("status") == "registration")
+            running = bool(active and active.get("status") == "running")
+            for child in self.children:
+                if child.custom_id in ("tournament:join", "tournament:leave"):
+                    child.disabled = not registration
+                elif child.custom_id == "tournament:checkin":
+                    child.disabled = not (registration and active.get("require_checkin"))
+                elif child.custom_id == "tournament:start":
+                    child.disabled = not registration
+                elif child.custom_id == "tournament:next":
+                    child.disabled = not running
 
     @discord.ui.button(label="Join Tournament", emoji="🛡️", style=discord.ButtonStyle.success,
                        custom_id="tournament:join", row=0)
@@ -309,7 +340,8 @@ class TournamentPanel(discord.ui.View):
     async def refresh(self, interaction, button):
         if interaction.guild_id is None:
             return await interaction.response.send_message("Server only.", ephemeral=True)
-        await interaction.response.edit_message(embed=status_embed(interaction.guild_id), view=self)
+        await interaction.response.edit_message(embed=status_embed(interaction.guild_id),
+                                                view=TournamentPanel(interaction.guild_id))
 
     @discord.ui.button(label="Main Menu", emoji="🏰", style=discord.ButtonStyle.secondary,
                        custom_id="tournament:home", row=1)
@@ -330,21 +362,83 @@ class NewTournament(discord.ui.Modal, title="Create Tournament"):
         await interaction.client.get_cog("TournamentCog").do_create(interaction, str(self.name), sz)
 
 
+class AdvancedTournamentModal(discord.ui.Modal, title="Create Custom Tournament"):
+    name = discord.ui.TextInput(label="Tournament Name", min_length=3, max_length=50,
+                                placeholder="The Grand Autumn Lists")
+    size = discord.ui.TextInput(label="Players: 4 or 8", min_length=1, max_length=1,
+                                placeholder="4")
+    format = discord.ui.TextInput(label="Format: knockout or league", min_length=6, max_length=10,
+                                  placeholder="knockout")
+    seeding = discord.ui.TextInput(label="Seeding: random or ranked", min_length=6, max_length=6,
+                                   placeholder="random")
+    checkin = discord.ui.TextInput(label="Require check-in? yes or no", min_length=2,
+                                   max_length=3, placeholder="no")
+
+    async def on_submit(self, interaction):
+        if not is_admin(interaction):
+            return await interaction.response.send_message("⛔ Admin only.", ephemeral=True)
+        raw_format = str(self.format).strip().lower()
+        mode = {"knockout": "single_elimination", "league": "round_robin"}.get(raw_format)
+        check = str(self.checkin).strip().lower()
+        seeding = str(self.seeding).strip().lower()
+        size = int(str(self.size)) if str(self.size) in ("4", "8") else 0
+        if not mode or check not in ("yes", "no") or seeding not in ("random", "ranked"):
+            return await interaction.response.send_message(
+                "❌ Format must be knockout/league; seeding random/ranked; check-in yes/no.",
+                ephemeral=True)
+        await interaction.client.get_cog("TournamentCog").do_create(
+            interaction, str(self.name), size, format=mode,
+            seeding=seeding, require_checkin=check == "yes")
+
+
+class ConfirmTournamentCancel(OwnedView):
+    def __init__(self, uid: int, gid: int | None):
+        super().__init__(uid, admin=True)
+        self.gid = gid
+        self.button("Confirm Cancel Event", self.confirm, style=discord.ButtonStyle.danger,
+                    row=0, emoji="🗑️")
+        self.button("Keep Tournament", lambda it: navigate(
+            it, TournamentHub(it.user.id, it.guild_id, is_admin(it))), row=0)
+        self.home()
+
+    def make_embed(self):
+        return discord.Embed(
+            title="⚠️ Cancel Tournament?",
+            description="This releases an unplayed tournament slot. "
+                        "A tournament containing completed match results or "
+                        "saved bouts cannot be cancelled. "
+                        "Existing knight, horse, gold and match records are never deleted.",
+            colour=discord.Colour.orange(),
+        )
+
+    async def confirm(self, interaction):
+        await interaction.client.get_cog("TournamentCog").do_cancel(interaction)
+
+
 class TournamentHub(OwnedView):
     def __init__(self, uid, gid, admin=False):
         super().__init__(uid)
         self.gid = gid
-        self.button("Refresh", self.refresh, row=0, emoji="🔄")
-        self.button("Join", self.join, row=0, emoji="🛡️")
-        self.button("Check In", self.checkin, row=0, emoji="✅")
-        self.button("Leave", self.leave, row=0, emoji="🚪")
-        self.button("History", self.history, row=0, emoji="📜")
-        self.button("Trophy Cabinet", self.cabinet, row=2, emoji="🎖️")
-        self.button("Grand Circuit", self.circuit, row=2, emoji="🏰")
+        current = engine.current(gid) if gid else None
+        registration = bool(current and current.get("status") == "registration")
+        running = bool(current and current.get("status") == "running")
+        self.button("Join", self.join, row=0, emoji="🛡️", disabled=not registration)
+        self.button("Check In", self.checkin, row=0, emoji="✅",
+                    disabled=not (registration and current.get("require_checkin")))
+        self.button("Leave", self.leave, row=0, emoji="🚪", disabled=not registration)
+        self.button("Refresh", self.refresh, row=1, emoji="🔄")
+        self.button("History", self.history, row=1, emoji="📜")
+        self.button("Trophy Cabinet", self.cabinet, row=1, emoji="🎖️")
+        self.button("Grand Circuit", self.circuit, row=1, emoji="🏰")
         if admin:
-            self.button("Create", self.create, row=1, style=discord.ButtonStyle.primary)
-            self.button("Start", self.start, row=1)
-            self.button("Start Next Match", self.next, row=1)
+            self.button("Create", self.create, row=2, style=discord.ButtonStyle.primary,
+                        disabled=bool(current))
+            self.button("Custom Event", self.custom, row=2, emoji="📋",
+                        disabled=bool(current))
+            self.button("Start", self.start, row=2, disabled=not registration)
+            self.button("Start Next Match", self.next, row=2, disabled=not running)
+            self.button("Cancel", self.cancel, row=2, style=discord.ButtonStyle.danger,
+                        disabled=not bool(current))
         self.home()
 
     def art_kwargs(self):
@@ -374,6 +468,16 @@ class TournamentHub(OwnedView):
         if not is_admin(it):
             return await it.response.send_message("Admin only.", ephemeral=True)
         await it.response.send_modal(NewTournament())
+    async def custom(self, it):
+        if not is_admin(it):
+            return await it.response.send_message("⛔ Admin only.", ephemeral=True)
+        await it.response.send_modal(AdvancedTournamentModal())
+
+    async def cancel(self, it):
+        if not is_admin(it):
+            return await it.response.send_message("⛔ Admin only.", ephemeral=True)
+        await navigate(it, ConfirmTournamentCancel(it.user.id, it.guild_id))
+
     async def start(self, it):
         await it.client.get_cog("TournamentCog").do_start(it)
     async def next(self, it):
@@ -417,7 +521,7 @@ class TournamentCog(commands.Cog):
                 return await interaction.response.send_message(f"❌ {ex}", ephemeral=True)
         await interaction.response.send_message("✅ Registration opened.", ephemeral=True)
         if interaction.channel:
-            await interaction.channel.send(embed=status_embed(interaction.guild_id), view=TournamentPanel())
+            await interaction.channel.send(embed=status_embed(interaction.guild_id), view=TournamentPanel(interaction.guild_id))
 
     async def do_join(self, interaction):
         if not interaction.guild or not isinstance(interaction.user, discord.Member):
@@ -436,9 +540,26 @@ class TournamentCog(commands.Cog):
         if interaction.message and interaction.message.embeds:
             try:
                 await interaction.message.edit(embed=status_embed(interaction.guild_id),
-                                               view=TournamentPanel())
+                                               view=TournamentPanel(interaction.guild_id))
             except discord.HTTPException:
                 pass
+
+    async def do_cancel(self, interaction):
+        if not interaction.guild_id or not is_admin(interaction):
+            return await interaction.response.send_message(
+                "⛔ Manage Server permission required.", ephemeral=True)
+        async with self.locks[interaction.guild_id]:
+            try:
+                cancelled = engine.cancel(interaction.guild_id, interaction.user.id)
+            except engine.TournamentError as ex:
+                return await interaction.response.send_message(f"❌ {ex}", ephemeral=True)
+        message = ("✅ Cancelled tournament **"
+                   + discord.utils.escape_markdown(cancelled["name"])
+                   + "**. Unplayed registration has been cleared.")
+        await interaction.response.send_message(message, ephemeral=True)
+        if interaction.channel:
+            await interaction.channel.send(embed=status_embed(interaction.guild_id),
+                                           view=TournamentPanel(interaction.guild_id))
 
     async def do_checkin(self, interaction):
         if not interaction.guild_id or not isinstance(interaction.user, discord.Member):
@@ -468,18 +589,23 @@ class TournamentCog(commands.Cog):
     async def do_start(self, interaction):
         if not is_admin(interaction):
             return await interaction.response.send_message("⛔ Manage Server permission required.", ephemeral=True)
-        current = engine.current(interaction.guild_id)
-        if not current or current["status"] != "registration":
-            return await interaction.response.send_message("❌ No tournament awaiting start.", ephemeral=True)
-        if len(current["entrants"]) != current["size"]:
-            return await interaction.response.send_message(
-                f"❌ Need {current['size']} riders; only {len(current['entrants'])} registered.", ephemeral=True)
-        for uid in current["entrants"]:
-            rider = await member_in(interaction.guild, uid)
-            if rider is None or valid_rider(rider):
-                return await interaction.response.send_message(
-                    f"❌ Rider {at(uid)} is no longer ready or available.", ephemeral=True)
+        # Check eligibility under the same guild lock as join, leave and start.
+        # A replacement entrant must not race in after the readiness check.
         async with self.locks[interaction.guild_id]:
+            current = engine.current(interaction.guild_id)
+            if not current or current["status"] != "registration":
+                return await interaction.response.send_message(
+                    "❌ No tournament awaiting start.", ephemeral=True)
+            if len(current["entrants"]) != current["size"]:
+                return await interaction.response.send_message(
+                    f"❌ Need {current['size']} riders; "
+                    f"only {len(current['entrants'])} registered.", ephemeral=True)
+            for uid in current["entrants"]:
+                rider = await member_in(interaction.guild, uid)
+                if rider is None or valid_rider(rider):
+                    return await interaction.response.send_message(
+                        f"❌ Rider {at(uid)} is no longer ready or available.",
+                        ephemeral=True)
             try:
                 engine.start(interaction.guild_id)
             except engine.TournamentError as ex:
@@ -487,7 +613,7 @@ class TournamentCog(commands.Cog):
         await interaction.response.send_message("✅ Bracket generated. Press Start Next Match.",
                                                 ephemeral=True)
         if interaction.channel:
-            await interaction.channel.send(embed=status_embed(interaction.guild_id), view=TournamentPanel())
+            await interaction.channel.send(embed=status_embed(interaction.guild_id), view=TournamentPanel(interaction.guild_id))
 
     async def do_next(self, interaction):
         if not is_admin(interaction):
@@ -588,13 +714,19 @@ class TournamentCog(commands.Cog):
                 ]
                 if names:
                     newly_earned.append(at(uid) + ": " + ", ".join(names))
-            label = "🏆 GRAND CHAMPION" if done["status"] == "completed" else "⚔️ Round Complete"
+            is_league = done.get("format") == "round_robin"
+            crowned = done["status"] == "completed"
+            label = "🏆 GRAND CHAMPION" if crowned else "⚔️ Round Complete"
+            result_line = (f"Bout winner: {at(winner)}" if is_league
+                           else f"Advances: {at(winner)}")
+            crown_line = (f"\n👑 Season tournament champion: {at(done['champion'])}"
+                          if crowned else "")
             notice = discord.Embed(
                 title=label,
                 description=f"{at(match['a'])} {score_a} — {score_b} {at(match['b'])}\n"
-                            f"Advances: {at(winner)}"
+                            + result_line
                             + (f"\nTie resolved by {tiebreak}." if tiebreak else "")
-                            + ("\nThe champion has been crowned!" if done["status"] == "completed" else ""),
+                            + crown_line,
                 colour=discord.Colour.gold())
             if newly_earned:
                 notice.add_field(
@@ -605,8 +737,12 @@ class TournamentCog(commands.Cog):
             if interaction.channel:
                 await interaction.channel.send(embed=notice)
                 await interaction.channel.send(embed=status_embed(interaction.guild_id),
-                                               view=TournamentPanel())
-            await interaction.followup.send(f"✅ {at(winner)} advances.", ephemeral=True)
+                                               view=TournamentPanel(interaction.guild_id))
+            await interaction.followup.send(
+                f"✅ {at(winner)} wins the bout." if is_league
+                else f"✅ {at(winner)} advances.",
+                ephemeral=True,
+            )
 
     @group.command(name="create", description="Admin: create a 4- or 8-rider event.")
     @app_commands.guild_only()
@@ -626,6 +762,12 @@ class TournamentCog(commands.Cog):
     @app_commands.guild_only()
     async def join(self, interaction: discord.Interaction):
         await self.do_join(interaction)
+
+    @group.command(name="cancel", description="Admin: cancel unplayed tournament safely.")
+    @app_commands.guild_only()
+    @app_commands.default_permissions(manage_guild=True)
+    async def cancel(self, interaction: discord.Interaction):
+        await self.do_cancel(interaction)
 
     @group.command(name="checkin", description="Confirm attendance before a checked-in tournament.")
     @app_commands.guild_only()
@@ -647,7 +789,7 @@ class TournamentCog(commands.Cog):
     @app_commands.guild_only()
     async def status(self, interaction: discord.Interaction):
         await interaction.response.send_message(embed=status_embed(interaction.guild_id),
-                                                view=TournamentPanel())
+                                                view=TournamentPanel(interaction.guild_id))
 
     @group.command(name="next", description="Admin: simulate the next bracket pairing.")
     @app_commands.guild_only()

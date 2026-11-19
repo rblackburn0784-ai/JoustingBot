@@ -5,6 +5,9 @@ roster protection. No new virtual currency or combat buffs.
 """
 from __future__ import annotations
 
+import asyncio
+from collections import defaultdict
+
 import discord
 from discord import app_commands
 from discord.ext import commands
@@ -13,6 +16,9 @@ from cogs.menu import OwnedView, embed, navigate
 from cogs.knight import get_knight, load_knights
 from services import circuit as engine
 from services.arenas import ARENAS
+
+# One lock per guild for slash, modal and component House writes.
+HOUSE_LOCKS = defaultdict(asyncio.Lock)
 
 
 def rider(uid: int) -> str:
@@ -205,14 +211,14 @@ class HouseCreateModal(discord.ui.Modal, title="Found a Knight House"):
                 raise engine.CircuitError("Create a House in your Discord server.")
             if not get_knight(load_knights(), interaction.user.id):
                 raise engine.CircuitError("Create a knight before founding a House.")
-            house = engine.create_house(interaction.guild_id, interaction.user.id,
-                                        str(self.name))
+            async with HOUSE_LOCKS[interaction.guild_id]:
+                house = engine.create_house(interaction.guild_id, interaction.user.id,
+                                            str(self.name))
         except engine.CircuitError as ex:
             return await interaction.response.send_message(f"❌ {ex}", ephemeral=True)
         view = HousePage(interaction.user.id, interaction.guild_id)
-        await interaction.response.send_message(
-            f"✅ Founded {discord.utils.escape_markdown(house['name'])}!",
-            embed=view.make_embed(), view=view, ephemeral=True)
+        await navigate(interaction, view,
+                       f"✅ Founded {discord.utils.escape_markdown(house['name'])}.")
 
 
 class HouseSelect(discord.ui.Select):
@@ -231,8 +237,9 @@ class HouseSelect(discord.ui.Select):
             return await interaction.response.send_message(
                 "❌ Create a knight before joining a House.", ephemeral=True)
         try:
-            result = engine.join_house(interaction.guild_id, interaction.user.id,
-                                       self.values[0])
+            async with HOUSE_LOCKS[interaction.guild_id]:
+                result = engine.join_house(interaction.guild_id, interaction.user.id,
+                                           self.values[0])
         except engine.CircuitError as ex:
             return await interaction.response.send_message(f"❌ {ex}", ephemeral=True)
         await navigate(interaction, HousePage(interaction.user.id, interaction.guild_id),
@@ -264,15 +271,17 @@ class HousePage(OwnedView):
         name = houses.get(mine, {}).get("name", "Not joined")
         lines = [
             f"**{discord.utils.escape_markdown(h['name'])}** — "
-            f"{len(h['members'])} knights · Captain {rider(h['captain'])}"
-            for h in list(houses.values())[:12]
+            f"{len(h['members'])} knights · Captain {rider(h['captain'])} "
+            f"· ID `{hid}`"
+            for hid, h in list(houses.items())[:12]
         ]
         return embed(
             "🏰 Knight Houses",
             f"**Your House:** {discord.utils.escape_markdown(name)}\n\n"
             + ("\n".join(lines) if lines else "No Houses founded here yet.")
-            + "\n\nUse the dropdown to join a House, found a new House, or "
-              "transfer captaincy using the House slash commands."
+            + "\n\n**Transfers:** a 24-hour cooldown applies when leaving "
+              "for a different House. Rejoining your previous House is "
+              "allowed immediately. Use the dropdown or `/house join`."
         )
 
     async def missions(self, interaction):
@@ -283,7 +292,8 @@ class HousePage(OwnedView):
 
     async def leave(self, interaction):
         try:
-            engine.leave_house(interaction.guild_id, interaction.user.id)
+            async with HOUSE_LOCKS[interaction.guild_id]:
+                engine.leave_house(interaction.guild_id, interaction.user.id)
         except engine.CircuitError as ex:
             return await interaction.response.send_message(f"❌ {ex}", ephemeral=True)
         await navigate(interaction, HousePage(interaction.user.id, interaction.guild_id),
@@ -363,7 +373,8 @@ class CircuitCog(commands.Cog):
             return await interaction.response.send_message(
                 "❌ Create a knight first.", ephemeral=True)
         try:
-            house = engine.create_house(interaction.guild_id, interaction.user.id, name)
+            async with HOUSE_LOCKS[interaction.guild_id]:
+                house = engine.create_house(interaction.guild_id, interaction.user.id, name)
         except engine.CircuitError as ex:
             return await interaction.response.send_message(f"❌ {ex}", ephemeral=True)
         await interaction.response.send_message(
@@ -377,7 +388,8 @@ class CircuitCog(commands.Cog):
             return await interaction.response.send_message(
                 "❌ Create a knight first.", ephemeral=True)
         try:
-            house = engine.join_house(interaction.guild_id, interaction.user.id, house_id)
+            async with HOUSE_LOCKS[interaction.guild_id]:
+                house = engine.join_house(interaction.guild_id, interaction.user.id, house_id)
         except engine.CircuitError as ex:
             return await interaction.response.send_message(f"❌ {ex}", ephemeral=True)
         await interaction.response.send_message(
@@ -387,7 +399,8 @@ class CircuitCog(commands.Cog):
     @app_commands.guild_only()
     async def leave(self, interaction: discord.Interaction):
         try:
-            engine.leave_house(interaction.guild_id, interaction.user.id)
+            async with HOUSE_LOCKS[interaction.guild_id]:
+                engine.leave_house(interaction.guild_id, interaction.user.id)
         except engine.CircuitError as ex:
             return await interaction.response.send_message(f"❌ {ex}", ephemeral=True)
         await interaction.response.send_message("✅ Left your House.", ephemeral=True)
@@ -398,8 +411,9 @@ class CircuitCog(commands.Cog):
         try:
             if member.bot:
                 raise engine.CircuitError("Bots cannot become House captains.")
-            house = engine.transfer_captain(interaction.guild_id,
-                                            interaction.user.id, member.id)
+            async with HOUSE_LOCKS[interaction.guild_id]:
+                house = engine.transfer_captain(interaction.guild_id,
+                                                 interaction.user.id, member.id)
         except engine.CircuitError as ex:
             return await interaction.response.send_message(f"❌ {ex}", ephemeral=True)
         await interaction.response.send_message(

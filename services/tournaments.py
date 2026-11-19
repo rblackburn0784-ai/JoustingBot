@@ -53,7 +53,10 @@ def create(guild_id: int, owner_id: int, name: str, size: int, *,
            format: str = "single_elimination",
            scheduled_at: str = "", require_checkin: bool = False,
            seeding: str = "random", championship: bool = False) -> dict:
-    name = " ".join(name.split())
+    raw_name = str(name or "")
+    if any(mark in raw_name for mark in ("@", "<", ">", "\n", "\r", "\x00")):
+        raise TournamentError("Tournament names cannot contain mentions or control characters.")
+    name = " ".join(raw_name.split())
     if size not in ALLOWED_SIZES:
         raise TournamentError("Tournament size must be 4 or 8.")
     if not 3 <= len(name) <= 50 or "\n" in name:
@@ -131,6 +134,8 @@ def check_in(guild_id: int, user_id: int) -> dict:
         raise TournamentError("There is no registration awaiting check-in.")
     if user_id not in item.get("entrants", []):
         raise TournamentError("Join the tournament before checking in.")
+    if not item.get("require_checkin"):
+        raise TournamentError("This tournament doesn't require check-in. You're already registered.")
     verified = item.setdefault("checked_in", [])
     if user_id in verified:
         raise TournamentError("You are already checked in.")
@@ -149,6 +154,41 @@ def leave(guild_id: int, user_id: int) -> dict:
     item["entrants"].remove(user_id)
     if user_id in item.get("checked_in", []):
         item["checked_in"].remove(user_id)
+    save_json(PATH, db)
+    return item
+
+
+def cancel(guild_id: int, admin_id: int) -> dict:
+    """Admin-only caller may cancel a dormant event without erasing gameplay.
+
+    An in-progress bout is serialized by TournamentCog's per-guild lock.
+    If ANY match has completed or entered the durable journal, cancellation
+    refuses to prevent secretly deleting competitive results or XP/gold.
+    """
+    if type(admin_id) is not int or admin_id <= 0:
+        raise TournamentError("Only an authorised server admin can cancel an event.")
+    db = load_db()
+    group = _bucket(db, guild_id)
+    item = group.get("active")
+    if not isinstance(item, dict) or item.get("status") not in ("registration", "running"):
+        raise TournamentError("There is no active tournament to cancel.")
+    if item["status"] == "running":
+        from services.records import load_history
+        pairings = [p for rnd in item.get("rounds", []) for p in rnd]
+        if any(p.get("status") == "complete" for p in pairings):
+            raise TournamentError("Cannot cancel a tournament after a bout is completed.")
+        journal_ids = {m.get("id") for m in load_history().get("matches", [])
+                       if isinstance(m, dict)
+                       and m.get("guild_id") == guild_id
+                       and m.get("tournament_id") == item.get("id")}
+        if any(p.get("id") in journal_ids for p in pairings):
+            raise TournamentError("Cannot cancel: a saved match exists. Resume instead.")
+    item["status"] = "cancelled"
+    item["cancelled_by"] = admin_id
+    item["cancelled_at"] = timestamp()
+    group.setdefault("cancelled", []).append(item)
+    group["cancelled"] = group["cancelled"][-20:]
+    group["active"] = None
     save_json(PATH, db)
     return item
 

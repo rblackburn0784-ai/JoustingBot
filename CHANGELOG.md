@@ -1,3 +1,12 @@
+## v2.9.7a — Circuit Integrity & UX
+
+- Added persistent 24-hour anti-hopping cooldown with same-House return, per-guild locks for all House writes and reciprocal roster validation.
+- Hardened Circuit journal provenance by validating optional seed/arena and included House structural health checks.
+- Added safe cancelled-event handling, admin cancellation confirmation and strict no-deletion safeguards after saved or completed bouts.
+- Removed the tournament-start eligibility race and misleading round-robin winner/champion announcements.
+- Added the Custom Event modal, clearer instructions, contextual button states, copyable House IDs and grouped participant/admin menus.
+- Added new reliability, exploit and UI layout regression tests. Kept the v2.9.6a combat, gold, XP, existing tournament records and artwork unchanged.
+
 ## v2.9.7 — The Grand Tournament Circuit
 
 - Implemented deterministic six-week UTC seasonal standings, honorary verified participation/win/crown/finalist points, qualified Circuit Finals and six arena championship honours; no extra gold, XP, paid prizes or buffs.

@@ -245,8 +245,8 @@ class HouseIntegrityTests(CircuitFixture):
         self.finish(name="Rivals Cup")
         before = circuit.house_standings(77, 1)
         self.assertGreater(sum(x["points"] for x in before), 0)
-        circuit.leave_house(77, 103)
-        circuit.join_house(77, 103, blue["id"])
+        circuit.leave_house(77, 103, now=NOW)
+        circuit.join_house(77, 103, blue["id"], now=NOW + timedelta(hours=25))
         self.assertEqual(before, circuit.house_standings(77, 1))
         self.assertEqual(circuit.house_standings(78, 1), [])
 

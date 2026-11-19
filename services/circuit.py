@@ -23,6 +23,7 @@ SEASON_DAYS = 42
 MAX_HOUSES = 12
 MAX_MEMBERS = 50
 MAX_FEED = 12
+HOUSE_TRANSFER_HOURS = 24
 
 
 class CircuitError(ValueError):
@@ -77,9 +78,56 @@ def _bucket(data: dict, guild_id: int) -> dict:
         raise CircuitError("Invalid stored House roster.")
     bucket.setdefault("houses", {})
     bucket.setdefault("members", {})
-    if not isinstance(bucket["houses"], dict) or not isinstance(bucket["members"], dict):
+    bucket.setdefault("departures", {})
+    if (not isinstance(bucket["houses"], dict)
+            or not isinstance(bucket["members"], dict)
+            or not isinstance(bucket["departures"], dict)):
         raise CircuitError("Invalid stored House roster.")
+    # Fail closed on broken rosters instead of allowing writes that amplify
+    # corruption. Applies to old v2.9.7 saves with no departures key.
+    for hid, house in bucket["houses"].items():
+        if (not isinstance(house, dict) or house.get("id") != hid
+                or not isinstance(house.get("members"), list)
+                or not isinstance(house.get("captain"), int)
+                or house["captain"] not in house["members"]
+                or any(type(uid) is not int or uid <= 0 for uid in house["members"])
+                or len(house["members"]) != len(set(house["members"]))
+                or not isinstance(house.get("name"), str)):
+            raise CircuitError("House roster is damaged; contact a server admin.")
+        if any(bucket["members"].get(str(uid)) != hid for uid in house["members"]):
+            raise CircuitError("House membership index does not match the roster.")
+    for uid, hid in bucket["members"].items():
+        if (not str(uid).isdigit() or hid not in bucket["houses"]
+                or int(uid) not in bucket["houses"][hid]["members"]):
+            raise CircuitError("House membership index is damaged.")
     return bucket
+
+
+def _rider_id(user_id: int) -> None:
+    if type(user_id) is not int or user_id <= 0:
+        raise CircuitError("Invalid knight ID.")
+
+
+def _transfer_check(bucket: dict, user_id: int,
+                    destination: str | None,
+                    now: datetime | None = None) -> None:
+    departure = bucket["departures"].get(str(user_id))
+    if departure is None:
+        return
+    if not isinstance(departure, dict) or not isinstance(departure.get("house"), str):
+        raise CircuitError("House transfer record is damaged; contact an admin.")
+    if destination is not None and destination == departure["house"]:
+        return  # returning to the same original House is harmless
+    if not isinstance(departure.get("at"), str):
+        raise CircuitError("House transfer timestamp is invalid; contact an admin.")
+    elapsed = (utc(now) - utc(departure["at"])).total_seconds()
+    if elapsed < 0:
+        raise CircuitError("House transfer timestamp is in the future; contact an admin.")
+    if elapsed < HOUSE_TRANSFER_HOURS * 3600:
+        remaining = max(1, int((HOUSE_TRANSFER_HOURS * 3600 - elapsed + 3599) // 3600))
+        raise CircuitError(
+            f"House transfers have a {HOUSE_TRANSFER_HOURS}-hour cooldown "
+            f"({remaining} hour(s) remaining). Returning to your previous House is allowed.")
 
 
 def house_for(guild_id: int | None, user_id: int) -> str | None:
@@ -94,6 +142,7 @@ def house_for(guild_id: int | None, user_id: int) -> str | None:
 
 
 def create_house(guild_id: int, user_id: int, name: str) -> dict:
+    _rider_id(user_id)
     name = " ".join(str(name or "").split())
     if not 3 <= len(name) <= 32 or any(ch in name for ch in "<>@#\n\r"):
         raise CircuitError("House name must contain 3–32 characters and no mentions.")
@@ -101,6 +150,7 @@ def create_house(guild_id: int, user_id: int, name: str) -> dict:
     group = _bucket(data, guild_id)
     if str(user_id) in group["members"]:
         raise CircuitError("Leave your current House before founding another.")
+    _transfer_check(group, user_id, None)
     if len(group["houses"]) >= MAX_HOUSES:
         raise CircuitError("This server already has the maximum 12 Houses.")
     if any(h.get("name", "").casefold() == name.casefold()
@@ -115,7 +165,9 @@ def create_house(guild_id: int, user_id: int, name: str) -> dict:
     return house
 
 
-def join_house(guild_id: int, user_id: int, house_id: str) -> dict:
+def join_house(guild_id: int, user_id: int, house_id: str, *,
+               now: datetime | None = None) -> dict:
+    _rider_id(user_id)
     data = load_houses()
     group = _bucket(data, guild_id)
     if str(user_id) in group["members"]:
@@ -123,6 +175,7 @@ def join_house(guild_id: int, user_id: int, house_id: str) -> dict:
     house = group["houses"].get(house_id)
     if not isinstance(house, dict):
         raise CircuitError("That House does not exist in this server.")
+    _transfer_check(group, user_id, house_id, now)
     if len(house.get("members", [])) >= MAX_MEMBERS:
         raise CircuitError("That House's roster is full.")
     house["members"].append(user_id)
@@ -131,7 +184,9 @@ def join_house(guild_id: int, user_id: int, house_id: str) -> dict:
     return house
 
 
-def leave_house(guild_id: int, user_id: int) -> None:
+def leave_house(guild_id: int, user_id: int, *,
+                now: datetime | None = None) -> None:
+    _rider_id(user_id)
     data = load_houses()
     group = _bucket(data, guild_id)
     hid = group["members"].get(str(user_id))
@@ -142,12 +197,15 @@ def leave_house(guild_id: int, user_id: int) -> None:
         raise CircuitError("Transfer the captaincy before leaving your House.")
     house["members"].remove(user_id)
     del group["members"][str(user_id)]
+    group["departures"][str(user_id)] = {"house": hid, "at": utc(now).isoformat()}
     if not house["members"]:
         del group["houses"][hid]
     save_json(PATH, data)
 
 
 def transfer_captain(guild_id: int, captain_id: int, to_user: int) -> dict:
+    _rider_id(captain_id)
+    _rider_id(to_user)
     data = load_houses()
     group = _bucket(data, guild_id)
     hid = group["members"].get(str(captain_id))
@@ -204,6 +262,13 @@ def verified_results(guild_id: int, tournaments: dict | None = None,
                         pairing.get("a"), pairing.get("b")):
                     continue
                 if pairing.get("winner") not in (a.get("user_id"), b.get("user_id")):
+                    continue
+                # When the journal contains optional provenance details, they
+                # must match the stored bracket. Older records lacking a seed
+                # still remain readable and cannot be backfilled arbitrarily.
+                if ("seed" in row and row["seed"] != pairing.get("seed")):
+                    continue
+                if ("arena_key" in row and row["arena_key"] != pairing.get("arena_key")):
                     continue
                 try:
                     when = utc(row["timestamp"])

@@ -29,7 +29,7 @@ from services.equipment import items_by_slot, get_item
 from services.records import load_history
 from services import ui_art
 
-VERSION = "v2.9.7"
+VERSION = "v2.9.7a"
 STYLE = discord.ButtonStyle
 
 
@@ -160,7 +160,7 @@ class VersionPage(OwnedView):
     def make_embed(self):
         return embed(
             f"⚙️ JoustingBot {VERSION}",
-            "**The Grand Tournament Circuit**\n"
+            "**Grand Circuit Integrity & UX**\n"
             "One live Discord graphic animates each pass: Prep, Gallop, Lance Ready, "
             "Collision and Outcome, before the final scorecard.\n\n"
             "Private tactics, seeded combat, tournaments, atomic saves, verified backups, "
@@ -213,8 +213,8 @@ class MainMenuView(OwnedView):
                      "⚔️ Knight · 🐎 Horse · 🛡️ Equipment · 🪙 Shop · 🏟️ Arenas\n"
                      "🎯 Challenge · 🏇 Training Yard · 📜 Profile · 🏆 Leaderboards\n"
                      "🏅 Titles · 🪙 Progression · 🩹 Injuries · 🏆 Tournaments\n"
-                     "**NEW:** Six-week seasons, Knight Houses, a Circuit leaderboard, "
-                     "Herald Chronicle and round-robin events.\n"
+                     "**NEW:** Circuit integrity, guarded House transfers, clearer "
+                     "tournament menus and safe event cancellation.\n"
                      "Buy gear in the Shop, then equip it on your Knight or Horse.\n\n"
                      "Only authorised members see the ⚙️ Admin controls.")
 

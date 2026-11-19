@@ -99,6 +99,16 @@ def inspect() -> dict:
                         warnings.append(f"matches.json: identical repeated ID {str(mid)[:40]} (can deduplicate).")
                 else:
                     ids[mid] = match
+        if name == "houses.json":
+            from services.circuit import _bucket, CircuitError
+            for gid, group in obj.get("guilds", {}).items():
+                try:
+                    if not str(gid).isdigit() or int(gid) <= 0:
+                        raise CircuitError("Invalid House guild ID.")
+                    # Audit stored affiliation both ways, without writing.
+                    _bucket(obj, int(gid))
+                except (CircuitError, ValueError, TypeError, KeyError) as exc:
+                    problems.append(f"houses.json: guild {str(gid)[:24]}: {exc}")
         if name == "tournaments.json":
             for gid, group in obj.get("guilds", {}).items():
                 if not isinstance(group, dict):
