@@ -237,3 +237,35 @@ class UIContractTests(Fixture):
         self.assertTrue(all(len(item.label) <= 45 for item in modal.children))
         self.assertTrue(all(getattr(item, "max_length", 100) <= 100
                             for item in modal.children))
+
+
+
+class AssetAuditTests(unittest.TestCase):
+    def test_real_pngs_pass_verification_and_metadata_checks(self):
+        """Regression: Pillow.verify() must precede channel/size inspection."""
+        from PIL import Image
+        from services.asset_health import audit_assets
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            arena = root / "assets/jousting/arenas/royal_lists.png"
+            knight = root / "assets/jousting/knights/red_knight/idle/red_knight_idle_left_01.png"
+            arena.parent.mkdir(parents=True, exist_ok=True)
+            knight.parent.mkdir(parents=True, exist_ok=True)
+            Image.new("RGBA", (320, 180), (25, 50, 90, 255)).save(arena)
+            Image.new("RGBA", (64, 64), (255, 20, 30, 0)).save(knight)
+            report = audit_assets(root)
+            self.assertEqual(report["present"], 2)
+            self.assertFalse(report["errors"], report["errors"])
+            self.assertGreater(report["missing"], 0)
+            self.assertFalse(report["ready_for_full_graphics"])
+
+    def test_corrupt_png_reports_error_without_crashing(self):
+        from services.asset_health import audit_assets
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            path = root / "assets/jousting/arenas/royal_lists.png"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(b"not really a PNG")
+            result = audit_assets(root)
+            self.assertTrue(result["errors"])
+            self.assertFalse(result["ready_for_full_graphics"])
