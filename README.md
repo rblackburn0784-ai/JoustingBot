@@ -18,6 +18,7 @@ This security, reliability and menu cleanup follows v2.9.7. The deterministic co
 - Participant buttons, admin options and history are grouped more cleanly. Irrelevant Join, Check In, Leave, Start and Next buttons are disabled based on the tournament state, while server-side checks still apply to old persistent messages.
 - House screens show House IDs for easy joining, explain transfer cooldowns, and edit the current private menu. Tournament cancellation has its own explicit confirmation step.
 - Menu layout tests check Discord row/component counts and embed limits. No extra PNGs or destructive data migrations are necessary.
+- **Graphics packaging limitation:** GitHub contains only a subset of the optional live-art PNG packs. CI now audits all present graphics for format/transparency/dimensions and reports absent packs as warnings. This check does not confirm sprite layering, image alignment or the contents of locally installed packs. Run /admin assets on the actual deployed host and review animated jousts and intro screens in Discord before calling the visuals production-ready.
 
 ### Validation and deployment
 Run the complete unittest suite, cross-arena balance sweep, command-registration check and targeted exploit/recovery regression tests before deployment. Live Discord presentation, mobile layout and real bot network failures must still be tested manually; passing automated tests is not a pixel-perfect visual certification.

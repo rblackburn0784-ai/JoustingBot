@@ -21,6 +21,22 @@ jobs:
         run: python -m unittest discover -s tests -v
       - name: Sweep tactical balance across all six arenas
         run: python tools/simulate_balance_v296.py --seeds 200 --defence-check
+      - name: Audit graphical asset inventory (local-only packs are warnings)
+        run: |
+          python - <<'PY'
+          from services.asset_health import audit_assets
+          report = audit_assets()
+          print(f"Graphics: {report['present']}/{report['expected']} installed; missing {report['missing']}")
+          for group, totals in report['groups'].items():
+              print(f"{group}: {totals['present']}/{totals['expected']}")
+          for issue in report["errors"]:
+              print("::error::" + issue)
+          if report["errors"]:
+              raise SystemExit(1)
+          if report["missing"]:
+              print("::warning::Optional/local-only graphical packs are absent from GitHub. "
+                    "Run /admin assets on the deployed bot to verify its own files.")
+          PY
       - name: Check Discord cog and slash command registration
         run: |
           python - <<'PY'
