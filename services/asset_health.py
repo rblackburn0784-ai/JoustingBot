@@ -101,6 +101,11 @@ def audit_assets(root: Path | None = None) -> dict:
         try:
             if found.stat().st_size > 50_000_000:
                 raise ValueError("image exceeds 50 MB")
+            # Pillow requires verify() immediately after Image.open().
+            # Metadata extraction/getchannel can consume the file pointer;
+            # verifying afterwards raises RuntimeError on valid PNG files.
+            with Image.open(found) as verification:
+                verification.verify()
             with Image.open(found) as img:
                 if img.format != "PNG":
                     raise ValueError("not PNG data")
@@ -120,8 +125,8 @@ def audit_assets(root: Path | None = None) -> dict:
                     # Name is red_knight_idle_left_01 etc.
                     pair = (components[0], components[-2])
                     idle_sizes[pair].add(img.size)
-                img.verify()
-        except (UnidentifiedImageError, OSError, ValueError, Image.DecompressionBombError) as exc:
+        except (UnidentifiedImageError, OSError, ValueError, SyntaxError,
+                RuntimeError, Image.DecompressionBombError) as exc:
             errors.append(f"{rel}: {exc}")
     for (colour, direction), sizes in idle_sizes.items():
         if len(sizes) > 1:
